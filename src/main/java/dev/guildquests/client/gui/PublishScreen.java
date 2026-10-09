@@ -23,6 +23,11 @@ public final class PublishScreen extends Screen {
         this.state = state;
     }
 
+    @Override
+    public boolean shouldPause() {
+        return false;
+    }
+
     /** Refreshes server-driven fields (balance) while keeping the wizard selections. */
     public void applyState(GuiState state) {
         this.state = state;

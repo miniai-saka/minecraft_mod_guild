@@ -27,6 +27,11 @@ public final class TransferScreen extends Screen {
         this.state = state;
     }
 
+    @Override
+    public boolean shouldPause() {
+        return false;
+    }
+
     public void applyState(GuiState state) {
         this.state = state;
         if (selectedUuid != null && find(selectedUuid) == null) selectedUuid = null;

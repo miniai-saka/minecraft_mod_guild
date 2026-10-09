@@ -26,6 +26,11 @@ public final class GuildScreen extends Screen {
         this.state = state;
     }
 
+    @Override
+    public boolean shouldPause() {
+        return false;
+    }
+
     /** Applies a refreshed state without closing the screen. */
     public void applyState(GuiState state) {
         this.state = state;

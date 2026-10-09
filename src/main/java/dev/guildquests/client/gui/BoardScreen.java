@@ -25,6 +25,11 @@ public final class BoardScreen extends Screen {
         this.state = state;
     }
 
+    @Override
+    public boolean shouldPause() {
+        return false;
+    }
+
     public void applyState(GuiState state) {
         this.state = state;
         clampPage();
