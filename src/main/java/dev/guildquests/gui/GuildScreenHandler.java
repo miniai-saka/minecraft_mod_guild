@@ -153,6 +153,11 @@ public final class GuildScreenHandler extends ScreenHandler {
                 "報酬を預けて誰かに達成してもらいましょう",
                 "クリックで公開ウィザードを開きます"),
                 (p, b, t) -> PublishQuestScreenHandler.open(p));
+        setAction(5, item(Items.LECTERN, "依頼クエスト掲示板",
+                "他のプレイヤーの依頼を表示します",
+                "左クリックで受注、自分の依頼は右クリックで取り消し",
+                "クリックで掲示板を開きます"),
+                (p, b, t) -> PublishedQuestBoardScreenHandler.open(p));
 
         for (int i = 0; i < Math.min(MAX_DAILY_SLOTS, board.size()); i++) {
             DailyQuest daily = board.get(i);
