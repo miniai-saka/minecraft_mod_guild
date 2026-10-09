@@ -148,15 +148,29 @@ public final class GuildNetwork {
         switch (parts[1]) {
             case "open" -> open(player, "publish");
             case "submit" -> {
-                if (parts.length < 6) {
+                if (parts.length < 3) {
                     warn(parts);
                     return;
                 }
-                QuestType type = "SUBMIT".equalsIgnoreCase(parts[2]) ? QuestType.SUBMIT : QuestType.KILL;
-                String target = parts[3];
-                int amount = parseInt(parts[4], 1);
-                long reward = parseLong(parts[5], 0);
-                GuildService.publishQuest(player, type, target, amount, reward);
+                StringBuilder json = new StringBuilder();
+                for (int i = 2; i < parts.length; i++) {
+                    if (i > 2) json.append('|');
+                    json.append(parts[i]);
+                }
+                try {
+                    PublishRequest req = NetCodec.GSON.fromJson(json.toString(), PublishRequest.class);
+                    if (req == null || req.target == null || req.target.isBlank()) {
+                        GuildService.message(player, "対象が指定されていません。", Formatting.YELLOW);
+                    } else {
+                        QuestType type = "SUBMIT".equalsIgnoreCase(req.type) ? QuestType.SUBMIT : QuestType.KILL;
+                        int amount = parseInt(req.amount, 1);
+                        long reward = parseLong(req.reward, 0);
+                        GuildService.publishQuest(player, type, req.target.trim(), amount, reward,
+                                req.title, req.description);
+                    }
+                } catch (RuntimeException e) {
+                    warn(parts);
+                }
                 sendState(player, "publish");
             }
             default -> warn(parts);

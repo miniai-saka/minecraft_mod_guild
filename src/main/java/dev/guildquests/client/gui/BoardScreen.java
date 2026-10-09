@@ -164,6 +164,7 @@ public final class BoardScreen extends Screen {
     private String tooltip(BoardRow row) {
         List<String> parts = new ArrayList<>();
         if (!row.objective.isBlank()) parts.add(row.objective);
+        if (row.description != null && !row.description.isBlank()) parts.add(row.description);
         parts.add("依頼者: " + row.publisherName);
         parts.add("報酬: " + row.reward + " コイン");
         if (row.taken && !row.takerName.isBlank()) parts.add("受注者: " + row.takerName);

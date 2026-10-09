@@ -25,6 +25,10 @@ public final class PublishedQuest {
     /** Null while open; set to the taker's uuid while taken. */
     public UUID takerId;
     public String takerName = "";
+    /** Custom quest title; blank = auto-generated ("依頼：討伐 …"). */
+    public String title = "";
+    /** Custom quest description; blank = default text. */
+    public String description = "";
 
     public PublishedQuest() {
     }
@@ -66,6 +70,8 @@ public final class PublishedQuest {
             def.title = "依頼：納品 " + itemNameSafe(target) + " × " + amount;
         }
         def.description = publisherName + " が発注した依頼クエスト";
+        if (title != null && !title.isBlank()) def.title = title;
+        if (description != null && !description.isBlank()) def.description = description;
         return def;
     }
 
@@ -103,6 +109,8 @@ public final class PublishedQuest {
         nbt.putBoolean("Taken", isTaken());
         nbt.putString("TakerId", takerId == null ? "" : takerId.toString());
         nbt.putString("TakerName", takerName == null ? "" : takerName);
+        nbt.putString("CustomTitle", title == null ? "" : title);
+        nbt.putString("CustomDescription", description == null ? "" : description);
         return nbt;
     }
 
@@ -127,6 +135,8 @@ public final class PublishedQuest {
             quest.takerId = null;
         }
         quest.takerName = nbt.getString("TakerName");
+        quest.title = nbt.getString("CustomTitle");
+        quest.description = nbt.getString("CustomDescription");
         return quest;
     }
 }

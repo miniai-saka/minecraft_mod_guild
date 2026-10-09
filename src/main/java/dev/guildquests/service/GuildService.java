@@ -120,9 +120,17 @@ public final class GuildService {
     // Player-published quests (bounty board)
     // ---------------------------------------------------------------------
 
+    /** Trims and length-caps a client-supplied free-text string (blank -> ""). */
+    private static String clampLength(String value, int maxChars) {
+        if (value == null) return "";
+        String trimmed = value.trim();
+        if (trimmed.length() <= maxChars) return trimmed;
+        return trimmed.substring(0, maxChars);
+    }
+
     /** Escrows the reward and publishes a quest on the shared board. */
     public static boolean publishQuest(ServerPlayerEntity player, QuestType type, String target,
-                                       int amount, long reward) {
+                                       int amount, long reward, String title, String description) {
         if (!ConfigManager.config().playerQuestsEnabled) {
             message(player, "公開クエスト機能は無効になっています。", Formatting.RED);
             return false;
@@ -163,6 +171,8 @@ public final class GuildService {
         quest.amount = amount;
         quest.reward = reward;
         quest.createdAtDay = Math.floorDiv(player.getServer().getOverworld().getTimeOfDay(), 24000L);
+        quest.title = clampLength(title, 100);
+        quest.description = clampLength(description, 300);
 
         data.coins -= reward;
         state.publishedQuests.add(quest);
