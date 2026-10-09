@@ -48,9 +48,20 @@ public final class ClientGui {
                     screen.applyState(state);
                 }
             }
-            // Screens for the remaining views are wired up as they land (GUI-D).
-            case "bank", "transfer" ->
-                    LOGGER.debug("GUI state for '{}' (open={}, not yet rendered)", state.view, state.openScreen);
+            case "bank" -> {
+                if (state.openScreen) {
+                    client.setScreen(new BankScreen(state));
+                } else if (client.currentScreen instanceof BankScreen screen) {
+                    screen.applyState(state);
+                }
+            }
+            case "transfer" -> {
+                if (state.openScreen) {
+                    client.setScreen(new TransferScreen(state));
+                } else if (client.currentScreen instanceof TransferScreen screen) {
+                    screen.applyState(state);
+                }
+            }
             default -> LOGGER.warn("GUI state with unknown view: {}", state.view);
         }
     }

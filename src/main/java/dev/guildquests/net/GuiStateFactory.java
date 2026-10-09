@@ -148,8 +148,7 @@ public final class GuiStateFactory {
         s.balance = data.coins;
         s.held = GuildService.countHeldCoins(player);
         s.feeWaived = feeWaived;
-        double pct = ConfigManager.config().bankFeePercent;
-        s.feePercent = pct == Math.floor(pct) ? String.valueOf((long) pct) : String.valueOf(pct);
+        s.feeRate = ConfigManager.config().bankFeePercent;
         s.paymentMode = GuildService.paymentMode(data);
         s.debt = data.debt;
         s.delinquent = data.delinquent;

@@ -43,7 +43,8 @@ public final class GuiState {
     // bank view
     // ------------------------------------------------------------------
     public boolean feeWaived;
-    public String feePercent = "";
+    /** Bank fee percentage (config.bankFeePercent). */
+    public double feeRate;
     public String paymentMode = "";
     public long debt;
     public boolean delinquent;
