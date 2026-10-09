@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "guildquests:block/guild_bank"
+    }
+  }
+}

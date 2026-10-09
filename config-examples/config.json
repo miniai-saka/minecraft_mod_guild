@@ -1,0 +1,20 @@
+{
+  "maxActiveQuests": 5,
+  "exploreCheckIntervalTicks": 20,
+  "dailyQuestCountMin": 1,
+  "dailyQuestCountMax": 4,
+  "exploreRandomRange": 3000,
+  "createIntegrationEnabled": true,
+  "bankFeePercent": 5.0,
+  "riboInstallment": 500,
+  "riboInterestPercent": 2.0,
+  "riboIntervalMinutes": 60,
+  "rankThresholds": {
+    "E": 0,
+    "D": 5,
+    "C": 15,
+    "B": 30,
+    "A": 50,
+    "S": 80
+  }
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "bread",
+    "title": "パン x16",
+    "item": "minecraft:bread",
+    "count": 16,
+    "price": 15,
+    "requiredCompleted": 0
+  },
+  {
+    "id": "arrows",
+    "title": "矢 x32",
+    "item": "minecraft:arrow",
+    "count": 32,
+    "price": 30,
+    "requiredCompleted": 0
+  },
+  {
+    "id": "iron",
+    "title": "鉄インゴット x8",
+    "item": "minecraft:iron_ingot",
+    "count": 8,
+    "price": 80,
+    "requiredCompleted": 5
+  },
+  {
+    "id": "diamond",
+    "title": "ダイヤモンド x1",
+    "item": "minecraft:diamond",
+    "count": 1,
+    "price": 180,
+    "requiredCompleted": 15
+  },
+  {
+    "id": "golden_apple",
+    "title": "金のリンゴ x1",
+    "item": "minecraft:golden_apple",
+    "count": 1,
+    "price": 220,
+    "requiredCompleted": 30
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "guildquests:guild_bank",
+    "guildquests:guild_deposit"
+  ]
+}

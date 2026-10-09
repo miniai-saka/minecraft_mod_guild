@@ -30,7 +30,7 @@ out/
 
 # Runtime / IDE
 run/
-dev/
+/dev/
 .idea/
 *.iml
 *.ipr
