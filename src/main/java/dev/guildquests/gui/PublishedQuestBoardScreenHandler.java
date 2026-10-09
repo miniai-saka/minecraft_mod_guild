@@ -156,7 +156,7 @@ public final class PublishedQuestBoardScreenHandler extends ScreenHandler {
 
         setAction(45, item(Items.ARROW, "戻る",
                 "ギルドメニューに戻ります"),
-                (p, b, t) -> GuildScreenHandler.openQuests(p));
+                (p, b, t) -> dev.guildquests.net.GuildNetwork.open(p, "guild"));
         setAction(49, item(Items.EMERALD, "クエストを公開",
                 "自分の依頼を掲示板に出します",
                 "クリックで公開ウィザードを開きます"),

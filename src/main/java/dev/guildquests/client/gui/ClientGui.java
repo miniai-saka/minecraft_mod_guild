@@ -22,14 +22,23 @@ public final class ClientGui {
     /** Invoked from the network thread; marshals onto the client thread. */
     public static void onState(GuiState state) {
         MinecraftClient client = MinecraftClient.getInstance();
-        client.execute(() -> {
-            switch (state.view) {
-                // Screens are wired up as they land on this branch (GUI-B..D).
-                case "guild", "board", "publish", "bank", "transfer" ->
-                        LOGGER.debug("GUI state for '{}' (open={}, not yet rendered)", state.view, state.openScreen);
-                default -> LOGGER.warn("GUI state with unknown view: {}", state.view);
+        client.execute(() -> apply(client, state));
+    }
+
+    private static void apply(MinecraftClient client, GuiState state) {
+        switch (state.view) {
+            case "guild" -> {
+                if (state.openScreen) {
+                    client.setScreen(new GuildScreen(state));
+                } else if (client.currentScreen instanceof GuildScreen screen) {
+                    screen.applyState(state);
+                }
             }
-        });
+            // Screens for the remaining views are wired up as they land (GUI-C/D).
+            case "board", "publish", "bank", "transfer" ->
+                    LOGGER.debug("GUI state for '{}' (open={}, not yet rendered)", state.view, state.openScreen);
+            default -> LOGGER.warn("GUI state with unknown view: {}", state.view);
+        }
     }
 
     /** Sends an action payload; no-op when the server does not run the mod. */
