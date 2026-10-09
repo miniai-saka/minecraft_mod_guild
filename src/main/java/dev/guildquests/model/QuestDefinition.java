@@ -16,8 +16,6 @@ public final class QuestDefinition {
     public int amountMin = 0;
     public int amountMax = 0;
     public long reward = 1;
-    /** Urgent quests may be mixed into the daily draw with a boosted reward. */
-    public boolean urgent = false;
 
     /** Total completed quests required before this quest can be accepted. */
     public int requiredCompleted = 0;

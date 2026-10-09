@@ -34,15 +34,6 @@ public final class ModConfig {
     /** Max health of the emergency boss. */
     public double bossEventHealth = 300;
 
-    /** Mix one urgent quest into the daily draw (red entry, boosted reward). */
-    public boolean urgentQuestEnabled = true;
-
-    /** Percent chance per in-game day that an urgent quest is drawn. 0..100. */
-    public int urgentQuestChance = 60;
-
-    /** Reward multiplier applied to urgent quests. Clamped to 1..100. */
-    public double urgentRewardMultiplier = 2.0;
-
     /** Allow players to publish their own quests (bounty board) with an escrowed reward. */
     public boolean playerQuestsEnabled = true;
 

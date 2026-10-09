@@ -14,10 +14,6 @@ public final class ActiveQuest {
     public double x;
     public double y;
     public double z;
-    /** Urgent quest accepted from today's board (boosted reward). */
-    public boolean urgent;
-    /** Reward locked at accept time for an urgent quest; 0 = use the definition reward. */
-    public long rewardOverride;
 
     public ActiveQuest(String questId, int progress) {
         this.questId = questId;
@@ -34,8 +30,6 @@ public final class ActiveQuest {
         nbt.putDouble("X", x);
         nbt.putDouble("Y", y);
         nbt.putDouble("Z", z);
-        nbt.putBoolean("Urgent", urgent);
-        nbt.putLong("RewardOverride", rewardOverride);
         return nbt;
     }
 
@@ -48,8 +42,6 @@ public final class ActiveQuest {
         quest.x = nbt.getDouble("X");
         quest.y = nbt.getDouble("Y");
         quest.z = nbt.getDouble("Z");
-        quest.urgent = nbt.getBoolean("Urgent");
-        quest.rewardOverride = Math.max(0, nbt.getLong("RewardOverride"));
         return quest;
     }
 }

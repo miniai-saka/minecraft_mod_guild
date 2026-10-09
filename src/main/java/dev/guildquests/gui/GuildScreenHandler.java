@@ -167,33 +167,32 @@ public final class GuildScreenHandler extends ScreenHandler {
             ActiveQuest active = data.findActive(quest.id);
             boolean locked = data.completedTotal < quest.requiredCompleted;
             boolean completedOneTime = !quest.repeatable && data.completedQuestIds.contains(quest.id);
-            long reward = daily.reward(quest.reward);
-            String title = daily.urgent ? "【緊急】" + quest.title : quest.title;
-            Formatting nameFormat = daily.urgent ? Formatting.RED : Formatting.WHITE;
+            long reward = quest.reward;
+            String title = quest.title;
 
             ItemStack icon;
             if (locked) {
-                icon = item(Items.BARRIER, nameFormat, "[LOCK] " + title,
+                icon = item(Items.BARRIER, "[LOCK] " + title,
                         quest.description,
                         "解放条件: 累計 " + quest.requiredCompleted + " 件達成",
                         dailyObjectiveLine(daily, quest),
-                        rewardLine(reward, daily.urgent, quest.reward));
+                        rewardLine(reward));
             } else if (completedOneTime) {
-                icon = item(Items.GRAY_DYE, nameFormat, "[達成済] " + title,
+                icon = item(Items.GRAY_DYE, "[達成済] " + title,
                         quest.description,
                         "このクエストは再受注できません。");
             } else if (active != null) {
                 int amount = GuildService.effectiveAmount(active, quest);
-                icon = questIcon(quest, nameFormat, "[受注中] " + title,
+                icon = questIcon(quest, "[受注中] " + title,
                         quest.description,
                         activeObjectiveLine(quest, active),
                         "進捗: " + active.progress + "/" + amount,
-                        rewardLine(reward, daily.urgent, quest.reward));
+                        rewardLine(reward));
             } else {
-                setAction(slot, questIcon(quest, nameFormat, title,
+                setAction(slot, questIcon(quest, title,
                         quest.description,
                         dailyObjectiveLine(daily, quest),
-                        rewardLine(reward, daily.urgent, quest.reward),
+                        rewardLine(reward),
                         "左クリックで受注"),
                         (p, b, t) -> {
                             if (b == 0) GuildService.acceptQuest(p, quest);
@@ -218,14 +217,13 @@ public final class GuildScreenHandler extends ScreenHandler {
             }
             boolean ready = active.progress >= GuildService.effectiveAmount(active, quest);
             int amount = GuildService.effectiveAmount(active, quest);
-            long reward = active.rewardOverride > 0 ? active.rewardOverride : quest.reward;
-            String title = active.urgent ? "【緊急】" + quest.title : quest.title;
-            Formatting nameFormat = active.urgent ? Formatting.RED : Formatting.WHITE;
-            ItemStack icon = item(ready ? Items.LIME_DYE : activeIcon(quest), nameFormat,
+            long reward = quest.reward;
+            String title = quest.title;
+            ItemStack icon = item(ready ? Items.LIME_DYE : activeIcon(quest),
                     (ready ? "[達成可能] " : "[進行中] ") + title,
                     activeObjectiveLine(quest, active),
                     "進捗: " + active.progress + "/" + amount,
-                    rewardLine(reward, active.urgent, quest.reward),
+                    rewardLine(reward),
                     quest.type == QuestType.SUBMIT && !ready ? "左クリック: 所持アイテムを納品" : "左クリック: 報酬を受け取る",
                     "右クリック: 破棄");
             setAction(slot, icon, (p, b, t) -> {
@@ -255,15 +253,8 @@ public final class GuildScreenHandler extends ScreenHandler {
         return item(activeIcon(quest), name, lore);
     }
 
-    private static ItemStack questIcon(QuestDefinition quest, Formatting nameFormat, String name, String... lore) {
-        return item(activeIcon(quest), nameFormat, name, lore);
-    }
-
-    /** Reward line, flagging the urgent boost against the base definition reward. */
-    private static String rewardLine(long reward, boolean urgent, long baseReward) {
-        if (urgent && reward > baseReward) {
-            return "報酬: " + reward + " コイン（緊急ボーナス: 通常 " + baseReward + "）";
-        }
+    /** Reward line for a board/active entry. */
+    private static String rewardLine(long reward) {
         return "報酬: " + reward + " コイン";
     }
 

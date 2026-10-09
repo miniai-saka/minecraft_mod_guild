@@ -13,21 +13,12 @@ public final class DailyQuest {
     public double x;
     public double y;
     public double z;
-    /** Urgent quest drawn for today (red board entry, boosted reward). */
-    public boolean urgent = false;
-    /** Boosted reward for an urgent quest; 0 = use the definition reward. */
-    public long rewardOverride = 0;
 
     public DailyQuest() {
     }
 
     public DailyQuest(String questId) {
         this.questId = questId;
-    }
-
-    /** Effective reward for this board entry. */
-    public long reward(long definitionReward) {
-        return rewardOverride > 0 ? rewardOverride : definitionReward;
     }
 
     public NbtCompound toNbt() {
@@ -39,8 +30,6 @@ public final class DailyQuest {
         nbt.putDouble("X", x);
         nbt.putDouble("Y", y);
         nbt.putDouble("Z", z);
-        nbt.putBoolean("Urgent", urgent);
-        nbt.putLong("RewardOverride", rewardOverride);
         return nbt;
     }
 
@@ -52,8 +41,6 @@ public final class DailyQuest {
         quest.x = nbt.getDouble("X");
         quest.y = nbt.getDouble("Y");
         quest.z = nbt.getDouble("Z");
-        quest.urgent = nbt.getBoolean("Urgent");
-        quest.rewardOverride = Math.max(0, nbt.getLong("RewardOverride"));
         return quest;
     }
 }

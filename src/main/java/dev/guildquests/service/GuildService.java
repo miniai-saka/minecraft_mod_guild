@@ -79,8 +79,6 @@ public final class GuildService {
         ActiveQuest active = new ActiveQuest(quest.id, 0);
         active.target = daily.target.isBlank() ? null : daily.target;
         active.amount = Math.max(1, daily.amount);
-        active.urgent = daily.urgent;
-        active.rewardOverride = daily.rewardOverride;
         if (daily.hasCoords) {
             active.randomCoords = true;
             active.x = daily.x;
@@ -102,8 +100,7 @@ public final class GuildService {
                     .append(formatCoords(active))
                     .append(" 半径 ").append((int) quest.radius).append("）");
         }
-        message(player, "クエスト「" + quest.title + "」を受注しました" + detail + "。"
-                + (daily.urgent ? "【緊急クエスト・報酬 " + daily.reward(quest.reward) + " コイン】" : ""), Formatting.GREEN);
+        message(player, "クエスト「" + quest.title + "」を受注しました" + detail + "。", Formatting.GREEN);
         return true;
     }
 
@@ -393,7 +390,7 @@ public final class GuildService {
         QuestDefinition quest = resolveQuest(player.getServer(), questId);
         if (active == null || quest == null || active.progress < effectiveAmount(active, quest)) return false;
 
-        long reward = active.rewardOverride > 0 ? active.rewardOverride : quest.reward;
+        long reward = quest.reward;
         long tribute = 0;
         if (data.delinquent && data.debt > 0 && reward > 0) {
             tribute = Math.min(reward, data.debt);
@@ -431,8 +428,7 @@ public final class GuildService {
                     + " コインはリボ返済に充当" + (reward > 0 ? "、残り " + reward + " コインは受け取り" : "")
                     + "（残債務 " + data.debt + "）", Formatting.GOLD);
         } else {
-            message(player, "クエスト「" + quest.title + "」達成！ +" + reward + " コイン"
-                    + (active.urgent ? "（緊急クエスト・報酬強化済み）" : ""), Formatting.GOLD);
+            message(player, "クエスト「" + quest.title + "」達成！ +" + reward + " コイン", Formatting.GOLD);
         }
         return true;
     }
@@ -769,33 +765,9 @@ public final class GuildService {
             for (int i = 0; i < count; i++) {
                 state.dailyBoard.add(drawDaily(pool.get(i), server));
             }
-            maybeDrawUrgent(server, state, config, pool, count);
         }
         expirePublishedQuests(server);
         state.markDirty();
-    }
-
-    /**
-     * Mixes one urgent quest into the daily board: a quest flagged "urgent" in quests.json,
-     * drawn with a boosted reward. Draws only when the daily chance roll passes and a
-     * flagged quest not already on the board exists.
-     */
-    private static void maybeDrawUrgent(MinecraftServer server, GuildPersistentState state, ModConfig config,
-                                        List<QuestDefinition> pool, int drawn) {
-        if (!config.urgentQuestEnabled || drawn >= 9) return;
-        if (RANDOM.nextInt(100) >= config.urgentQuestChance) return;
-
-        List<QuestDefinition> urgentPool = new ArrayList<>();
-        for (QuestDefinition quest : pool) {
-            if (quest.urgent && state.findDaily(quest.id) == null) urgentPool.add(quest);
-        }
-        if (urgentPool.isEmpty()) return;
-
-        QuestDefinition quest = urgentPool.get(RANDOM.nextInt(urgentPool.size()));
-        DailyQuest daily = drawDaily(quest, server);
-        daily.urgent = true;
-        daily.rewardOverride = Math.max(1, Math.round(quest.reward * config.urgentRewardMultiplier));
-        state.dailyBoard.add(daily);
     }
 
     /** Rolls today's concrete values for one quest definition. */
