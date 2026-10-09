@@ -148,6 +148,11 @@ public final class GuildScreenHandler extends ScreenHandler {
                 "送金先の選択・金額指定",
                 "手数料: 無料"),
                 (p, b, t) -> TransferScreenHandler.open(p));
+        setAction(3, item(Items.EMERALD, "クエストを公開",
+                "自分の依頼を掲示板に出します",
+                "報酬を預けて誰かに達成してもらいましょう",
+                "クリックで公開ウィザードを開きます"),
+                (p, b, t) -> PublishQuestScreenHandler.open(p));
 
         for (int i = 0; i < Math.min(MAX_DAILY_SLOTS, board.size()); i++) {
             DailyQuest daily = board.get(i);
@@ -157,30 +162,33 @@ public final class GuildScreenHandler extends ScreenHandler {
             ActiveQuest active = data.findActive(quest.id);
             boolean locked = data.completedTotal < quest.requiredCompleted;
             boolean completedOneTime = !quest.repeatable && data.completedQuestIds.contains(quest.id);
+            long reward = daily.reward(quest.reward);
+            String title = daily.urgent ? "【緊急】" + quest.title : quest.title;
+            Formatting nameFormat = daily.urgent ? Formatting.RED : Formatting.WHITE;
 
             ItemStack icon;
             if (locked) {
-                icon = item(Items.BARRIER, "[LOCK] " + quest.title,
+                icon = item(Items.BARRIER, nameFormat, "[LOCK] " + title,
                         quest.description,
                         "解放条件: 累計 " + quest.requiredCompleted + " 件達成",
                         dailyObjectiveLine(daily, quest),
-                        "報酬: " + quest.reward + " コイン");
+                        rewardLine(reward, daily.urgent, quest.reward));
             } else if (completedOneTime) {
-                icon = item(Items.GRAY_DYE, "[達成済] " + quest.title,
+                icon = item(Items.GRAY_DYE, nameFormat, "[達成済] " + title,
                         quest.description,
                         "このクエストは再受注できません。");
             } else if (active != null) {
                 int amount = GuildService.effectiveAmount(active, quest);
-                icon = questIcon(quest, "[受注中] " + quest.title,
+                icon = questIcon(quest, nameFormat, "[受注中] " + title,
                         quest.description,
                         activeObjectiveLine(quest, active),
                         "進捗: " + active.progress + "/" + amount,
-                        "報酬: " + quest.reward + " コイン");
+                        rewardLine(reward, daily.urgent, quest.reward));
             } else {
-                setAction(slot, questIcon(quest, quest.title,
+                setAction(slot, questIcon(quest, nameFormat, title,
                         quest.description,
                         dailyObjectiveLine(daily, quest),
-                        "報酬: " + quest.reward + " コイン",
+                        rewardLine(reward, daily.urgent, quest.reward),
                         "左クリックで受注"),
                         (p, b, t) -> {
                             if (b == 0) GuildService.acceptQuest(p, quest);
@@ -194,7 +202,7 @@ public final class GuildScreenHandler extends ScreenHandler {
         List<ActiveQuest> activeList = new ArrayList<>(data.activeQuests);
         for (int i = 0; i < Math.min(9, activeList.size()); i++) {
             ActiveQuest active = activeList.get(i);
-            QuestDefinition quest = ConfigManager.quest(active.questId);
+            QuestDefinition quest = GuildService.resolveQuest(owner.getServer(), active.questId);
             int slot = 36 + i;
             if (quest == null) {
                 setAction(slot, item(Items.BARRIER, "不明なクエスト: " + active.questId,
@@ -205,10 +213,14 @@ public final class GuildScreenHandler extends ScreenHandler {
             }
             boolean ready = active.progress >= GuildService.effectiveAmount(active, quest);
             int amount = GuildService.effectiveAmount(active, quest);
-            ItemStack icon = item(ready ? Items.LIME_DYE : activeIcon(quest),
-                    (ready ? "[達成可能] " : "[進行中] ") + quest.title,
+            long reward = active.rewardOverride > 0 ? active.rewardOverride : quest.reward;
+            String title = active.urgent ? "【緊急】" + quest.title : quest.title;
+            Formatting nameFormat = active.urgent ? Formatting.RED : Formatting.WHITE;
+            ItemStack icon = item(ready ? Items.LIME_DYE : activeIcon(quest), nameFormat,
+                    (ready ? "[達成可能] " : "[進行中] ") + title,
                     activeObjectiveLine(quest, active),
                     "進捗: " + active.progress + "/" + amount,
+                    rewardLine(reward, active.urgent, quest.reward),
                     quest.type == QuestType.SUBMIT && !ready ? "左クリック: 所持アイテムを納品" : "左クリック: 報酬を受け取る",
                     "右クリック: 破棄");
             setAction(slot, icon, (p, b, t) -> {
@@ -236,6 +248,18 @@ public final class GuildScreenHandler extends ScreenHandler {
 
     private static ItemStack questIcon(QuestDefinition quest, String name, String... lore) {
         return item(activeIcon(quest), name, lore);
+    }
+
+    private static ItemStack questIcon(QuestDefinition quest, Formatting nameFormat, String name, String... lore) {
+        return item(activeIcon(quest), nameFormat, name, lore);
+    }
+
+    /** Reward line, flagging the urgent boost against the base definition reward. */
+    private static String rewardLine(long reward, boolean urgent, long baseReward) {
+        if (urgent && reward > baseReward) {
+            return "報酬: " + reward + " コイン（緊急ボーナス: 通常 " + baseReward + "）";
+        }
+        return "報酬: " + reward + " コイン";
     }
 
     private static Item activeIcon(QuestDefinition quest) {
@@ -289,8 +313,12 @@ public final class GuildScreenHandler extends ScreenHandler {
     }
 
     private static ItemStack item(Item item, String name, String... lore) {
+        return item(item, Formatting.WHITE, name, lore);
+    }
+
+    private static ItemStack item(Item item, Formatting nameFormat, String name, String... lore) {
         ItemStack stack = new ItemStack(item);
-        stack.setCustomName(Text.literal(name).formatted(Formatting.WHITE));
+        stack.setCustomName(Text.literal(name).formatted(nameFormat));
         Text[] lines = new Text[lore.length];
         for (int i = 0; i < lore.length; i++) lines[i] = Text.literal(lore[i]).formatted(Formatting.GRAY);
         setLore(stack, lines);
