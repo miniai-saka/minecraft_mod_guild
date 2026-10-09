@@ -102,6 +102,16 @@ public final class GuildQuestsMod implements ModInitializer {
                         return 1;
                     }));
 
+            guildAdmin.then(CommandManager.literal("boss")
+                    .executes(context -> {
+                        boolean spawned = BossEvent.spawnNow(context.getSource().getServer());
+                        boolean result = spawned;
+                        context.getSource().sendFeedback(() -> Text.literal(result
+                                ? "Emergency boss spawned (chance roll skipped)."
+                                : "Boss spawn failed: no players online or a boss is already alive."), false);
+                        return spawned ? 1 : 0;
+                    }));
+
             var coins = CommandManager.literal("coins");
             coins.then(CommandManager.literal("set")
                     .then(CommandManager.argument("player", EntityArgumentType.player())

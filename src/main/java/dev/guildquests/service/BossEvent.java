@@ -108,23 +108,28 @@ public final class BossEvent {
         if (boss != null && !boss.isRemoved() && boss.isAlive()) return;
         int chance = Math.max(0, Math.min(100, config.bossEventChancePercent));
         if (RANDOM.nextInt(100) >= chance) return;
-        trySpawn(server);
+        spawnNow(server);
     }
 
-    private static void trySpawn(MinecraftServer server) {
+    /**
+     * Spawns the boss immediately with the normal placement rules (200-500 blocks from a
+     * random online player), skipping the chance roll. Returns false when a boss is already
+     * alive, no player is online, or the spawn could not be completed.
+     */
+    public static boolean spawnNow(MinecraftServer server) {
         ServerWorld world = server.getWorld(World.OVERWORLD);
-        if (world == null) return;
+        if (world == null) return false;
 
         for (Entity entity : world.iterateEntities()) {
             if (entity instanceof LivingEntity living && living.isAlive()
                     && living.getCommandTags().contains(BOSS_TAG)) {
                 adopt(living);
-                return;
+                return false;
             }
         }
 
         List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
-        if (players.isEmpty()) return;
+        if (players.isEmpty()) return false;
         ServerPlayerEntity anchor = players.get(RANDOM.nextInt(players.size()));
         double angle = RANDOM.nextDouble() * Math.PI * 2.0;
         double distance = 200 + RANDOM.nextDouble() * 300;
@@ -136,7 +141,7 @@ public final class BossEvent {
         int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING, x, z);
 
         EntityType<?> type = BOSSES.get(RANDOM.nextInt(BOSSES.size()));
-        if (!(type.create(world) instanceof MobEntity mob)) return;
+        if (!(type.create(world) instanceof MobEntity mob)) return false;
 
         ModConfig config = ConfigManager.config();
         String mobName = type.getName().getString();
@@ -161,6 +166,7 @@ public final class BossEvent {
         GuildService.broadcast(server, "緊急ボス【" + mobName + "】が出現！座標: (" + x + ", " + y + ", " + z
                 + ")  与えたダメージの割合で報酬 " + Math.max(0, config.bossEventReward)
                 + " コインを分配します。", Formatting.RED);
+        return true;
     }
 
     private static void equip(MobEntity mob) {
