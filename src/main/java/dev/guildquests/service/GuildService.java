@@ -287,7 +287,7 @@ public final class GuildService {
         if (changed) state.markDirty();
     }
 
-    private static void broadcast(MinecraftServer server, String text, Formatting formatting) {
+    public static void broadcast(MinecraftServer server, String text, Formatting formatting) {
         for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
             p.sendMessage(Text.literal("[Guild] ").formatted(Formatting.GOLD)
                     .append(Text.literal(text).formatted(formatting)), false);

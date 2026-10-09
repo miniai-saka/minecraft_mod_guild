@@ -8,6 +8,7 @@ import dev.guildquests.data.PlayerGuildData;
 import dev.guildquests.gui.BankScreenHandler;
 import dev.guildquests.gui.GuildScreenHandler;
 import dev.guildquests.item.ModItems;
+import dev.guildquests.service.BossEvent;
 import dev.guildquests.service.GuildService;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -36,6 +37,7 @@ public final class GuildQuestsMod implements ModInitializer {
         ConfigManager.loadAll();
         ModItems.register();
         ModBlocks.register();
+        BossEvent.init();
 
         ServerPlayNetworking.registerGlobalReceiver(OPEN_GUILD, (server, player, handler, buf, responseSender) ->
                 server.execute(() -> GuildScreenHandler.openQuests(player)));

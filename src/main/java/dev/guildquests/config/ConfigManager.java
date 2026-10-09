@@ -72,6 +72,10 @@ public final class ConfigManager {
         c.dailyQuestCountMax = Math.max(1, Math.min(9, c.dailyQuestCountMax));
         if (c.dailyQuestCountMax < c.dailyQuestCountMin) c.dailyQuestCountMax = c.dailyQuestCountMin;
         c.exploreRandomRange = Math.max(1, Math.min(100000, c.exploreRandomRange));
+        c.bossEventIntervalMinutes = Math.max(1, Math.min(1440, c.bossEventIntervalMinutes));
+        c.bossEventChancePercent = Math.max(0, Math.min(100, c.bossEventChancePercent));
+        c.bossEventReward = Math.max(0, c.bossEventReward);
+        c.bossEventHealth = Math.max(1, Math.min(100000, c.bossEventHealth));
         c.urgentQuestChance = Math.max(0, Math.min(100, c.urgentQuestChance));
         c.urgentRewardMultiplier = Math.max(1.0, Math.min(100.0, c.urgentRewardMultiplier));
         c.publishedQuestExpireDays = Math.max(0, Math.min(365, c.publishedQuestExpireDays));

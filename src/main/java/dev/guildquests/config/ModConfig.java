@@ -19,6 +19,21 @@ public final class ModConfig {
     /** Default half-size (blocks) of the random coordinate box when a quest sets coordRange = 0. */
     public int exploreRandomRange = 3000;
 
+    /** Emergency boss: allow the periodic spawn event. */
+    public boolean bossEventEnabled = true;
+
+    /** Real minutes between boss event rolls; counts only while a player is online. */
+    public int bossEventIntervalMinutes = 30;
+
+    /** Percent chance per roll that the boss actually spawns. Clamped to 0..100. */
+    public int bossEventChancePercent = 20;
+
+    /** Total coins split among players by damage share when the boss dies. */
+    public long bossEventReward = 100;
+
+    /** Max health of the emergency boss. */
+    public double bossEventHealth = 300;
+
     /** Mix one urgent quest into the daily draw (red entry, boosted reward). */
     public boolean urgentQuestEnabled = true;
 
