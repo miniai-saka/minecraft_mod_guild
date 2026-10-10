@@ -140,7 +140,7 @@ public final class TransferScreenHandler extends ScreenHandler {
             boolean selected = target != null && target.getUuid().equals(candidate.getUuid());
             String name = candidate.getName().getString();
             UUID id = candidate.getUuid();
-            setAction(9 + i, item(Items.PLAYER_HEAD, (selected ? "● " : "") + name,
+            setAction(9 + i, headItem(name, id, (selected ? "● " : "") + name,
                             selected ? "現在の送金先" : "クリックで送金先に選択",
                             "残高: " + GuildService.data(candidate).coins),
                     (p, b, t) -> {
@@ -194,10 +194,16 @@ public final class TransferScreenHandler extends ScreenHandler {
             return;
         }
         String name = target == null ? "未選択" : target.getName().getString();
-        setAction(slot, item(Items.PLAYER_HEAD, "送金先: " + name,
+        ItemStack head = target == null
+                ? item(Items.PLAYER_HEAD, "送金先: 未選択",
                         "左クリックで送金先を切り替え",
                         "オンライン: " + candidates.size() + "人",
-                        "下段の頭アイコンから直接選択も可能"),
+                        "下段の頭アイコンから直接選択も可能")
+                : headItem(target.getName().getString(), target.getUuid(), "送金先: " + name,
+                        "左クリックで送金先を切り替え",
+                        "オンライン: " + candidates.size() + "人",
+                        "下段の頭アイコンから直接選択も可能");
+        setAction(slot, head,
                 (p, b, t) -> {
                     if (b != 0) return;
                     List<ServerPlayerEntity> list = transferCandidates();
@@ -286,6 +292,19 @@ public final class TransferScreenHandler extends ScreenHandler {
 
     private static ItemStack item(Item item, String name, String... lore) {
         ItemStack stack = new ItemStack(item);
+        stack.setCustomName(Text.literal(name).formatted(Formatting.WHITE));
+        Text[] lines = new Text[lore.length];
+        for (int i = 0; i < lore.length; i++) lines[i] = Text.literal(lore[i]).formatted(Formatting.GRAY);
+        setLore(stack, lines);
+        return stack;
+    }
+
+    /** Player head showing the owner's skin (resolved client-side from the profile id). */
+    private static ItemStack headItem(String ownerName, UUID ownerId, String name, String... lore) {
+        ItemStack stack = new ItemStack(Items.PLAYER_HEAD);
+        NbtCompound skull = stack.getOrCreateSubNbt("SkullOwner");
+        skull.putString("Id", ownerId.toString());
+        skull.putString("Name", ownerName);
         stack.setCustomName(Text.literal(name).formatted(Formatting.WHITE));
         Text[] lines = new Text[lore.length];
         for (int i = 0; i < lore.length; i++) lines[i] = Text.literal(lore[i]).formatted(Formatting.GRAY);

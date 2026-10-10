@@ -4,7 +4,6 @@ import dev.guildquests.config.ConfigManager;
 import dev.guildquests.config.ModConfig;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -55,23 +54,16 @@ public final class BossEvent {
             EntityType.WITCH, EntityType.PILLAGER, EntityType.VINDICATOR,
             EntityType.EVOKER, EntityType.RAVAGER);
 
-    private static final Item[] WEAPONS = {
-            Items.WOODEN_SWORD, Items.STONE_SWORD, Items.IRON_SWORD, Items.GOLDEN_SWORD, Items.DIAMOND_SWORD,
-            Items.WOODEN_AXE, Items.STONE_AXE, Items.IRON_AXE, Items.GOLDEN_AXE, Items.DIAMOND_AXE};
+    /** Boss weapon: always diamond tier (sword or axe). */
+    private static final Item[] WEAPONS = {Items.DIAMOND_SWORD, Items.DIAMOND_AXE};
+
+    /** Full diamond armor, always all four slots. */
+    private static final Item[] ARMOR_SET = {
+            Items.DIAMOND_HELMET, Items.DIAMOND_CHESTPLATE,
+            Items.DIAMOND_LEGGINGS, Items.DIAMOND_BOOTS};
 
     private static final EquipmentSlot[] ARMOR_SLOTS = {
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
-
-    private static final Enchantment[] ARMOR_FAMILY = {
-            Enchantments.PROTECTION, Enchantments.FIRE_PROTECTION,
-            Enchantments.BLAST_PROTECTION, Enchantments.PROJECTILE_PROTECTION};
-    private static final Enchantment[] ARMOR_EXTRAS = {Enchantments.THORNS, Enchantments.UNBREAKING};
-    private static final Enchantment[] WEAPON_FAMILY = {
-            Enchantments.SHARPNESS, Enchantments.SMITE, Enchantments.BANE_OF_ARTHROPODS};
-    private static final Enchantment[] SWORD_EXTRAS = {
-            Enchantments.FIRE_ASPECT, Enchantments.KNOCKBACK, Enchantments.SWEEPING, Enchantments.UNBREAKING};
-    private static final Enchantment[] AXE_EXTRAS = {
-            Enchantments.FIRE_ASPECT, Enchantments.KNOCKBACK, Enchantments.UNBREAKING};
 
     private static int ticker;
     private static LivingEntity boss;
@@ -171,78 +163,28 @@ public final class BossEvent {
         return true;
     }
 
+    /** Equips the boss with a unified, always-full enchanted diamond set. */
     private static void equip(MobEntity mob) {
-        ItemStack weapon = new ItemStack(WEAPONS[RANDOM.nextInt(WEAPONS.length)]);
-        maybeEnchant(weapon, WEAPON_FAMILY, weapon.getItem() instanceof SwordItem ? SWORD_EXTRAS : AXE_EXTRAS);
+        Item weaponItem = WEAPONS[RANDOM.nextInt(WEAPONS.length)];
+        ItemStack weapon = new ItemStack(weaponItem);
+        weapon.addEnchantment(Enchantments.SHARPNESS, 5);
+        weapon.addEnchantment(Enchantments.FIRE_ASPECT, 2);
+        weapon.addEnchantment(Enchantments.UNBREAKING, 3);
+        if (weaponItem instanceof SwordItem) {
+            weapon.addEnchantment(Enchantments.KNOCKBACK, 2);
+            weapon.addEnchantment(Enchantments.SWEEPING, 2);
+        }
         mob.equipStack(EquipmentSlot.MAINHAND, weapon);
         mob.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0f);
-        for (EquipmentSlot slot : ARMOR_SLOTS) {
-            if (RANDOM.nextInt(100) < 75) {
-                mob.equipStack(slot, makeArmor(slot));
-            }
-            mob.setEquipmentDropChance(slot, 0f);
-        }
-    }
 
-    private static ItemStack makeArmor(EquipmentSlot slot) {
-        int tier = RANDOM.nextInt(5);
-        Item item = switch (slot) {
-            case HEAD -> switch (tier) {
-                case 0 -> Items.LEATHER_HELMET;
-                case 1 -> Items.CHAINMAIL_HELMET;
-                case 2 -> Items.GOLDEN_HELMET;
-                case 3 -> Items.IRON_HELMET;
-                default -> Items.DIAMOND_HELMET;
-            };
-            case CHEST -> switch (tier) {
-                case 0 -> Items.LEATHER_CHESTPLATE;
-                case 1 -> Items.CHAINMAIL_CHESTPLATE;
-                case 2 -> Items.GOLDEN_CHESTPLATE;
-                case 3 -> Items.IRON_CHESTPLATE;
-                default -> Items.DIAMOND_CHESTPLATE;
-            };
-            case LEGS -> switch (tier) {
-                case 0 -> Items.LEATHER_LEGGINGS;
-                case 1 -> Items.CHAINMAIL_LEGGINGS;
-                case 2 -> Items.GOLDEN_LEGGINGS;
-                case 3 -> Items.IRON_LEGGINGS;
-                default -> Items.DIAMOND_LEGGINGS;
-            };
-            default -> switch (tier) {
-                case 0 -> Items.LEATHER_BOOTS;
-                case 1 -> Items.CHAINMAIL_BOOTS;
-                case 2 -> Items.GOLDEN_BOOTS;
-                case 3 -> Items.IRON_BOOTS;
-                default -> Items.DIAMOND_BOOTS;
-            };
-        };
-        ItemStack stack = new ItemStack(item);
-        maybeEnchant(stack, ARMOR_FAMILY, ARMOR_EXTRAS);
-        return stack;
-    }
-
-    /** Rolls enchant presence randomly: ~40% of items stay unenchanted. */
-    private static void maybeEnchant(ItemStack stack, Enchantment[] family, Enchantment[] extras) {
-        if (RANDOM.nextInt(100) < 40) return;
-        Enchantment main = family[RANDOM.nextInt(family.length)];
-        stack.addEnchantment(main, 1 + RANDOM.nextInt(maxLevel(main)));
-        if (RANDOM.nextInt(100) < 50) {
-            Enchantment extra = extras[RANDOM.nextInt(extras.length)];
-            stack.addEnchantment(extra, 1 + RANDOM.nextInt(maxLevel(extra)));
+        for (int i = 0; i < ARMOR_SET.length; i++) {
+            ItemStack armor = new ItemStack(ARMOR_SET[i]);
+            armor.addEnchantment(Enchantments.PROTECTION, 4);
+            armor.addEnchantment(Enchantments.THORNS, 3);
+            armor.addEnchantment(Enchantments.UNBREAKING, 3);
+            mob.equipStack(ARMOR_SLOTS[i], armor);
+            mob.setEquipmentDropChance(ARMOR_SLOTS[i], 0f);
         }
-    }
-
-    private static int maxLevel(Enchantment enchantment) {
-        if (enchantment == Enchantments.PROTECTION || enchantment == Enchantments.FIRE_PROTECTION
-                || enchantment == Enchantments.BLAST_PROTECTION || enchantment == Enchantments.PROJECTILE_PROTECTION) {
-            return 4;
-        }
-        if (enchantment == Enchantments.SHARPNESS || enchantment == Enchantments.SMITE
-                || enchantment == Enchantments.BANE_OF_ARTHROPODS) return 5;
-        if (enchantment == Enchantments.UNBREAKING) return 3;
-        if (enchantment == Enchantments.THORNS || enchantment == Enchantments.FIRE_ASPECT
-                || enchantment == Enchantments.KNOCKBACK || enchantment == Enchantments.SWEEPING) return 2;
-        return 1;
     }
 
     private static void onDamage(LivingEntity entity, DamageSource source, float amount) {
