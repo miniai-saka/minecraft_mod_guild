@@ -14,6 +14,8 @@ import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.boss.BossBar;
 import net.minecraft.entity.boss.ServerBossBar;
 import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -310,6 +312,8 @@ public final class BossEvent {
         viewers.clear();
         bar = new ServerBossBar(Text.literal(bossName).formatted(Formatting.RED),
                 BossBar.Color.RED, BossBar.Style.PROGRESS);
+        // Always glowing so the emergency boss is easy to spot.
+        entity.addStatusEffect(new StatusEffectInstance(StatusEffects.GLOWING, Integer.MAX_VALUE, 0, false, false, false));
         if (boss.getHealth() > 0) {
             bar.setPercent(MathHelper.clamp(boss.getHealth() / boss.getMaxHealth(), 0f, 1f));
         }
