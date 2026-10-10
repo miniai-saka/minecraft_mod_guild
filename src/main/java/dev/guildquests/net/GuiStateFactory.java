@@ -5,10 +5,8 @@ import dev.guildquests.data.ActiveQuest;
 import dev.guildquests.data.DailyQuest;
 import dev.guildquests.data.GuildPersistentState;
 import dev.guildquests.data.PlayerGuildData;
-import dev.guildquests.data.PublishedQuest;
 import dev.guildquests.model.QuestDefinition;
 import dev.guildquests.model.QuestType;
-import dev.guildquests.net.GuiState.BoardRow;
 import dev.guildquests.net.GuiState.Candidate;
 import dev.guildquests.net.GuiState.QuestRow;
 import dev.guildquests.service.GuildService;
@@ -18,12 +16,9 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 
 /** Builds {@link GuiState} payloads for each view on the server thread. */
 public final class GuiStateFactory {
-    private static final int MAX_BOARD_ROWS = 27;
-
     private GuiStateFactory() {
     }
 
@@ -41,7 +36,6 @@ public final class GuiStateFactory {
         s.maxActive = ConfigManager.config().maxActiveQuests;
         s.dailyCount = state.dailyBoard.size();
         s.nextDraw = GuildService.formatGameTime(GuildService.ticksUntilNextDraw(server));
-        s.publishedCount = state.publishedQuests.size();
 
         for (DailyQuest daily : state.dailyBoard) {
             QuestDefinition quest = ConfigManager.quest(daily.questId);
@@ -102,44 +96,6 @@ public final class GuiStateFactory {
         return s;
     }
 
-    public static GuiState board(ServerPlayerEntity player) {
-        MinecraftServer server = player.getServer();
-        PlayerGuildData data = GuildService.data(player);
-        UUID me = player.getUuid();
-
-        GuiState s = new GuiState();
-        s.view = "board";
-        s.balance = data.coins;
-
-        List<PublishedQuest> quests = new ArrayList<>(GuildPersistentState.get(server).publishedQuests);
-        s.boardTotal = quests.size();
-        for (int i = 0; i < Math.min(MAX_BOARD_ROWS, quests.size()); i++) {
-            PublishedQuest quest = quests.get(i);
-            BoardRow row = new BoardRow();
-            row.boardId = quest.id;
-            row.questId = quest.questId();
-            row.title = quest.toDefinition().title;
-            row.description = quest.toDefinition().description;
-            row.publisherName = quest.publisherName;
-            row.reward = quest.reward;
-            row.createdAtDay = quest.createdAtDay;
-            row.taken = quest.isTaken();
-            if (quest.isTaken()) row.takerName = quest.takerName;
-            row.objective = quest.type == QuestType.KILL
-                    ? "討伐: " + GuildService.entityName(quest.target) + " × " + quest.amount
-                    : "納品: " + GuildService.itemName(quest.target) + " × " + quest.amount;
-
-            boolean own = me.equals(quest.publisherId);
-            boolean mine = me.equals(quest.takerId);
-            row.relation = own ? "own" : mine ? "mine" : quest.isTaken() ? "taken" : "open";
-            row.canAccept = !quest.isTaken() && !own && data.findActive(quest.questId()) == null;
-            row.canCancel = own && !quest.isTaken();
-            row.canAbandon = mine;
-            s.board.add(row);
-        }
-        return s;
-    }
-
     public static GuiState bank(ServerPlayerEntity player, boolean feeWaived) {
         PlayerGuildData data = GuildService.data(player);
 
@@ -180,19 +136,6 @@ public final class GuiStateFactory {
             candidate.balance = GuildService.data(other).coins;
             s.candidates.add(candidate);
         }
-        return s;
-    }
-
-    public static GuiState publish(ServerPlayerEntity player) {
-        PlayerGuildData data = GuildService.data(player);
-
-        GuiState s = new GuiState();
-        s.view = "publish";
-        s.balance = data.coins;
-        s.publishEnabled = ConfigManager.config().playerQuestsEnabled;
-        s.rewardMin = ConfigManager.config().publishedQuestRewardMin;
-        s.rewardMax = ConfigManager.config().publishedQuestRewardMax;
-        s.publishMaxPerPlayer = ConfigManager.config().publishedQuestMaxPerPlayer;
         return s;
     }
 

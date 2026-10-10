@@ -76,10 +76,6 @@ public final class ConfigManager {
         c.bossEventChancePercent = Math.max(0, Math.min(100, c.bossEventChancePercent));
         c.bossEventReward = Math.max(0, c.bossEventReward);
         c.bossEventHealth = Math.max(1, Math.min(100000, c.bossEventHealth));
-        c.publishedQuestExpireDays = Math.max(0, Math.min(365, c.publishedQuestExpireDays));
-        c.publishedQuestMaxPerPlayer = Math.max(1, Math.min(18, c.publishedQuestMaxPerPlayer));
-        c.publishedQuestRewardMin = Math.max(1, c.publishedQuestRewardMin);
-        c.publishedQuestRewardMax = Math.max(c.publishedQuestRewardMin, c.publishedQuestRewardMax);
         c.bankFeePercent = Math.max(0, Math.min(100, c.bankFeePercent));
         c.riboInstallment = Math.max(1, c.riboInstallment);
         c.riboInterestPercent = Math.max(0, Math.min(100, c.riboInterestPercent));

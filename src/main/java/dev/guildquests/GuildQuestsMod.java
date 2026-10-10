@@ -12,6 +12,7 @@ import dev.guildquests.service.GuildService;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.command.CommandManager;
@@ -34,6 +35,9 @@ public final class GuildQuestsMod implements ModInitializer {
         ModBlocks.register();
         BossEvent.init();
         GuildNetwork.initServer();
+
+        // The player-published quest (bounty board) system was removed; clean up old saves.
+        ServerLifecycleEvents.SERVER_STARTED.register(GuildService::purgePublishedQuests);
 
         ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, entity, killedEntity) -> {
             if (entity instanceof ServerPlayerEntity player) {

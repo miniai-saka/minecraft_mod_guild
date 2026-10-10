@@ -34,21 +34,6 @@ public final class ModConfig {
     /** Max health of the emergency boss. */
     public double bossEventHealth = 300;
 
-    /** Allow players to publish their own quests (bounty board) with an escrowed reward. */
-    public boolean playerQuestsEnabled = true;
-
-    /** In-game days before an untaken published quest expires (reward refunded). 0 disables. */
-    public int publishedQuestExpireDays = 3;
-
-    /** Maximum published quests per player (open + taken). */
-    public int publishedQuestMaxPerPlayer = 5;
-
-    /** Minimum reward for a published quest. */
-    public long publishedQuestRewardMin = 1;
-
-    /** Maximum reward for a published quest. */
-    public long publishedQuestRewardMax = 1000;
-
     /** Allow paying Create shops (table cloth price tags set to guild coins) from the virtual balance. */
     public boolean createIntegrationEnabled = true;
 

@@ -1,11 +1,7 @@
 package dev.guildquests.net;
 
 import dev.guildquests.GuildQuestsMod;
-import dev.guildquests.config.ConfigManager;
-import dev.guildquests.data.GuildPersistentState;
-import dev.guildquests.data.PublishedQuest;
 import dev.guildquests.model.QuestDefinition;
-import dev.guildquests.model.QuestType;
 import dev.guildquests.service.GuildService;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -41,11 +37,6 @@ public final class GuildNetwork {
 
     /** Opens a view on the client (fresh state, openScreen=true). */
     public static void open(ServerPlayerEntity player, String view) {
-        if ((view.equals("board") || view.equals("publish"))
-                && !ConfigManager.config().playerQuestsEnabled) {
-            GuildService.message(player, "公開クエスト機能は無効になっています。", Formatting.RED);
-            return;
-        }
         if (view.equals("bank")) BANK_FEE_WAIVED.put(player.getUuid(), false);
         push(player, view, true);
     }
@@ -73,10 +64,8 @@ public final class GuildNetwork {
     private static GuiState build(ServerPlayerEntity player, String view) {
         return switch (view) {
             case "guild" -> GuiStateFactory.guild(player);
-            case "board" -> GuiStateFactory.board(player);
             case "bank" -> GuiStateFactory.bank(player, feeWaived(player));
             case "transfer" -> GuiStateFactory.transfer(player);
-            case "publish" -> GuiStateFactory.publish(player);
             default -> null;
         };
     }
@@ -87,8 +76,6 @@ public final class GuildNetwork {
         if (parts.length < 2) return;
         switch (parts[0]) {
             case "guild" -> handleGuild(player, parts);
-            case "board" -> handleBoard(player, parts);
-            case "publish" -> handlePublish(player, parts);
             case "bank" -> handleBank(player, parts);
             case "transfer" -> handleTransfer(player, parts);
             default -> GuildQuestsMod.LOGGER.warn("Unknown GUI action view: {}", parts[0]);
@@ -114,64 +101,6 @@ public final class GuildNetwork {
             case "cancel" -> {
                 GuildService.cancelQuest(player, arg(parts, 2));
                 sendState(player, "guild");
-            }
-            default -> warn(parts);
-        }
-    }
-
-    private static void handleBoard(ServerPlayerEntity player, String[] parts) {
-        switch (parts[1]) {
-            case "open" -> open(player, "board");
-            case "accept" -> {
-                GuildService.acceptPublishedQuest(player, arg(parts, 2));
-                sendState(player, "board");
-            }
-            case "cancel" -> {
-                String id = arg(parts, 2);
-                PublishedQuest quest = GuildPersistentState.get(player.getServer()).findPublished(id);
-                if (quest == null) {
-                    GuildService.message(player, "その公開クエストは存在しません。", Formatting.YELLOW);
-                } else if (player.getUuid().equals(quest.publisherId)) {
-                    GuildService.cancelPublishedQuest(player, id);
-                } else if (player.getUuid().equals(quest.takerId)) {
-                    GuildService.cancelQuest(player, quest.questId());
-                } else {
-                    GuildService.message(player, "この依頼には関われません。", Formatting.RED);
-                }
-                sendState(player, "board");
-            }
-            default -> warn(parts);
-        }
-    }
-
-    private static void handlePublish(ServerPlayerEntity player, String[] parts) {
-        switch (parts[1]) {
-            case "open" -> open(player, "publish");
-            case "submit" -> {
-                if (parts.length < 3) {
-                    warn(parts);
-                    return;
-                }
-                StringBuilder json = new StringBuilder();
-                for (int i = 2; i < parts.length; i++) {
-                    if (i > 2) json.append('|');
-                    json.append(parts[i]);
-                }
-                try {
-                    PublishRequest req = NetCodec.GSON.fromJson(json.toString(), PublishRequest.class);
-                    if (req == null || req.target == null || req.target.isBlank()) {
-                        GuildService.message(player, "対象が指定されていません。", Formatting.YELLOW);
-                    } else {
-                        QuestType type = "SUBMIT".equalsIgnoreCase(req.type) ? QuestType.SUBMIT : QuestType.KILL;
-                        int amount = parseInt(req.amount, 1);
-                        long reward = parseLong(req.reward, 0);
-                        GuildService.publishQuest(player, type, req.target.trim(), amount, reward,
-                                req.title, req.description);
-                    }
-                } catch (RuntimeException e) {
-                    warn(parts);
-                }
-                sendState(player, "publish");
             }
             default -> warn(parts);
         }
@@ -244,14 +173,6 @@ public final class GuildNetwork {
     private static long parseLong(String text, long fallback) {
         try {
             return Long.parseLong(text);
-        } catch (NumberFormatException e) {
-            return fallback;
-        }
-    }
-
-    private static int parseInt(String text, int fallback) {
-        try {
-            return Integer.parseInt(text);
         } catch (NumberFormatException e) {
             return fallback;
         }

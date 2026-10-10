@@ -8,8 +8,9 @@ import net.minecraft.server.MinecraftServer;
 import java.util.UUID;
 
 /**
- * A quest published by a player (bounty board). The publisher escrows the reward from
- * their balance at publish time; the first taker who completes it receives the payout.
+ * Legacy model of a player-published quest (bounty board). The publishing feature was
+ * removed; this class is kept only so old saves can be loaded, purged, and refunded on
+ * startup (see GuildService.purgePublishedQuests).
  */
 public final class PublishedQuest {
     public String id = "";

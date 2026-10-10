@@ -42,26 +42,6 @@ public final class GuildPersistentState extends PersistentState {
         return null;
     }
 
-    /** Published quest by its raw id (without the "pub:" prefix), or null. */
-    public PublishedQuest findPublished(String id) {
-        for (PublishedQuest quest : publishedQuests) {
-            if (quest.id.equals(id)) {
-                return quest;
-            }
-        }
-        return null;
-    }
-
-    /** Published quest by the synthesized quest id ("pub:<id>"), or null. */
-    public PublishedQuest findByQuestId(String questId) {
-        for (PublishedQuest quest : publishedQuests) {
-            if (quest.isQuestId(questId)) {
-                return quest;
-            }
-        }
-        return null;
-    }
-
     @Override
     public NbtCompound writeNbt(NbtCompound nbt) {
         NbtCompound playersNbt = new NbtCompound();

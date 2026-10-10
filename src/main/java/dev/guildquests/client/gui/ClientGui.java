@@ -34,20 +34,6 @@ public final class ClientGui {
                     screen.applyState(state);
                 }
             }
-            case "board" -> {
-                if (state.openScreen) {
-                    client.setScreen(new BoardScreen(state));
-                } else if (client.currentScreen instanceof BoardScreen screen) {
-                    screen.applyState(state);
-                }
-            }
-            case "publish" -> {
-                if (state.openScreen) {
-                    client.setScreen(new PublishScreen(state));
-                } else if (client.currentScreen instanceof PublishScreen screen) {
-                    screen.applyState(state);
-                }
-            }
             case "bank" -> {
                 if (state.openScreen) {
                     client.setScreen(new BankScreen(state));

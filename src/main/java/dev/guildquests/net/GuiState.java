@@ -8,7 +8,7 @@ import java.util.List;
  * Only the fields relevant to {@link #view} are populated; the rest stay at defaults.
  */
 public final class GuiState {
-    /** One of: guild, board, publish, bank, transfer. */
+    /** One of: guild, bank, transfer. */
     public String view = "";
     /** true: the client should (re)open the screen; false: update it only when already open. */
     public boolean openScreen = false;
@@ -25,19 +25,12 @@ public final class GuiState {
     public int maxActive;
     public int dailyCount;
     public String nextDraw = "";
-    public int publishedCount;
 
     // ------------------------------------------------------------------
     // guild view
     // ------------------------------------------------------------------
     public List<QuestRow> daily = new ArrayList<>();
     public List<QuestRow> active = new ArrayList<>();
-
-    // ------------------------------------------------------------------
-    // board view
-    // ------------------------------------------------------------------
-    public int boardTotal;
-    public List<BoardRow> board = new ArrayList<>();
 
     // ------------------------------------------------------------------
     // bank view
@@ -58,14 +51,6 @@ public final class GuiState {
     // ------------------------------------------------------------------
     public List<Candidate> candidates = new ArrayList<>();
 
-    // ------------------------------------------------------------------
-    // publish view
-    // ------------------------------------------------------------------
-    public boolean publishEnabled;
-    public long rewardMin;
-    public long rewardMax;
-    public int publishMaxPerPlayer;
-
     public static final class QuestRow {
         public String questId = "";
         public String title = "";
@@ -81,24 +66,6 @@ public final class GuiState {
         /** Active SUBMIT quest that still needs items delivered. */
         public boolean canSubmit;
         public String lockReason = "";
-    }
-
-    public static final class BoardRow {
-        public String boardId = "";
-        public String questId = "";
-        public String title = "";
-        public String description = "";
-        public String publisherName = "";
-        public String takerName = "";
-        public String objective = "";
-        public long reward;
-        public long createdAtDay;
-        public boolean taken;
-        /** own (viewer is publisher) / mine (viewer is taker) / taken / open */
-        public String relation = "open";
-        public boolean canAccept;
-        public boolean canCancel;
-        public boolean canAbandon;
     }
 
     public static final class Candidate {

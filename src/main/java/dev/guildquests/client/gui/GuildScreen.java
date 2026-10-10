@@ -132,10 +132,10 @@ public final class GuildScreen extends Screen {
     }
 
     private void initNavBar() {
-        String[] labels = {"掲示板", "公開", "銀行", "送金", "更新", "閉じる"};
-        String[] actions = {"board|open", "publish|open", "bank|open", "transfer|open", "guild|open", null};
+        String[] labels = {"銀行", "送金", "更新", "閉じる"};
+        String[] actions = {"bank|open", "transfer|open", "guild|open", null};
         int navY = height - 24;
-        int buttonW = Math.min(66, (width - 16 - 5 * 4) / labels.length);
+        int buttonW = Math.min(66, (width - 16 - 3 * 4) / labels.length);
         for (int i = 0; i < labels.length; i++) {
             String action = actions[i];
             ButtonWidget button = ButtonWidget.builder(Text.literal(labels[i]), btn -> {
@@ -179,7 +179,6 @@ public final class GuildScreen extends Screen {
                 + " ｜ ランク: " + state.rank
                 + " ｜ 累計達成: " + state.completedTotal + " 件";
         String line2 = "同時受注: " + state.active.size() + "/" + state.maxActive
-                + " ｜ 公開中の依頼: " + state.publishedCount + " 件"
                 + " ｜ 次の抽選まで: " + state.nextDraw;
         context.drawTextWithShadow(textRenderer, line1, 8, 18, 0xFFD200);
         context.drawTextWithShadow(textRenderer, line2, 8, 30, 0xFFD200);

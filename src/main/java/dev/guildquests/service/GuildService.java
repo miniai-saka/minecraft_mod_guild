@@ -1,5 +1,6 @@
 package dev.guildquests.service;
 
+import dev.guildquests.GuildQuestsMod;
 import dev.guildquests.config.ConfigManager;
 import dev.guildquests.config.ModConfig;
 import dev.guildquests.data.ActiveQuest;
@@ -104,194 +105,50 @@ public final class GuildService {
         return true;
     }
 
-    /** Resolves a quest by id: config definitions first, then player-published quests. */
+    /** Resolves a quest by id from the config definitions. */
     public static QuestDefinition resolveQuest(MinecraftServer server, String questId) {
-        QuestDefinition def = ConfigManager.quest(questId);
-        if (def != null) return def;
-        PublishedQuest published = GuildPersistentState.get(server).findByQuestId(questId);
-        return published == null ? null : published.toDefinition();
-    }
-
-    private static boolean isPublishedId(String questId) {
-        return questId != null && questId.startsWith("pub:");
+        return ConfigManager.quest(questId);
     }
 
     // ---------------------------------------------------------------------
-    // Player-published quests (bounty board)
+    // Legacy cleanup: the player-published quest (bounty board) system was
+    // removed. On startup any leftover board entries are deleted, active
+    // "pub:" quests are dropped, and the escrowed rewards are refunded.
     // ---------------------------------------------------------------------
 
-    /** Trims and length-caps a client-supplied free-text string (blank -> ""). */
-    private static String clampLength(String value, int maxChars) {
-        if (value == null) return "";
-        String trimmed = value.trim();
-        if (trimmed.length() <= maxChars) return trimmed;
-        return trimmed.substring(0, maxChars);
-    }
-
-    /** Escrows the reward and publishes a quest on the shared board. */
-    public static boolean publishQuest(ServerPlayerEntity player, QuestType type, String target,
-                                       int amount, long reward, String title, String description) {
-        if (!ConfigManager.config().playerQuestsEnabled) {
-            message(player, "公開クエスト機能は無効になっています。", Formatting.RED);
-            return false;
-        }
-        if (target == null || target.isBlank()) {
-            message(player, "対象が指定されていません。", Formatting.YELLOW);
-            return false;
-        }
-        ModConfig config = ConfigManager.config();
-        reward = Math.max(config.publishedQuestRewardMin, Math.min(config.publishedQuestRewardMax, reward));
-        amount = Math.max(1, amount);
-
-        GuildPersistentState state = GuildPersistentState.get(player.getServer());
-        PlayerGuildData data = state.get(player.getUuid());
-
-        if (data.delinquent) {
-            riboLockMessage(player, data);
-            return false;
-        }
-        int own = 0;
-        for (PublishedQuest q : state.publishedQuests) {
-            if (player.getUuid().equals(q.publisherId)) own++;
-        }
-        if (own >= config.publishedQuestMaxPerPlayer) {
-            message(player, "公開中のクエストが上限です（" + config.publishedQuestMaxPerPlayer + " 件）。", Formatting.RED);
-            return false;
-        }
-        if (data.coins < reward) {
-            message(player, "報酬のエスクローに必要な残高が不足しています（必要: " + reward + " / 残高: " + data.coins + "）。", Formatting.RED);
-            return false;
-        }
-
-        PublishedQuest quest = new PublishedQuest(Long.toHexString(RANDOM.nextLong()) + Long.toHexString(System.nanoTime()));
-        quest.publisherId = player.getUuid();
-        quest.publisherName = player.getName().getString();
-        quest.type = type;
-        quest.target = target;
-        quest.amount = amount;
-        quest.reward = reward;
-        quest.createdAtDay = Math.floorDiv(player.getServer().getOverworld().getTimeOfDay(), 24000L);
-        quest.title = clampLength(title, 100);
-        quest.description = clampLength(description, 300);
-
-        data.coins -= reward;
-        state.publishedQuests.add(quest);
-        state.markDirty();
-
-        message(player, "クエスト「" + quest.toDefinition().title + "」を公開しました（報酬 " + reward
-                + " コインを預託、残高 " + data.coins + "）。", Formatting.GREEN);
-        broadcast(player.getServer(), player.getName().getString() + " が新しい依頼クエストを公開しました: "
-                + quest.toDefinition().title, Formatting.AQUA);
-        return true;
-    }
-
-    /** Publisher cancels an untaken quest and gets the escrow back. */
-    public static boolean cancelPublishedQuest(ServerPlayerEntity player, String id) {
-        GuildPersistentState state = GuildPersistentState.get(player.getServer());
-        PublishedQuest quest = state.findPublished(id);
-        if (quest == null) {
-            message(player, "その公開クエストは存在しません。", Formatting.YELLOW);
-            return false;
-        }
-        if (!player.getUuid().equals(quest.publisherId)) {
-            message(player, "自分の公開クエストのみ取り消せます。", Formatting.RED);
-            return false;
-        }
-        if (quest.isTaken()) {
-            message(player, "すでに受注されているため取り消せません（受注者が破棄すれば戻ります）。", Formatting.YELLOW);
-            return false;
-        }
-        refundEscrow(player.getServer(), quest);
-        state.publishedQuests.remove(quest);
-        state.markDirty();
-        message(player, "公開クエストを取り消し、報酬 " + quest.reward + " コインを返金しました。", Formatting.GRAY);
-        return true;
-    }
-
-    /** First taker accepts a published quest; progress is tracked like a normal quest. */
-    public static boolean acceptPublishedQuest(ServerPlayerEntity player, String id) {
-        GuildPersistentState state = GuildPersistentState.get(player.getServer());
-        PlayerGuildData data = state.get(player.getUuid());
-        PublishedQuest quest = state.findPublished(id);
-        if (quest == null) {
-            message(player, "その公開クエストは存在しません。", Formatting.YELLOW);
-            return false;
-        }
-        if (quest.isTaken()) {
-            message(player, "すでに他のプレイヤーが受注しています。", Formatting.YELLOW);
-            return false;
-        }
-        if (player.getUuid().equals(quest.publisherId)) {
-            message(player, "自分の公開クエストは受注できません。", Formatting.YELLOW);
-            return false;
-        }
-        if (data.findActive(quest.questId()) != null) {
-            message(player, "そのクエストは既に受注中です。", Formatting.YELLOW);
-            return false;
-        }
-        if (data.activeQuests.size() >= ConfigManager.config().maxActiveQuests) {
-            message(player, "同時受注数の上限に達しています。", Formatting.RED);
-            return false;
-        }
-
-        quest.takerId = player.getUuid();
-        quest.takerName = player.getName().getString();
-        ActiveQuest active = new ActiveQuest(quest.questId(), 0);
-        active.target = quest.target;
-        active.amount = quest.amount;
-        data.activeQuests.add(active);
-        state.markDirty();
-
-        message(player, "依頼クエスト「" + quest.toDefinition().title + "」を受注しました（依頼者: " + quest.publisherName + "）。", Formatting.GREEN);
-        ServerPlayerEntity publisher = player.getServer().getPlayerManager().getPlayer(quest.publisherId);
-        if (publisher != null) {
-            message(publisher, "あなたの公開クエスト「" + quest.toDefinition().title + "」を "
-                    + player.getName().getString() + " が受注しました。", Formatting.AQUA);
-        }
-        return true;
-    }
-
-    /** Taker abandons a published quest: it returns to the open board with progress reset. */
-    private static boolean releasePublishedQuest(ServerPlayerEntity player, String questId) {
-        GuildPersistentState state = GuildPersistentState.get(player.getServer());
-        PublishedQuest quest = state.findByQuestId(questId);
-        if (quest == null) return false;
-        quest.takerId = null;
-        quest.takerName = "";
-        state.markDirty();
-        message(player, "依頼を破棄しました。クエストは掲示板に戻ります。", Formatting.GRAY);
-        ServerPlayerEntity publisher = player.getServer().getPlayerManager().getPlayer(quest.publisherId);
-        if (publisher != null) {
-            message(publisher, "公開クエスト「" + quest.toDefinition().title + "」の受注者が破棄しました。再び受注可能になります。", Formatting.YELLOW);
-        }
-        return true;
-    }
-
-    private static void refundEscrow(MinecraftServer server, PublishedQuest quest) {
-        if (quest.publisherId == null) return;
-        creditCoins(server, quest.publisherId, quest.reward);
-        ServerPlayerEntity publisher = server.getPlayerManager().getPlayer(quest.publisherId);
-        if (publisher != null) {
-            message(publisher, "公開クエストの預託分 " + quest.reward + " コインが返金されました。", Formatting.AQUA);
-        }
-    }
-
-    /** Expires untaken published quests on day rollover and refunds the escrow. */
-    public static void expirePublishedQuests(MinecraftServer server) {
-        int expireDays = ConfigManager.config().publishedQuestExpireDays;
-        if (expireDays <= 0) return;
+    /** Refunds and clears all leftover player-published quests (bounty board removal). */
+    public static void purgePublishedQuests(MinecraftServer server) {
         GuildPersistentState state = GuildPersistentState.get(server);
-        long day = Math.floorDiv(server.getOverworld().getTimeOfDay(), 24000L);
-        boolean changed = false;
-        for (int i = state.publishedQuests.size() - 1; i >= 0; i--) {
-            PublishedQuest quest = state.publishedQuests.get(i);
-            if (quest.isTaken()) continue;
-            if (day - quest.createdAtDay < expireDays) continue;
-            refundEscrow(server, quest);
-            state.publishedQuests.remove(i);
-            changed = true;
+        if (state.publishedQuests.isEmpty()) {
+            // Still drop any stray active pub:* quests from older saves.
+            boolean stray = false;
+            for (PlayerGuildData data : state.players().values()) {
+                for (int i = data.activeQuests.size() - 1; i >= 0; i--) {
+                    String id = data.activeQuests.get(i).questId;
+                    if (id != null && id.startsWith("pub:")) {
+                        data.activeQuests.remove(i);
+                        stray = true;
+                    }
+                }
+            }
+            if (stray) state.markDirty();
+            return;
         }
-        if (changed) state.markDirty();
+
+        int count = state.publishedQuests.size();
+        for (PublishedQuest quest : new ArrayList<>(state.publishedQuests)) {
+            for (PlayerGuildData data : state.players().values()) {
+                ActiveQuest active = data.findActive(quest.questId());
+                if (active != null) data.activeQuests.remove(active);
+            }
+            if (quest.publisherId != null && quest.reward > 0) {
+                PlayerGuildData publisher = state.get(quest.publisherId);
+                publisher.coins = safeAdd(publisher.coins, quest.reward);
+            }
+        }
+        state.publishedQuests.clear();
+        state.markDirty();
+        GuildQuestsMod.LOGGER.info("Removed {} player-published quests (escrowed rewards refunded).", count);
     }
 
     public static void broadcast(MinecraftServer server, String text, Formatting formatting) {
@@ -306,11 +163,6 @@ public final class GuildService {
         PlayerGuildData data = state.get(player.getUuid());
         ActiveQuest active = data.findActive(questId);
         if (active == null) return false;
-        if (isPublishedId(questId) && releasePublishedQuest(player, questId)) {
-            data.activeQuests.remove(active);
-            state.markDirty();
-            return true;
-        }
         data.activeQuests.remove(active);
         state.markDirty();
         QuestDefinition quest = resolveQuest(player.getServer(), questId);
@@ -418,19 +270,6 @@ public final class GuildService {
         data.completedTotal++;
         data.completedQuestIds.add(quest.id);
         data.activeQuests.remove(active);
-
-        // Published quests: the escrowed reward is paid out and the quest leaves the board.
-        if (isPublishedId(questId)) {
-            PublishedQuest published = state.findByQuestId(questId);
-            if (published != null) {
-                state.publishedQuests.remove(published);
-                ServerPlayerEntity publisher = player.getServer().getPlayerManager().getPlayer(published.publisherId);
-                if (publisher != null) {
-                    message(publisher, "あなたの公開クエスト「" + published.toDefinition().title + "」が "
-                            + player.getName().getString() + " に達成されました。", Formatting.AQUA);
-                }
-            }
-        }
         state.markDirty();
 
         if (tribute > 0) {
@@ -776,7 +615,6 @@ public final class GuildService {
                 state.dailyBoard.add(drawDaily(pool.get(i), server));
             }
         }
-        expirePublishedQuests(server);
         state.markDirty();
     }
 
