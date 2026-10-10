@@ -15,6 +15,7 @@ import net.minecraft.entity.boss.ServerBossBar;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -39,7 +40,7 @@ import java.util.UUID;
 
 /**
  * Emergency boss event: while players are online, every configured interval a chance roll
- * spawns a buffed random overworld hostile mob 100-200 blocks from a random player, shown on
+ * spawns a buffed random overworld hostile mob 50-100 blocks from a random player, shown on
  * a boss bar. On death the configured reward is split among players by damage share.
  */
 public final class BossEvent {
@@ -69,6 +70,8 @@ public final class BossEvent {
     private static LivingEntity boss;
     private static ServerBossBar bar;
     private static String bossName = "";
+    private static ArmorStandEntity marker;
+    private static int markerLife;
     private static final Map<UUID, ServerPlayerEntity> viewers = new HashMap<>();
     private static final Map<UUID, Double> damage = new HashMap<>();
     private static final Map<UUID, String> damageNames = new HashMap<>();
@@ -95,6 +98,12 @@ public final class BossEvent {
         if (anyoneOnline) ticker++;
         updateBar(server);
 
+        // Tick down and remove the temporary boss marker.
+        if (marker != null && !marker.isRemoved()) {
+            if (markerLife > 0) markerLife--;
+            if (markerLife <= 0) marker.discard();
+        }
+
         int interval = Math.max(1, Math.min(1440, config.bossEventIntervalMinutes)) * TICKS_PER_MINUTE;
         if (ticker < interval) return;
         ticker = 0;
@@ -106,7 +115,7 @@ public final class BossEvent {
     }
 
     /**
-     * Spawns the boss immediately with the normal placement rules (100-200 blocks from a
+     * Spawns the boss immediately with the normal placement rules (50-100 blocks from a
      * random online player), skipping the chance roll. Returns false when a boss is already
      * alive, no player is online, or the spawn could not be completed.
      */
@@ -126,7 +135,7 @@ public final class BossEvent {
         if (players.isEmpty()) return false;
         ServerPlayerEntity anchor = players.get(RANDOM.nextInt(players.size()));
         double angle = RANDOM.nextDouble() * Math.PI * 2.0;
-        double distance = 100 + RANDOM.nextDouble() * 100;
+        double distance = 50 + RANDOM.nextDouble() * 50;
         int x = MathHelper.clamp((int) Math.floor(anchor.getX() + Math.cos(angle) * distance),
                 -29999000, 29999000);
         int z = MathHelper.clamp((int) Math.floor(anchor.getZ() + Math.sin(angle) * distance),
@@ -153,6 +162,19 @@ public final class BossEvent {
         mob.setHealth((float) health);
         equip(mob);
         world.spawnEntity(mob);
+
+        // Spawn a temporary glowing marker at the boss location (like apoticiousisMOD waypoints).
+        if (marker != null && !marker.isRemoved()) marker.discard();
+        marker = new ArmorStandEntity(world, x + 0.5, y, z + 0.5);
+        marker.setCustomName(Text.literal("☠ ボスポイント ☠").formatted(Formatting.RED, Formatting.BOLD));
+        marker.setCustomNameVisible(true);
+        marker.setInvisible(true);
+        marker.addCommandTag("guildquests_marker");
+        marker.setGlowing(true);
+        marker.setInvulnerable(true);
+        marker.setNoGravity(true);
+        world.spawnEntity(marker);
+        markerLife = 6000; // 5 minutes
 
         damage.clear();
         damageNames.clear();
@@ -199,6 +221,7 @@ public final class BossEvent {
         if (!entity.getCommandTags().contains(BOSS_TAG)) return;
         MinecraftServer server = entity.getWorld().getServer();
         if (server == null) return;
+        if (marker != null && !marker.isRemoved()) marker.discard();
         payout(server, bossName.isEmpty() ? entity.getDisplayName().getString() : bossName);
     }
 

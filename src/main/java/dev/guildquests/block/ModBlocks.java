@@ -35,15 +35,11 @@ public final class ModBlocks {
     public static void register() {
         Identifier bankId = new Identifier(GuildQuestsMod.MOD_ID, "guild_bank");
         Registry.register(Registries.BLOCK, bankId, GUILD_BANK);
-        BlockItem bankItem = new BlockItem(GUILD_BANK, new Item.Settings());
-        Registry.register(Registries.ITEM, bankId, bankItem);
-        ModItems.addItemToTab(bankItem);
+        Registry.register(Registries.ITEM, bankId, new BlockItem(GUILD_BANK, new Item.Settings()));
 
         Identifier depositId = new Identifier(GuildQuestsMod.MOD_ID, "guild_deposit");
         Registry.register(Registries.BLOCK, depositId, GUILD_DEPOSIT);
         Registry.register(Registries.BLOCK_ENTITY_TYPE, depositId, GUILD_DEPOSIT_BE);
-        BlockItem depositItem = new BlockItem(GUILD_DEPOSIT, new Item.Settings());
-        Registry.register(Registries.ITEM, depositId, depositItem);
-        ModItems.addItemToTab(depositItem);
+        Registry.register(Registries.ITEM, depositId, new BlockItem(GUILD_DEPOSIT, new Item.Settings()));
     }
 }
