@@ -1,6 +1,6 @@
 package dev.guildquests.block;
 
-import dev.guildquests.net.GuildNetwork;
+import dev.guildquests.gui.BankScreenHandler;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.ShapeContext;
@@ -26,7 +26,7 @@ public class GuildBankBlock extends Block {
     @Override
     public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
         if (world instanceof ServerWorld && player instanceof ServerPlayerEntity serverPlayer) {
-            GuildNetwork.openBank(serverPlayer, true);
+            BankScreenHandler.openFromBlock(serverPlayer);
             return ActionResult.SUCCESS;
         }
         return ActionResult.SUCCESS;
