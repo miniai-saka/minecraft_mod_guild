@@ -4,6 +4,7 @@ import dev.guildquests.config.ConfigManager;
 import dev.guildquests.config.ModConfig;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.Entity;
@@ -22,7 +23,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.SwordItem;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.packet.s2c.play.CustomPayloadS2CPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -185,9 +185,9 @@ public final class BossEvent {
         return true;
     }
 
-    /** Sends a JourneyMap waypoint packet to the given player. No-op if JourneyMap is absent. */
+    /** Sends a JourneyMap waypoint packet to the given player (Fabric networking API). */
     private static void createWaypoint(ServerPlayerEntity player, int x, int y, int z) {
-        if (player.networkHandler == null) return;
+        if (!ServerPlayNetworking.canSend(player, JOURNEYMAP_WAYPOINT_CHANNEL)) return;
         String dimension = player.getWorld().getRegistryKey().getValue().toString();
         String json = "{\"id\":\"" + BOSS_WAYPOINT_NAME + "_" + x + "," + y + "," + z + "\","
                 + "\"name\":\"" + BOSS_WAYPOINT_NAME + "\","
@@ -199,24 +199,22 @@ public final class BossEvent {
                 + "\"r\":255,\"g\":0,\"b\":0,"
                 + "\"persistent\":false,"
                 + "\"dimensions\":[\"" + dimension + "\"]}";
-        PacketByteBuf buf = new PacketByteBuf(io.netty.buffer.Unpooled.buffer());
-        buf.writeByte(0);
+        PacketByteBuf buf = PacketByteBufs.create();
         buf.writeString(json);
         buf.writeString("create");
         buf.writeBoolean(false);
-        player.networkHandler.sendPacket(new CustomPayloadS2CPacket(JOURNEYMAP_WAYPOINT_CHANNEL, buf));
+        ServerPlayNetworking.send(player, JOURNEYMAP_WAYPOINT_CHANNEL, buf);
     }
 
     /** Removes the boss waypoint from the given player's JourneyMap. */
     private static void deleteWaypoint(ServerPlayerEntity player) {
-        if (player.networkHandler == null) return;
+        if (!ServerPlayNetworking.canSend(player, JOURNEYMAP_WAYPOINT_CHANNEL)) return;
         String json = "{\"name\":\"" + BOSS_WAYPOINT_NAME + "\",\"origin\":\"external\"}";
-        PacketByteBuf buf = new PacketByteBuf(io.netty.buffer.Unpooled.buffer());
-        buf.writeByte(0);
+        PacketByteBuf buf = PacketByteBufs.create();
         buf.writeString(json);
         buf.writeString("delete");
         buf.writeBoolean(false);
-        player.networkHandler.sendPacket(new CustomPayloadS2CPacket(JOURNEYMAP_WAYPOINT_CHANNEL, buf));
+        ServerPlayNetworking.send(player, JOURNEYMAP_WAYPOINT_CHANNEL, buf);
     }
 
     /** Equips the boss with a unified, always-full enchanted diamond set. */
