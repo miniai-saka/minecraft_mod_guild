@@ -31,6 +31,7 @@ public class GuildDepositBlockEntity extends BlockEntity implements SidedInvento
     private int tickCounter;
     private long lastNoticeAt = -100;
     private long unnotifiedCoins;
+    private boolean notifyOnDeposit = true;
 
     public GuildDepositBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlocks.GUILD_DEPOSIT_BE, pos, state);
@@ -47,6 +48,15 @@ public class GuildDepositBlockEntity extends BlockEntity implements SidedInvento
     public void setOwner(UUID id, String name) {
         this.ownerId = id;
         this.ownerName = name == null ? "" : name;
+        markDirty();
+    }
+
+    public boolean isNotifyOnDeposit() {
+        return notifyOnDeposit;
+    }
+
+    public void setNotifyOnDeposit(boolean notifyOnDeposit) {
+        this.notifyOnDeposit = notifyOnDeposit;
         markDirty();
     }
 
@@ -75,7 +85,7 @@ public class GuildDepositBlockEntity extends BlockEntity implements SidedInvento
         GuildService.creditCoins(server, be.ownerId, count);
         be.unnotifiedCoins += count;
 
-        if (world.getTime() - be.lastNoticeAt >= 100 && be.unnotifiedCoins > 0) {
+        if (be.notifyOnDeposit && world.getTime() - be.lastNoticeAt >= 100 && be.unnotifiedCoins > 0) {
             ServerPlayerEntity owner = server.getPlayerManager().getPlayer(be.ownerId);
             if (owner != null) {
                 GuildService.message(owner, be.unnotifiedCoins
@@ -180,6 +190,7 @@ public class GuildDepositBlockEntity extends BlockEntity implements SidedInvento
             nbt.putUuid("OwnerId", ownerId);
         }
         nbt.putString("OwnerName", ownerName);
+        nbt.putBoolean("NotifyOnDeposit", notifyOnDeposit);
         Inventories.writeNbt(nbt, inventory);
     }
 
@@ -188,6 +199,7 @@ public class GuildDepositBlockEntity extends BlockEntity implements SidedInvento
         super.readNbt(nbt);
         ownerId = nbt.contains("OwnerId") ? nbt.getUuid("OwnerId") : null;
         ownerName = nbt.getString("OwnerName");
+        notifyOnDeposit = !nbt.contains("NotifyOnDeposit") || nbt.getBoolean("NotifyOnDeposit");
         inventory.clear();
         Inventories.readNbt(nbt, inventory);
     }

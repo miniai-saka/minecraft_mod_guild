@@ -1,5 +1,6 @@
 package dev.guildquests.block;
 
+import dev.guildquests.gui.DepositSettingsScreenHandler;
 import dev.guildquests.item.ModItems;
 import dev.guildquests.service.GuildService;
 import net.minecraft.block.Block;
@@ -73,7 +74,7 @@ public class GuildDepositBlock extends BlockWithEntity {
             GuildService.message(serverPlayer, "設置者のみ利用できます（設置者: " + be.getOwnerName() + "）。", Formatting.YELLOW);
             return ActionResult.SUCCESS;
         }
-        GuildService.depositHeldCoinsTo(serverPlayer, be.getOwnerId(), be.getOwnerName());
+        DepositSettingsScreenHandler.open(serverPlayer, be);
         return ActionResult.SUCCESS;
     }
 

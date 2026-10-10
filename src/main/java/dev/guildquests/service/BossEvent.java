@@ -39,7 +39,7 @@ import java.util.UUID;
 
 /**
  * Emergency boss event: while players are online, every configured interval a chance roll
- * spawns a buffed random overworld hostile mob 200-500 blocks from a random player, shown on
+ * spawns a buffed random overworld hostile mob 100-200 blocks from a random player, shown on
  * a boss bar. On death the configured reward is split among players by damage share.
  */
 public final class BossEvent {
@@ -106,7 +106,7 @@ public final class BossEvent {
     }
 
     /**
-     * Spawns the boss immediately with the normal placement rules (200-500 blocks from a
+     * Spawns the boss immediately with the normal placement rules (100-200 blocks from a
      * random online player), skipping the chance roll. Returns false when a boss is already
      * alive, no player is online, or the spawn could not be completed.
      */
@@ -126,7 +126,7 @@ public final class BossEvent {
         if (players.isEmpty()) return false;
         ServerPlayerEntity anchor = players.get(RANDOM.nextInt(players.size()));
         double angle = RANDOM.nextDouble() * Math.PI * 2.0;
-        double distance = 200 + RANDOM.nextDouble() * 300;
+        double distance = 100 + RANDOM.nextDouble() * 100;
         int x = MathHelper.clamp((int) Math.floor(anchor.getX() + Math.cos(angle) * distance),
                 -29999000, 29999000);
         int z = MathHelper.clamp((int) Math.floor(anchor.getZ() + Math.sin(angle) * distance),

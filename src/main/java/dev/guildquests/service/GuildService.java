@@ -531,10 +531,18 @@ public final class GuildService {
     }
 
     /**
-     * Fee-free deposit of every held coin into the target account (deposit block right-click).
+     * Fee-free deposit of every held coin into the target account (deposit block).
      * Always credits the owner's balance, never the clicking player's.
      */
     public static boolean depositHeldCoinsTo(ServerPlayerEntity player, UUID target, String targetName) {
+        return depositHeldCoinsTo(player, target, targetName, Long.MAX_VALUE);
+    }
+
+    /**
+     * Fee-free deposit of held coins into the target account, capped at maxAmount.
+     * Always credits the owner's balance, never the clicking player's.
+     */
+    public static boolean depositHeldCoinsTo(ServerPlayerEntity player, UUID target, String targetName, long maxAmount) {
         if (target == null) return false;
         GuildPersistentState state = GuildPersistentState.get(player.getServer());
         PlayerGuildData data = state.get(target);
@@ -542,7 +550,7 @@ public final class GuildService {
             riboLockMessage(player, data);
             return false;
         }
-        int held = countItem(player.getInventory(), ModItems.COIN);
+        int held = (int) Math.min(maxAmount, countItem(player.getInventory(), ModItems.COIN));
         if (held <= 0) {
             message(player, "預け入れできるギルドコインを持っていません。", Formatting.YELLOW);
             return false;
