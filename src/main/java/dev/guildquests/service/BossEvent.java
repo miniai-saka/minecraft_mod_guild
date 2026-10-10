@@ -50,8 +50,8 @@ public final class BossEvent {
     private static final Random RANDOM = new Random();
     private static final String BOSS_TAG = "guildquests_emergency_boss";
     private static final int TICKS_PER_MINUTE = 1200;
-    private static final Identifier JOURNEYMAP_WAYPOINT_CHANNEL = new Identifier("journeymap", "waypoint");
-    private static final String BOSS_WAYPOINT_NAME = "緊急ボス";
+    /** S2C: show/clear the client-side boss pin (x,y,z + lifetime ticks; lifetime 0 = clear). */
+    public static final Identifier BOSS_PIN = new Identifier("guildquests", "boss_pin");
 
     private static final List<EntityType<?>> BOSSES = List.of(
             EntityType.ZOMBIE, EntityType.HUSK, EntityType.DROWNED,
@@ -102,12 +102,12 @@ public final class BossEvent {
         if (anyoneOnline) ticker++;
         updateBar(server);
 
-        // Tick down boss waypoint lifetime.
+        // Tick down boss pin lifetime.
         if (markerLife > 0) {
             markerLife--;
             if (markerLife == 0) {
                 for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
-                    deleteWaypoint(p);
+                    sendBossPin(p, 0, 0, 0, 0);
                 }
             }
         }
@@ -171,13 +171,13 @@ public final class BossEvent {
         equip(mob);
         world.spawnEntity(mob);
 
-        // Send a JourneyMap waypoint to all players (temporary, 5 minutes or until death).
+        // Show a client-rendered pin at the boss location (5 minutes or until death).
         damage.clear();
         damageNames.clear();
         adopt(mob);
         markerLife = 6000;
         for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
-            createWaypoint(p, x, y, z);
+            sendBossPin(p, x, y, z, markerLife);
         }
         GuildService.broadcast(server, "緊急ボス【" + mobName + "】が出現！座標: (" + x + ", " + y + ", " + z
                 + ")  与えたダメージの割合で報酬 " + Math.max(0, config.bossEventReward)
@@ -185,36 +185,22 @@ public final class BossEvent {
         return true;
     }
 
-    /** Sends a JourneyMap waypoint packet to the given player (Fabric networking API). */
-    private static void createWaypoint(ServerPlayerEntity player, int x, int y, int z) {
-        if (!ServerPlayNetworking.canSend(player, JOURNEYMAP_WAYPOINT_CHANNEL)) return;
-        String dimension = player.getWorld().getRegistryKey().getValue().toString();
-        String json = "{\"id\":\"" + BOSS_WAYPOINT_NAME + "_" + x + "," + y + "," + z + "\","
-                + "\"name\":\"" + BOSS_WAYPOINT_NAME + "\","
-                + "\"icon\":\"journeymap:ui/img/waypoint-icon.png\","
-                + "\"enable\":true,"
-                + "\"type\":\"Normal\","
-                + "\"origin\":\"external\","
-                + "\"x\":" + x + ",\"y\":" + y + ",\"z\":" + z + ","
-                + "\"r\":255,\"g\":0,\"b\":0,"
-                + "\"persistent\":false,"
-                + "\"dimensions\":[\"" + dimension + "\"]}";
+    /** Sends the boss pin packet to one player. lifetimeTicks 0 clears the pin. */
+    private static void sendBossPin(ServerPlayerEntity player, int x, int y, int z, int lifetimeTicks) {
+        if (!ServerPlayNetworking.canSend(player, BOSS_PIN)) return;
         PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeString(json);
-        buf.writeString("create");
-        buf.writeBoolean(false);
-        ServerPlayNetworking.send(player, JOURNEYMAP_WAYPOINT_CHANNEL, buf);
+        buf.writeVarInt(x);
+        buf.writeVarInt(y);
+        buf.writeVarInt(z);
+        buf.writeVarInt(lifetimeTicks);
+        ServerPlayNetworking.send(player, BOSS_PIN, buf);
     }
 
-    /** Removes the boss waypoint from the given player's JourneyMap. */
-    private static void deleteWaypoint(ServerPlayerEntity player) {
-        if (!ServerPlayNetworking.canSend(player, JOURNEYMAP_WAYPOINT_CHANNEL)) return;
-        String json = "{\"name\":\"" + BOSS_WAYPOINT_NAME + "\",\"origin\":\"external\"}";
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeString(json);
-        buf.writeString("delete");
-        buf.writeBoolean(false);
-        ServerPlayNetworking.send(player, JOURNEYMAP_WAYPOINT_CHANNEL, buf);
+    private static void clearBossPins(MinecraftServer server) {
+        markerLife = 0;
+        for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
+            sendBossPin(p, 0, 0, 0, 0);
+        }
     }
 
     /** Equips the boss with a unified, always-full enchanted diamond set. */
@@ -253,10 +239,7 @@ public final class BossEvent {
         if (!entity.getCommandTags().contains(BOSS_TAG)) return;
         MinecraftServer server = entity.getWorld().getServer();
         if (server == null) return;
-        markerLife = 0;
-        for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
-            deleteWaypoint(p);
-        }
+        clearBossPins(server);
         payout(server, bossName.isEmpty() ? entity.getDisplayName().getString() : bossName);
     }
 

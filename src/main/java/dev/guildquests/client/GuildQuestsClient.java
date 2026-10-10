@@ -1,6 +1,7 @@
 package dev.guildquests.client;
 
 import dev.guildquests.block.ModBlocks;
+import dev.guildquests.service.BossEvent;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -10,6 +11,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
@@ -37,5 +39,17 @@ public final class GuildQuestsClient implements ClientModInitializer {
                 }
             }
         });
+
+        BossPinRenderer.init();
+        ClientPlayNetworking.registerGlobalReceiver(BossEvent.BOSS_PIN, (client, handler, buf, responseSender) -> {
+            int x = buf.readVarInt();
+            int y = buf.readVarInt();
+            int z = buf.readVarInt();
+            int life = buf.readVarInt();
+            client.execute(() -> BossPinRenderer.set(x, y, z, life));
+        });
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
+                (handler, client) -> BossPinRenderer.clear());
     }
 }
+
