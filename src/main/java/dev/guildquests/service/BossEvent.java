@@ -4,6 +4,7 @@ import dev.guildquests.config.ConfigManager;
 import dev.guildquests.config.ModConfig;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -15,17 +16,19 @@ import net.minecraft.entity.boss.ServerBossBar;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.SwordItem;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.packet.s2c.play.CustomPayloadS2CPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.World;
@@ -47,6 +50,8 @@ public final class BossEvent {
     private static final Random RANDOM = new Random();
     private static final String BOSS_TAG = "guildquests_emergency_boss";
     private static final int TICKS_PER_MINUTE = 1200;
+    private static final Identifier JOURNEYMAP_WAYPOINT_CHANNEL = new Identifier("journeymap", "waypoint");
+    private static final String BOSS_WAYPOINT_NAME = "緊急ボス";
 
     private static final List<EntityType<?>> BOSSES = List.of(
             EntityType.ZOMBIE, EntityType.HUSK, EntityType.DROWNED,
@@ -70,7 +75,6 @@ public final class BossEvent {
     private static LivingEntity boss;
     private static ServerBossBar bar;
     private static String bossName = "";
-    private static ArmorStandEntity marker;
     private static int markerLife;
     private static final Map<UUID, ServerPlayerEntity> viewers = new HashMap<>();
     private static final Map<UUID, Double> damage = new HashMap<>();
@@ -98,10 +102,14 @@ public final class BossEvent {
         if (anyoneOnline) ticker++;
         updateBar(server);
 
-        // Tick down and remove the temporary boss marker.
-        if (marker != null && !marker.isRemoved()) {
-            if (markerLife > 0) markerLife--;
-            if (markerLife <= 0) marker.discard();
+        // Tick down boss waypoint lifetime.
+        if (markerLife > 0) {
+            markerLife--;
+            if (markerLife == 0) {
+                for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
+                    deleteWaypoint(p);
+                }
+            }
         }
 
         int interval = Math.max(1, Math.min(1440, config.bossEventIntervalMinutes)) * TICKS_PER_MINUTE;
@@ -163,26 +171,52 @@ public final class BossEvent {
         equip(mob);
         world.spawnEntity(mob);
 
-        // Spawn a temporary glowing marker at the boss location (like apoticiousisMOD waypoints).
-        if (marker != null && !marker.isRemoved()) marker.discard();
-        marker = new ArmorStandEntity(world, x + 0.5, y, z + 0.5);
-        marker.setCustomName(Text.literal("☠ ボスポイント ☠").formatted(Formatting.RED, Formatting.BOLD));
-        marker.setCustomNameVisible(true);
-        marker.setInvisible(true);
-        marker.addCommandTag("guildquests_marker");
-        marker.setGlowing(true);
-        marker.setInvulnerable(true);
-        marker.setNoGravity(true);
-        world.spawnEntity(marker);
-        markerLife = 6000; // 5 minutes
-
+        // Send a JourneyMap waypoint to all players (temporary, 5 minutes or until death).
         damage.clear();
         damageNames.clear();
         adopt(mob);
+        markerLife = 6000;
+        for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
+            createWaypoint(p, x, y, z);
+        }
         GuildService.broadcast(server, "緊急ボス【" + mobName + "】が出現！座標: (" + x + ", " + y + ", " + z
                 + ")  与えたダメージの割合で報酬 " + Math.max(0, config.bossEventReward)
                 + " コインを分配します。", Formatting.RED);
         return true;
+    }
+
+    /** Sends a JourneyMap waypoint packet to the given player. No-op if JourneyMap is absent. */
+    private static void createWaypoint(ServerPlayerEntity player, int x, int y, int z) {
+        if (player.networkHandler == null) return;
+        String dimension = player.getWorld().getRegistryKey().getValue().toString();
+        String json = "{\"id\":\"" + BOSS_WAYPOINT_NAME + "_" + x + "," + y + "," + z + "\","
+                + "\"name\":\"" + BOSS_WAYPOINT_NAME + "\","
+                + "\"icon\":\"journeymap:ui/img/waypoint-icon.png\","
+                + "\"enable\":true,"
+                + "\"type\":\"Normal\","
+                + "\"origin\":\"external\","
+                + "\"x\":" + x + ",\"y\":" + y + ",\"z\":" + z + ","
+                + "\"r\":255,\"g\":0,\"b\":0,"
+                + "\"persistent\":false,"
+                + "\"dimensions\":[\"" + dimension + "\"]}";
+        PacketByteBuf buf = new PacketByteBuf(io.netty.buffer.Unpooled.buffer());
+        buf.writeByte(0);
+        buf.writeString(json);
+        buf.writeString("create");
+        buf.writeBoolean(false);
+        player.networkHandler.sendPacket(new CustomPayloadS2CPacket(JOURNEYMAP_WAYPOINT_CHANNEL, buf));
+    }
+
+    /** Removes the boss waypoint from the given player's JourneyMap. */
+    private static void deleteWaypoint(ServerPlayerEntity player) {
+        if (player.networkHandler == null) return;
+        String json = "{\"name\":\"" + BOSS_WAYPOINT_NAME + "\",\"origin\":\"external\"}";
+        PacketByteBuf buf = new PacketByteBuf(io.netty.buffer.Unpooled.buffer());
+        buf.writeByte(0);
+        buf.writeString(json);
+        buf.writeString("delete");
+        buf.writeBoolean(false);
+        player.networkHandler.sendPacket(new CustomPayloadS2CPacket(JOURNEYMAP_WAYPOINT_CHANNEL, buf));
     }
 
     /** Equips the boss with a unified, always-full enchanted diamond set. */
@@ -221,7 +255,10 @@ public final class BossEvent {
         if (!entity.getCommandTags().contains(BOSS_TAG)) return;
         MinecraftServer server = entity.getWorld().getServer();
         if (server == null) return;
-        if (marker != null && !marker.isRemoved()) marker.discard();
+        markerLife = 0;
+        for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
+            deleteWaypoint(p);
+        }
         payout(server, bossName.isEmpty() ? entity.getDisplayName().getString() : bossName);
     }
 
