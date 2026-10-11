@@ -363,24 +363,30 @@ public final class BossEvent {
             }
             shares[0] = reward - given;
 
+            // Small flat participation bonus for everyone who dealt damage.
+            long bonus = Math.max(1, reward / 20);
+
             StringBuilder detail = new StringBuilder();
             for (int i = 0; i < sorted.size(); i++) {
                 UUID uuid = sorted.get(i).getKey();
                 double dealt = sorted.get(i).getValue();
-                if (shares[i] > 0) {
-                    GuildService.creditCoins(server, uuid, shares[i]);
+                if (shares[i] > 0 || dealt > 0) {
+                    long totalPaid = shares[i] + bonus;
+                    GuildService.creditCoins(server, uuid, totalPaid);
                     ServerPlayerEntity online = server.getPlayerManager().getPlayer(uuid);
                     if (online != null) {
-                        GuildService.message(online, "緊急ボス討伐報酬: +" + shares[i] + " コイン（与ダメージ: "
+                        GuildService.message(online, "緊急ボス討伐報酬: +" + shares[i]
+                                + " コイン + 参加ボーナス +" + bonus
+                                + "（計 " + totalPaid + " / 与ダメージ: "
                                 + (int) Math.round(dealt) + "）", Formatting.GREEN);
                     }
                 }
                 if (detail.length() > 0) detail.append(" / ");
                 detail.append(damageNames.getOrDefault(uuid, uuid.toString().substring(0, 8)))
-                        .append(" ").append(shares[i]).append("コイン");
+                        .append(" ").append(shares[i] + bonus).append("コイン");
             }
             GuildService.broadcast(server, "緊急ボス【" + name + "】を討伐！報酬 " + reward
-                    + " コインを分配: " + detail, Formatting.GOLD);
+                    + " コイン + 参加ボーナス各 +" + bonus + " を分配: " + detail, Formatting.GOLD);
         }
         damage.clear();
         damageNames.clear();

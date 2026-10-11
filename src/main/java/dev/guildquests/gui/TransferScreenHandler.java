@@ -40,6 +40,8 @@ public final class TransferScreenHandler extends ScreenHandler {
     private final Map<Integer, MenuAction> actions = new HashMap<>();
     /** Currently selected recipient; null = unselected. */
     private UUID transferTargetId;
+    /** Amount to send, 0..9999, composed via digit heads and paper buttons. */
+    private long transferAmount;
 
     public TransferScreenHandler(int syncId, PlayerInventory playerInventory, ServerPlayerEntity owner) {
         super(ScreenHandlerType.GENERIC_9X3, syncId);
@@ -113,55 +115,128 @@ public final class TransferScreenHandler extends ScreenHandler {
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setStack(i, item(Items.GRAY_STAINED_GLASS_PANE, " "));
 
         PlayerGuildData data = GuildService.data(owner);
-        long held = GuildService.countHeldCoins(owner);
+        long balance = data.coins;
+        if (transferAmount > 9999) transferAmount = 9999;
         ServerPlayerEntity target = currentTransferTarget();
-
-        set(0, item(ModItems.COIN, "所持コイン: " + held,
-                "銀行残高: " + data.coins,
-                "送金は銀行残高から引き落とします"));
-
-        recipientButton(1, target);
-
-        set(8, item(Items.LIME_CONCRETE, "手数料: 無料",
-                "プレイヤー間の送金は",
-                "手数料がかかりません"));
-
-        sendButton(4, 1, data.coins, target);
-        sendButton(5, 10, data.coins, target);
-        sendButton(6, 64, data.coins, target);
-        sendAllButton(7, data.coins, target);
-
-        setAction(13, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeHandledScreen());
-
-        // Row 1: direct-select heads for online players (first 9 by name).
         List<ServerPlayerEntity> candidates = transferCandidates();
-        for (int i = 0; i < Math.min(9, candidates.size()); i++) {
-            ServerPlayerEntity candidate = candidates.get(i);
-            boolean selected = target != null && target.getUuid().equals(candidate.getUuid());
-            String name = candidate.getName().getString();
-            UUID id = candidate.getUuid();
-            setAction(9 + i, headItem(name, id, (selected ? "● " : "") + name,
-                            selected ? "現在の送金先" : "クリックで送金先に選択",
-                            "残高: " + GuildService.data(candidate).coins),
-                    (p, b, t) -> {
-                        if (b == 0) transferTargetId = id;
-                    });
+
+        // Columns 0-2 (slots 0-2, 9-11, 18-20): player heads for recipient selection.
+        for (int i = 0; i < 9; i++) {
+            int slot = headSlot(i);
+            if (i < candidates.size()) {
+                ServerPlayerEntity candidate = candidates.get(i);
+                boolean selected = target != null && target.getUuid().equals(candidate.getUuid());
+                String name = candidate.getName().getString();
+                UUID id = candidate.getUuid();
+                setAction(slot, headItem(name, id, (selected ? "● " : "") + name,
+                                selected ? "現在の送金先" : "クリックで送金先に選択",
+                                "残高: " + GuildService.data(candidate).coins),
+                        (p, b, t) -> {
+                            if (b == 0) transferTargetId = id;
+                        });
+            } else {
+                set(slot, item(Items.PLAYER_HEAD, " "));
+            }
         }
         if (candidates.isEmpty()) {
-            set(9, item(Items.PLAYER_HEAD, "オンラインの他プレイヤーがいません",
+            set(0, item(Items.PLAYER_HEAD, "オンラインの他プレイヤーがいません",
                     "送金先は同じサーバーの",
                     "オンラインプレイヤーのみ"));
-        } else if (candidates.size() > 9) {
-            set(17, item(Items.COMPARATOR, "送金先: " + candidates.size() + "人",
-                    "上段の送金先ピッカーで",
-                    "全員から選択できます"));
         }
 
-        set(22, item(Items.WRITABLE_BOOK, "ギルド送金",
-                "① プレイヤー頭か送金先ピッカーで宛先を選択",
-                "② 金額ボタン（1 / 10 / 64 / 全部）で送金",
-                "③ 残高から即時引き落とし、相手に加算",
-                "手数料は無料、延滞中は送金できません"));
+        // Column 3 (slots 3, 12, 21): center info / confirm.
+        set(3, item(ModItems.COIN, "所持コイン: " + GuildService.countHeldCoins(owner),
+                "銀行残高: " + balance,
+                "送金は銀行残高から引き落とし",
+                "手数料は無料"));
+        set(12, item(Items.PAPER, "送金予定額: " + transferAmount,
+                target == null ? "送金先: 未選択（左の頭を選択）" : "送金先: " + target.getName().getString(),
+                "金額は右の紙・数字頭で調整",
+                "最大 9999 まで"));
+
+        // Confirm button at center of bottom row.
+        if (target == null) {
+            setAction(21, item(Items.LIME_CONCRETE, "送金決定",
+                            "送金先が選ばれていません",
+                            "左のプレイヤー頭から選択してください"),
+                    (p, b, t) -> { });
+        } else if (transferAmount <= 0) {
+            setAction(21, item(Items.LIME_CONCRETE, "送金決定",
+                            "金額が 0 です",
+                            "紙ボタンまたは数字頭で金額を設定"),
+                    (p, b, t) -> { });
+        } else if (balance < transferAmount) {
+            setAction(21, item(Items.LIME_CONCRETE, "送金決定",
+                            "銀行残高が不足しています（残高: " + balance + "）",
+                            "送金先: " + target.getName().getString()),
+                    (p, b, t) -> { });
+        } else {
+            String name = target.getName().getString();
+            UUID id = target.getUuid();
+            long amount = transferAmount;
+            setAction(21, item(Items.LIME_CONCRETE, "送金決定: " + amount,
+                            "クリックで " + name + " へ送金",
+                            "残高 -" + amount + " → " + name + " +" + amount,
+                            "手数料: 無料"),
+                    (p, b, t) -> {
+                        if (b == 0) send(p, id, amount);
+                    });
+        }
+
+        // Row 0, columns 4-7 (slots 4-7): digit heads (thousands, hundreds, tens, ones).
+        int[] places = {1000, 100, 10, 1};
+        String[] labels = {"千の位", "百の位", "十の位", "一の位"};
+        for (int i = 0; i < 4; i++) {
+            int place = places[i];
+            int digit = (int) ((transferAmount / place) % 10);
+            setAction(4 + i, digitHead(digit, labels[i]),
+                    (p, b, t) -> {
+                        if (b == 0) {
+                            transferAmount = Math.floorMod(transferAmount + place, 10000);
+                        } else if (b == 1) {
+                            transferAmount = Math.floorMod(transferAmount - place, 10000);
+                        }
+                    });
+        }
+
+        // Row 1, columns 4-7 (slots 13-16): paper buttons to add amounts.
+        addPaper(13, 1);
+        addPaper(14, 10);
+        addPaper(15, 100);
+        addPaper(16, 64);
+
+        // Row 1, column 8: clear amount.
+        setAction(17, item(Items.BARRIER, "金額クリア"),
+                (p, b, t) -> {
+                    if (b == 0) transferAmount = 0;
+                });
+
+        // Row 2, column 8: close.
+        setAction(26, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeHandledScreen());
+    }
+
+    /** Map a 0..8 head index to its display slot (columns 0-2, all three rows). */
+    private static int headSlot(int index) {
+        int row = index / 3;
+        int col = index % 3;
+        return col + row * 9;
+    }
+
+    private void addPaper(int slot, int amount) {
+        long preview = Math.min(9999, transferAmount + amount);
+        setAction(slot, item(Items.PAPER, "＋" + amount,
+                        "クリックで " + amount + " 加算",
+                        "現在: " + transferAmount + " → " + preview),
+                (p, b, t) -> {
+                    if (b == 0) transferAmount = Math.min(9999, transferAmount + amount);
+                });
+    }
+
+    private static ItemStack digitHead(int digit, String placeLabel) {
+        return headItem("digit", new UUID(0, digit),
+                "送金額 " + placeLabel + ": " + digit,
+                "左クリックで +1（0-9 で循環）",
+                "右クリックで -1");
     }
 
     /** Online players other than the owner, sorted by name. */
@@ -184,91 +259,6 @@ public final class TransferScreenHandler extends ScreenHandler {
 
     private ServerPlayerEntity currentTransferTarget() {
         return findPlayer(transferTargetId);
-    }
-
-    private void recipientButton(int slot, ServerPlayerEntity target) {
-        List<ServerPlayerEntity> candidates = transferCandidates();
-        if (candidates.isEmpty()) {
-            set(slot, item(Items.PLAYER_HEAD, "送金先: なし",
-                    "オンラインの他のプレイヤーがいません"));
-            return;
-        }
-        String name = target == null ? "未選択" : target.getName().getString();
-        ItemStack head = target == null
-                ? item(Items.PLAYER_HEAD, "送金先: 未選択",
-                        "左クリックで送金先を切り替え",
-                        "オンライン: " + candidates.size() + "人",
-                        "下段の頭アイコンから直接選択も可能")
-                : headItem(target.getName().getString(), target.getUuid(), "送金先: " + name,
-                        "左クリックで送金先を切り替え",
-                        "オンライン: " + candidates.size() + "人",
-                        "下段の頭アイコンから直接選択も可能");
-        setAction(slot, head,
-                (p, b, t) -> {
-                    if (b != 0) return;
-                    List<ServerPlayerEntity> list = transferCandidates();
-                    if (list.isEmpty()) return;
-                    int idx = -1;
-                    for (int i = 0; i < list.size(); i++) {
-                        if (list.get(i).getUuid().equals(transferTargetId)) {
-                            idx = i;
-                            break;
-                        }
-                    }
-                    transferTargetId = list.get((idx + 1) % list.size()).getUuid();
-                });
-    }
-
-    private void sendButton(int slot, long amount, long balance, ServerPlayerEntity target) {
-        String label = "送金: " + amount;
-        if (target == null) {
-            setAction(slot, item(Items.PAPER, label,
-                            "送金先が選ばれていません",
-                            "プレイヤー頭アイコンで送金先を選んでください"),
-                    (p, b, t) -> { });
-            return;
-        }
-        String name = target.getName().getString();
-        UUID id = target.getUuid();
-        if (balance < amount) {
-            setAction(slot, item(Items.PAPER, label,
-                            "銀行残高が不足しています（残高: " + balance + "）",
-                            "送金先: " + name),
-                    (p, b, t) -> send(p, id, amount));
-            return;
-        }
-        setAction(slot, item(Items.PAPER, label,
-                        "クリックで " + name + " へ送金",
-                        "残高 -" + amount + " → " + name + " +" + amount,
-                        "手数料: 無料"),
-                (p, b, t) -> {
-                    if (b == 0) send(p, id, amount);
-                });
-    }
-
-    private void sendAllButton(int slot, long balance, ServerPlayerEntity target) {
-        String label = "送金: 全部";
-        if (target == null) {
-            setAction(slot, item(Items.PAPER, label,
-                            "送金先が選ばれていません",
-                            "プレイヤー頭アイコンで送金先を選んでください"),
-                    (p, b, t) -> { });
-            return;
-        }
-        String name = target.getName().getString();
-        UUID id = target.getUuid();
-        if (balance <= 0) {
-            setAction(slot, item(Items.PAPER, label, "銀行残高がありません", "送金先: " + name),
-                    (p, b, t) -> send(p, id, 0));
-            return;
-        }
-        setAction(slot, item(Items.PAPER, label,
-                        "クリックで全部送金（残高 " + balance + "）",
-                        name + " に +" + balance + " 追加",
-                        "手数料: 無料"),
-                (p, b, t) -> {
-                    if (b == 0) send(p, id, balance);
-                });
     }
 
     /** Resolve the recipient at click time so a logged-off player is never used. */
