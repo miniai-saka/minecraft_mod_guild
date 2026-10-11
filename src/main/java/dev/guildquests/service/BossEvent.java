@@ -77,6 +77,8 @@ public final class BossEvent {
     private static ServerBossBar bar;
     private static String bossName = "";
     private static int markerLife;
+    private static double lastStuckX, lastStuckY, lastStuckZ;
+    private static int stuckTicks;
     private static final Map<UUID, ServerPlayerEntity> viewers = new HashMap<>();
     private static final Map<UUID, Double> damage = new HashMap<>();
     private static final Map<UUID, String> damageNames = new HashMap<>();
@@ -121,17 +123,62 @@ public final class BossEvent {
         if (anyoneOnline) ticker++;
         updateBar(server);
 
-        // Rescue the boss if it somehow ends up in lava or the void.
+        // Rescue the boss if it somehow ends up in lava, the void, walled in, or stuck.
         if (boss != null && !boss.isRemoved() && boss.isAlive()) {
-            if (boss.isInLava() || boss.getY() < -64) {
-                ServerWorld world = boss.getWorld() instanceof ServerWorld sw ? sw : null;
-                if (world != null) {
-                    int tx = MathHelper.floor(boss.getX());
-                    int tz = MathHelper.floor(boss.getZ());
+            ServerWorld world = boss.getWorld() instanceof ServerWorld sw ? sw : null;
+            if (world != null) {
+                boolean needsRescue = false;
+
+                // Lava / void.
+                if (boss.isInLava() || boss.getY() < -64) {
+                    needsRescue = true;
+                }
+
+                // Walled in: the block at the boss's feet is a full solid cube.
+                if (!needsRescue) {
+                    var state = world.getBlockState(boss.getBlockPos());
+                    if (state.isSolidBlock(world, boss.getBlockPos())) {
+                        needsRescue = true;
+                    }
+                }
+
+                // Stuck: has not moved for ~5 seconds (100 ticks).
+                if (!needsRescue) {
+                    double dx = boss.getX() - lastStuckX;
+                    double dy = boss.getY() - lastStuckY;
+                    double dz = boss.getZ() - lastStuckZ;
+                    if (dx * dx + dy * dy + dz * dz < 0.01) {
+                        stuckTicks++;
+                        if (stuckTicks >= 100) {
+                            needsRescue = true;
+                        }
+                    } else {
+                        stuckTicks = 0;
+                        lastStuckX = boss.getX();
+                        lastStuckY = boss.getY();
+                        lastStuckZ = boss.getZ();
+                    }
+                }
+
+                if (needsRescue) {
+                    ServerPlayerEntity target = nearestPlayer(boss);
+                    int tx;
+                    int tz;
+                    if (target != null) {
+                        tx = MathHelper.floor(target.getX());
+                        tz = MathHelper.floor(target.getZ());
+                    } else {
+                        tx = MathHelper.floor(boss.getX());
+                        tz = MathHelper.floor(boss.getZ());
+                    }
                     int ty = world.getTopY(Heightmap.Type.MOTION_BLOCKING, tx, tz);
                     boss.teleport(tx + 0.5, ty + 0.1, tz + 0.5, false);
                     boss.extinguish();
                     boss.fallDistance = 0;
+                    stuckTicks = 0;
+                    lastStuckX = boss.getX();
+                    lastStuckY = boss.getY();
+                    lastStuckZ = boss.getZ();
                 }
             }
         }
@@ -220,6 +267,22 @@ public final class BossEvent {
                 + ")  与えたダメージの割合で報酬 " + Math.max(0, config.bossEventReward)
                 + " コインを分配します。", Formatting.RED);
         return true;
+    }
+
+    private static ServerPlayerEntity nearestPlayer(LivingEntity from) {
+        MinecraftServer server = from.getWorld().getServer();
+        if (server == null) return null;
+        ServerPlayerEntity best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
+            if (p.isRemoved() || !p.isAlive()) continue;
+            double d = p.squaredDistanceTo(from);
+            if (d < bestDist) {
+                bestDist = d;
+                best = p;
+            }
+        }
+        return best;
     }
 
     /** Sends the boss pin packet to one player. lifetimeTicks 0 clears the pin. */
