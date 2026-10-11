@@ -15,6 +15,7 @@ import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.boss.BossBar;
 import net.minecraft.entity.boss.ServerBossBar;
 import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.MobEntity;
@@ -86,10 +87,28 @@ public final class BossEvent {
     public static void init() {
         ServerTickEvents.END_SERVER_TICK.register(BossEvent::tick);
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
+            // Environmental kill cheese (lava, void, fall, etc.) is ignored for the boss.
+            if (entity.getCommandTags().contains(BOSS_TAG) && isEnvironmental(source)) {
+                return false;
+            }
             onDamage(entity, source, amount);
             return true;
         });
         ServerLivingEntityEvents.AFTER_DEATH.register(BossEvent::onDeath);
+    }
+
+    private static boolean isEnvironmental(DamageSource source) {
+        return source.isOf(DamageTypes.LAVA)
+                || source.isOf(DamageTypes.IN_FIRE)
+                || source.isOf(DamageTypes.ON_FIRE)
+                || source.isOf(DamageTypes.OUT_OF_WORLD)
+                || source.isOf(DamageTypes.FALL)
+                || source.isOf(DamageTypes.DROWN)
+                || source.isOf(DamageTypes.CACTUS)
+                || source.isOf(DamageTypes.HOT_FLOOR)
+                || source.isOf(DamageTypes.FREEZE)
+                || source.isOf(DamageTypes.STALAGMITE)
+                || source.isOf(DamageTypes.SWEET_BERRY_BUSH);
     }
 
     private static void tick(MinecraftServer server) {
@@ -101,6 +120,21 @@ public final class BossEvent {
         boolean anyoneOnline = !server.getPlayerManager().getPlayerList().isEmpty();
         if (anyoneOnline) ticker++;
         updateBar(server);
+
+        // Rescue the boss if it somehow ends up in lava or the void.
+        if (boss != null && !boss.isRemoved() && boss.isAlive()) {
+            if (boss.isInLava() || boss.getY() < -64) {
+                ServerWorld world = boss.getWorld() instanceof ServerWorld sw ? sw : null;
+                if (world != null) {
+                    int tx = MathHelper.floor(boss.getX());
+                    int tz = MathHelper.floor(boss.getZ());
+                    int ty = world.getTopY(Heightmap.Type.MOTION_BLOCKING, tx, tz);
+                    boss.teleport(tx + 0.5, ty + 0.1, tz + 0.5, false);
+                    boss.extinguish();
+                    boss.fallDistance = 0;
+                }
+            }
+        }
 
         // Tick down boss pin lifetime.
         if (markerLife > 0) {
@@ -166,6 +200,9 @@ public final class BossEvent {
         double health = Math.max(1, config.bossEventHealth);
         if (mob.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH) != null) {
             mob.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH).setBaseValue(health);
+        }
+        if (mob.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE) != null) {
+            mob.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE).setBaseValue(1.0);
         }
         mob.setHealth((float) health);
         equip(mob);
@@ -291,6 +328,10 @@ public final class BossEvent {
         boss = entity;
         if (entity.getCustomName() != null) {
             bossName = entity.getCustomName().getString();
+        }
+        // Ensure adopted bosses also resist knockback (anti-cheese).
+        if (entity.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE) != null) {
+            entity.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE).setBaseValue(1.0);
         }
         viewers.clear();
         bar = new ServerBossBar(Text.literal(bossName).formatted(Formatting.RED),
