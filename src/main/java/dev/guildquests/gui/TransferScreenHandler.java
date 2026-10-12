@@ -323,7 +323,7 @@ public final class TransferScreenHandler extends ScreenHandler {
             NbtList textures = new NbtList();
             textures.add(property);
             NbtCompound properties = new NbtCompound();
-            properties.put("Textures", textures);
+            properties.put("textures", textures);
             skull.put("Properties", properties);
         }
         stack.setCustomName(Text.literal(name).formatted(Formatting.WHITE));
