@@ -1,6 +1,7 @@
 package dev.guildquests.gui;
 
 import dev.guildquests.config.ConfigManager;
+import dev.guildquests.data.GuildPersistentState;
 import dev.guildquests.data.PlayerGuildData;
 import dev.guildquests.item.ModItems;
 import dev.guildquests.service.GuildService;
@@ -156,6 +157,11 @@ public final class BankScreenHandler extends ScreenHandler {
                     });
         }
 
+        // Row 0, column 8: guild rank summary.
+        set(8, item(Items.NETHER_STAR, "ギルドランク: " + GuildService.rank(data),
+                "累計達成: " + data.completedTotal + " 件",
+                "同時受注上限: " + ConfigManager.config().maxActiveQuests + " 件"));
+
         // Columns 0-2, row 1: payment modes.
         String mode = GuildService.paymentMode(data);
         paymentModeButton(9, GuildService.MODE_RIBO, "リボ", mode);
@@ -176,6 +182,11 @@ public final class BankScreenHandler extends ScreenHandler {
         addPaper(15, 100);
         addPaper(16, 64);
 
+        // Row 1, column 8: active quest count.
+        set(17, item(Items.BOOK, "受注中クエスト: " + data.activeQuests.size() + " 件",
+                "同時受注上限: " + ConfigManager.config().maxActiveQuests + " 件",
+                "内容はギルド画面（/guild）で確認できます"));
+
         // Columns 0-2, row 2: debt / help.
         debtDisplay(18, data);
         set(19, item(Items.WRITABLE_BOOK, "ギルド銀行",
@@ -185,8 +196,23 @@ public final class BankScreenHandler extends ScreenHandler {
                 "下段左: 支払い方法（リボ/引き落とし/無効）",
                 "リボは定期自動徴収・延滞でロック"));
 
+        // Row 2, column 2: today's quests.
+        GuildService.ensureDailyBoard(owner.getServer());
+        var board = GuildPersistentState.get(owner.getServer()).dailyBoard;
+        set(20, item(Items.LECTERN, "本日のクエスト: " + board.size() + " 問",
+                "次の抽選まで: " + GuildService.formatGameTime(GuildService.ticksUntilNextDraw(owner.getServer())),
+                "受注はギルド画面（/guild）から"));
+
         // Column 3, row 2: close.
         setAction(21, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeHandledScreen());
+
+        // Row 2, column 4: select the full bank balance (for withdrawal).
+        setAction(22, item(Items.GOLD_BLOCK, "銀行残高全部選択",
+                        "クリックで銀行残高全額を選択",
+                        "現在: " + bankAmount + " → " + balance),
+                (p, b, t) -> {
+                    if (b == 0) bankAmount = Math.min(balance, Integer.MAX_VALUE);
+                });
 
         // Row 2, columns 5-8: clear / select all held / deposit / withdraw.
         setAction(23, item(Items.BARRIER, "金額クリア"),
