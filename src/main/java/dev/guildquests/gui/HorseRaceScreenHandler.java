@@ -88,7 +88,7 @@ public final class HorseRaceScreenHandler extends ScreenHandler {
             java.util.Random rand = new java.util.Random();
             for (int i = 0; i < 4; i++) {
                 if (h.positions[i] < FINISH) {
-                    h.positions[i] += 1 + rand.nextInt(3);
+                    h.positions[i] += 2 + rand.nextInt(4);
                     if (h.positions[i] >= FINISH) {
                         h.positions[i] = FINISH;
                         if (h.winner == -1) h.winner = i;
@@ -102,10 +102,16 @@ public final class HorseRaceScreenHandler extends ScreenHandler {
                 if (pos < FINISH) { allDone = false; break; }
             }
 
-            if (allDone || h.raceTicks > 200) {
+            if (allDone || h.raceTicks > 100) {
                 h.raceActive = false;
                 h.raceDone = true;
                 h.finishRace();
+                // Show result screen before removing from map
+                ServerPlayerEntity p = server.getPlayerManager().getPlayer(entry.getKey());
+                if (p != null && p.currentScreenHandler == h) {
+                    h.populate();
+                    h.sendContentUpdates();
+                }
                 return true;
             }
 
