@@ -125,29 +125,29 @@ public final class BankScreenHandler extends ScreenHandler {
         long balance = data.coins;
         if (bankAmount < 0) bankAmount = 0;
 
-        // Columns 0-2, row 0: bank balance / fee / transfer menu.
-        set(0, item(Items.GOLD_INGOT, "銀行残高: " + balance, "電子通貨として保存されています"));
-        set(1, feeWaived
+        // Column 0: blank gutter. Columns 1-3, row 0: bank balance / fee / held coins.
+        set(1, item(Items.GOLD_INGOT, "銀行残高: " + balance, "電子通貨として保存されています"));
+        set(2, feeWaived
                 ? item(Items.EMERALD, "手数料: 無料", "ギルド銀行ブロック経由のため", "すべての取引が無料です")
                 : item(Items.PAPER, "手数料: " + feePercentText() + "%",
                         "預け入れ・引き出し時に課金されます",
                         "ギルド銀行ブロック経由なら無料です"));
-        setAction(2, item(Items.PLAYER_HEAD, "送金（新メニュー）",
+        set(3, item(ModItems.COIN, "所持コイン: " + held, "インベントリ内のギルドコイン"));
+
+        // Column 4 (slots 4, 13, 22): center action column (transfer / disabled / close).
+        setAction(4, item(Items.PLAYER_HEAD, "送金（新メニュー）",
                 "クリックで送金メニューを開きます",
                 "送金先の選択・金額指定はこちらで",
                 "手数料: 無料"),
                 (p, b, t) -> TransferScreenHandler.open(p));
 
-        // Column 3, row 0: held coins.
-        set(3, item(ModItems.COIN, "所持コイン: " + held, "インベントリ内のギルドコイン"));
-
-        // Row 0, columns 4-7: digit heads (thousands, hundreds, tens, ones).
+        // Row 0, columns 5-8: digit heads (thousands, hundreds, tens, ones).
         int[] places = {1000, 100, 10, 1};
         String[] labels = {"千の位", "百の位", "十の位", "一の位"};
         for (int i = 0; i < 4; i++) {
             long place = places[i];
             long digit = (bankAmount / place) % 10;
-            setAction(4 + i, TransferScreenHandler.digitHead((int) digit, labels[i]),
+            setAction(5 + i, TransferScreenHandler.digitHead((int) digit, labels[i]),
                     (p, b, t) -> {
                         if (b != 0 && b != 1) return;
                         long cur = (bankAmount / place) % 10;
@@ -156,13 +156,10 @@ public final class BankScreenHandler extends ScreenHandler {
                     });
         }
 
-        // Columns 0-2, row 1: payment modes.
+        // Columns 1-3, row 1: payment modes / amount summary.
         String mode = GuildService.paymentMode(data);
-        paymentModeButton(9, GuildService.MODE_RIBO, "リボ", mode);
-        paymentModeButton(10, GuildService.MODE_DEBIT, "引き落とし", mode);
-        paymentModeButton(11, GuildService.MODE_DISABLED, "無効", mode);
-
-        // Column 3, row 1: selected amount summary.
+        paymentModeButton(10, GuildService.MODE_RIBO, "リボ", mode);
+        paymentModeButton(11, GuildService.MODE_DEBIT, "引き落とし", mode);
         long fee = GuildService.bankFee(bankAmount, feeWaived);
         set(12, item(Items.PAPER, "入出金額: " + bankAmount,
                 "入金: 手持ち -" + bankAmount + " → 残高 +" + (bankAmount - fee),
@@ -170,23 +167,26 @@ public final class BankScreenHandler extends ScreenHandler {
                 feeLine(fee),
                 "数字頭・紙で金額を調整"));
 
-        // Row 1, columns 4-7: paper buttons to add amounts.
-        addPaper(13, 1);
-        addPaper(14, 10);
-        addPaper(15, 100);
-        addPaper(16, 64);
+        // Column 4, row 1: disabled payment mode (center action column).
+        paymentModeButton(13, GuildService.MODE_DISABLED, "無効", mode);
 
-        // Columns 0-2, row 2: debt / help.
-        debtDisplay(18, data);
-        set(19, item(Items.WRITABLE_BOOK, "ギルド銀行",
+        // Row 1, columns 5-8: paper buttons to add amounts.
+        addPaper(14, 1);
+        addPaper(15, 10);
+        addPaper(16, 100);
+        addPaper(17, 64);
+
+        // Columns 1-3, row 2: debt / help.
+        debtDisplay(19, data);
+        set(20, item(Items.WRITABLE_BOOK, "ギルド銀行",
                 "数字頭・紙で金額を選択してから",
                 "下段の入金・出金ボタンで実行",
                 "所持金全部ボタンで全額をまとめて選択",
-                "下段左: 支払い方法（リボ/引き落とし/無効）",
+                "中央列: 送金 / 支払い無効 / 閉じる",
                 "リボは定期自動徴収・延滞でロック"));
 
-        // Column 3, row 2: close.
-        setAction(21, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeHandledScreen());
+        // Column 4, row 2: close (center action column).
+        setAction(22, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeHandledScreen());
 
         // Row 2, columns 5-8: clear / select all held / deposit / withdraw.
         setAction(23, item(Items.BARRIER, "金額クリア"),
