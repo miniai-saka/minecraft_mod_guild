@@ -56,3 +56,16 @@ jar {
     }
 }
 
+// LoomのremapJar後にバージョン区切りをアンダースコアへリネーム
+tasks.matching { it.name == 'remapJar' }.configureEach {
+    doLast {
+        def f = archiveFile.get().asFile
+        def name = f.name
+        def idx = name.lastIndexOf('-')
+        if (idx > 0) {
+            def target = new File(f.parentFile, name.substring(0, idx) + '_' + name.substring(idx + 1))
+            f.renameTo(target)
+        }
+    }
+}
+
