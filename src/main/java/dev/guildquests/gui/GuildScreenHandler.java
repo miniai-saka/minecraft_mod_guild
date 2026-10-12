@@ -148,6 +148,11 @@ public final class GuildScreenHandler extends ScreenHandler {
                 "送金先の選択・金額指定",
                 "手数料: 無料"),
                 (p, b, t) -> TransferScreenHandler.open(p));
+        setAction(3, item(Items.HAY_BLOCK, "ギャンブル",
+                "クリックでギャンブルメニューを開きます",
+                "ブラックジャック・競馬",
+                "所持コインで賭けられます"),
+                (p, b, t) -> GambleScreenHandler.open(p));
 
         for (int i = 0; i < Math.min(MAX_DAILY_SLOTS, board.size()); i++) {
             DailyQuest daily = board.get(i);

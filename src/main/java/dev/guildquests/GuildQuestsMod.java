@@ -54,6 +54,7 @@ public final class GuildQuestsMod implements ModInitializer {
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             GuildService.ensureDailyBoard(server);
+            dev.guildquests.gui.HorseRaceScreenHandler.tickAll(server);
 
             int interval = ConfigManager.config().exploreCheckIntervalTicks;
             exploreTicker++;
