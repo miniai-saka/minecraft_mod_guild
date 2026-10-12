@@ -120,8 +120,8 @@ public final class TransferScreenHandler extends ScreenHandler {
         ServerPlayerEntity target = currentTransferTarget();
         List<ServerPlayerEntity> candidates = transferCandidates();
 
-        // Columns 0-2 (slots 0-2, 9-11, 18-20): player heads for recipient selection.
-        for (int i = 0; i < 9; i++) {
+        // Columns 0-3 (slots 0-3, 9-12, 18-21): player heads for recipient selection.
+        for (int i = 0; i < 12; i++) {
             int slot = headSlot(i);
             if (i < candidates.size()) {
                 ServerPlayerEntity candidate = candidates.get(i);
@@ -144,12 +144,12 @@ public final class TransferScreenHandler extends ScreenHandler {
                     "オンラインプレイヤーのみ"));
         }
 
-        // Column 3 (slots 3, 12, 21): center info / close.
-        set(3, item(ModItems.COIN, "所持コイン: " + GuildService.countHeldCoins(owner),
+        // Column 4 (slots 4, 13, 22): center info / close.
+        set(4, item(ModItems.COIN, "所持コイン: " + GuildService.countHeldCoins(owner),
                 "銀行残高: " + balance,
                 "送金は銀行残高から引き落とし",
                 "手数料は無料"));
-        set(12, item(Items.PAPER, "送金予定額: " + transferAmount,
+        set(13, item(Items.PAPER, "送金予定額: " + transferAmount,
                 target == null ? "送金先: 未選択（左の頭を選択）" : "送金先: " + target.getName().getString(),
                 "金額は右の紙・数字頭で調整",
                 "最大 9999 まで"));
@@ -183,13 +183,13 @@ public final class TransferScreenHandler extends ScreenHandler {
                     });
         }
 
-        // Row 0, columns 4-7 (slots 4-7): digit heads (thousands, hundreds, tens, ones).
+        // Row 0, columns 5-8 (slots 5-8): digit heads (thousands, hundreds, tens, ones).
         int[] places = {1000, 100, 10, 1};
         String[] labels = {"千の位", "百の位", "十の位", "一の位"};
         for (int i = 0; i < 4; i++) {
             int place = places[i];
             int digit = (int) ((transferAmount / place) % 10);
-            setAction(4 + i, digitHead(digit, labels[i]),
+            setAction(5 + i, digitHead(digit, labels[i]),
                     (p, b, t) -> {
                         if (b == 0) {
                             transferAmount = Math.floorMod(transferAmount + place, 10000);
@@ -199,11 +199,11 @@ public final class TransferScreenHandler extends ScreenHandler {
                     });
         }
 
-        // Row 1, columns 4-7 (slots 13-16): paper buttons to add amounts.
-        addPaper(13, 1);
-        addPaper(14, 10);
-        addPaper(15, 100);
-        addPaper(16, 64);
+        // Row 1, columns 5-8 (slots 14-17): paper buttons to add amounts.
+        addPaper(14, 1);
+        addPaper(15, 10);
+        addPaper(16, 100);
+        addPaper(17, 64);
 
         // Row 2, column 7: clear amount.
         setAction(25, item(Items.BARRIER, "金額クリア"),
@@ -211,14 +211,14 @@ public final class TransferScreenHandler extends ScreenHandler {
                     if (b == 0) transferAmount = 0;
                 });
 
-        // Row 2, column 3: close.
-        setAction(21, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeHandledScreen());
+        // Row 2, column 4: close.
+        setAction(22, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeHandledScreen());
     }
 
-    /** Map a 0..8 head index to its display slot (columns 0-2, all three rows). */
+    /** Map a 0..11 head index to its display slot (columns 0-3, all three rows). */
     private static int headSlot(int index) {
-        int row = index / 3;
-        int col = index % 3;
+        int row = index / 4;
+        int col = index % 4;
         return col + row * 9;
     }
 
