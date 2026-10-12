@@ -120,7 +120,8 @@ public final class TransferScreenHandler extends ScreenHandler {
         ServerPlayerEntity target = currentTransferTarget();
         List<ServerPlayerEntity> candidates = transferCandidates();
 
-        // Columns 0-2 (slots 0-2, 9-11, 18-20): player heads for recipient selection.
+        // Columns 1-3 (slots 1-3, 10-12, 19-21): player heads for recipient selection.
+        // Column 0 is a blank gutter so the row starts with the heads after it.
         for (int i = 0; i < 9; i++) {
             int slot = headSlot(i);
             if (i < candidates.size()) {
@@ -139,12 +140,12 @@ public final class TransferScreenHandler extends ScreenHandler {
             }
         }
         if (candidates.isEmpty()) {
-            set(0, item(Items.PLAYER_HEAD, "オンラインの他プレイヤーがいません",
+            set(1, item(Items.PLAYER_HEAD, "オンラインの他プレイヤーがいません",
                     "送金先は同じサーバーの",
                     "オンラインプレイヤーのみ"));
         }
 
-        // Column 4 (slots 4, 13, 22): center info / confirm.
+        // Column 4 (slots 4, 13, 22): center info / close.
         set(4, item(ModItems.COIN, "所持コイン: " + GuildService.countHeldCoins(owner),
                 "銀行残高: " + balance,
                 "送金は銀行残高から引き落とし",
@@ -154,19 +155,19 @@ public final class TransferScreenHandler extends ScreenHandler {
                 "金額は右の紙・数字頭で調整",
                 "最大 9999 まで"));
 
-        // Confirm button at center of bottom row.
+        // Confirm button at bottom-right (slot 26).
         if (target == null) {
-            setAction(22, item(Items.LIME_CONCRETE, "送金決定",
+            setAction(26, item(Items.LIME_CONCRETE, "送金決定",
                             "送金先が選ばれていません",
                             "左のプレイヤー頭から選択してください"),
                     (p, b, t) -> { });
         } else if (transferAmount <= 0) {
-            setAction(22, item(Items.LIME_CONCRETE, "送金決定",
+            setAction(26, item(Items.LIME_CONCRETE, "送金決定",
                             "金額が 0 です",
                             "紙ボタンまたは数字頭で金額を設定"),
                     (p, b, t) -> { });
         } else if (balance < transferAmount) {
-            setAction(22, item(Items.LIME_CONCRETE, "送金決定",
+            setAction(26, item(Items.LIME_CONCRETE, "送金決定",
                             "銀行残高が不足しています（残高: " + balance + "）",
                             "送金先: " + target.getName().getString()),
                     (p, b, t) -> { });
@@ -174,7 +175,7 @@ public final class TransferScreenHandler extends ScreenHandler {
             String name = target.getName().getString();
             UUID id = target.getUuid();
             long amount = transferAmount;
-            setAction(22, item(Items.LIME_CONCRETE, "送金決定: " + amount,
+            setAction(26, item(Items.LIME_CONCRETE, "送金決定: " + amount,
                             "クリックで " + name + " へ送金",
                             "残高 -" + amount + " → " + name + " +" + amount,
                             "手数料: 無料"),
@@ -211,14 +212,14 @@ public final class TransferScreenHandler extends ScreenHandler {
                     if (b == 0) transferAmount = 0;
                 });
 
-        // Row 2, column 8: close.
-        setAction(26, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeHandledScreen());
+        // Row 2, column 4: close.
+        setAction(22, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeHandledScreen());
     }
 
-    /** Map a 0..8 head index to its display slot (columns 0-2, all three rows). */
+    /** Map a 0..8 head index to its display slot (columns 1-3, all three rows). */
     private static int headSlot(int index) {
         int row = index / 3;
-        int col = index % 3;
+        int col = 1 + index % 3;
         return col + row * 9;
     }
 
@@ -246,7 +247,7 @@ public final class TransferScreenHandler extends ScreenHandler {
             "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvOGQ3OTEwZTEwMzM0Zjg5MGE2MjU0ODNhYzBjODI0YjVlNGExYTRiMTVhOTU2MzI3YTNlM2FlNDU4ZDllYTQifX19"
     };
 
-    private static ItemStack digitHead(int digit, String placeLabel) {
+    static ItemStack digitHead(int digit, String placeLabel) {
         return headItemWithTexture("digit", new UUID(0, digit), DIGIT_TEXTURES[digit],
                 "送金額 " + placeLabel + ": " + digit,
                 "左クリックで +1（0-9 で循環）",
