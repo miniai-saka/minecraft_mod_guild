@@ -144,29 +144,29 @@ public final class TransferScreenHandler extends ScreenHandler {
                     "オンラインプレイヤーのみ"));
         }
 
-        // Column 3 (slots 3, 12, 21): center info / confirm.
-        set(3, item(ModItems.COIN, "所持コイン: " + GuildService.countHeldCoins(owner),
+        // Column 4 (slots 4, 13, 22): center info / confirm.
+        set(4, item(ModItems.COIN, "所持コイン: " + GuildService.countHeldCoins(owner),
                 "銀行残高: " + balance,
                 "送金は銀行残高から引き落とし",
                 "手数料は無料"));
-        set(12, item(Items.PAPER, "送金予定額: " + transferAmount,
+        set(13, item(Items.PAPER, "送金予定額: " + transferAmount,
                 target == null ? "送金先: 未選択（左の頭を選択）" : "送金先: " + target.getName().getString(),
                 "金額は右の紙・数字頭で調整",
                 "最大 9999 まで"));
 
         // Confirm button at center of bottom row.
         if (target == null) {
-            setAction(21, item(Items.LIME_CONCRETE, "送金決定",
+            setAction(22, item(Items.LIME_CONCRETE, "送金決定",
                             "送金先が選ばれていません",
                             "左のプレイヤー頭から選択してください"),
                     (p, b, t) -> { });
         } else if (transferAmount <= 0) {
-            setAction(21, item(Items.LIME_CONCRETE, "送金決定",
+            setAction(22, item(Items.LIME_CONCRETE, "送金決定",
                             "金額が 0 です",
                             "紙ボタンまたは数字頭で金額を設定"),
                     (p, b, t) -> { });
         } else if (balance < transferAmount) {
-            setAction(21, item(Items.LIME_CONCRETE, "送金決定",
+            setAction(22, item(Items.LIME_CONCRETE, "送金決定",
                             "銀行残高が不足しています（残高: " + balance + "）",
                             "送金先: " + target.getName().getString()),
                     (p, b, t) -> { });
@@ -174,7 +174,7 @@ public final class TransferScreenHandler extends ScreenHandler {
             String name = target.getName().getString();
             UUID id = target.getUuid();
             long amount = transferAmount;
-            setAction(21, item(Items.LIME_CONCRETE, "送金決定: " + amount,
+            setAction(22, item(Items.LIME_CONCRETE, "送金決定: " + amount,
                             "クリックで " + name + " へ送金",
                             "残高 -" + amount + " → " + name + " +" + amount,
                             "手数料: 無料"),
@@ -183,13 +183,13 @@ public final class TransferScreenHandler extends ScreenHandler {
                     });
         }
 
-        // Row 0, columns 4-7 (slots 4-7): digit heads (thousands, hundreds, tens, ones).
+        // Row 0, columns 5-8 (slots 5-8): digit heads (thousands, hundreds, tens, ones).
         int[] places = {1000, 100, 10, 1};
         String[] labels = {"千の位", "百の位", "十の位", "一の位"};
         for (int i = 0; i < 4; i++) {
             int place = places[i];
             int digit = (int) ((transferAmount / place) % 10);
-            setAction(4 + i, digitHead(digit, labels[i]),
+            setAction(5 + i, digitHead(digit, labels[i]),
                     (p, b, t) -> {
                         if (b == 0) {
                             transferAmount = Math.floorMod(transferAmount + place, 10000);
@@ -199,14 +199,14 @@ public final class TransferScreenHandler extends ScreenHandler {
                     });
         }
 
-        // Row 1, columns 4-7 (slots 13-16): paper buttons to add amounts.
-        addPaper(13, 1);
-        addPaper(14, 10);
-        addPaper(15, 100);
-        addPaper(16, 64);
+        // Row 1, columns 5-8 (slots 14-17): paper buttons to add amounts.
+        addPaper(14, 1);
+        addPaper(15, 10);
+        addPaper(16, 100);
+        addPaper(17, 64);
 
-        // Row 1, column 8: clear amount.
-        setAction(17, item(Items.BARRIER, "金額クリア"),
+        // Row 2, column 7: clear amount.
+        setAction(25, item(Items.BARRIER, "金額クリア"),
                 (p, b, t) -> {
                     if (b == 0) transferAmount = 0;
                 });
