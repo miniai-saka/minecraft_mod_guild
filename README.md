@@ -1,30 +1,47 @@
 # Guild Quests & Economy (Fabric 1.20.1)
 
-Minecraft 1.20.1 / Fabric 向けの、クエスト・電子通貨・ショップ・ギルドランクを単体で実装するModです。
+Minecraft 1.20.1 / Fabric 向けの、クエスト・ギルド通貨・銀行・ギャンブルを単体で実装するModです。
 FTB Quests、Q Shop 等への依存はありません。
 
-## 実装済み機能
+バージョン: **26.3.0**
 
-- クエストGUI (`/guild`)
-- ショップGUI (`/guild shop`)
+## 機能
+
+### クエスト
+- 日次クエスト掲示板（毎日自動抽選、1〜9問）
 - 討伐クエスト (KILL)
 - 納品クエスト (SUBMIT / アイテム消費)
 - 探索クエスト (EXPLORE)
-  - 座標 + 半径
-  - バイオームID
-  - 構造物ID
-- 非アイテム型コイン
-- 累計達成数によるランク表示とクエスト/商品解放
-- プレイヤー別永続化
-  - コイン
-  - 受注中クエストと進捗
-  - 累計達成数
-  - 当日達成数
-  - 当日獲得コイン
-- 1日あたりクエスト達成上限
-- 1日あたりコイン獲得上限
+  - 座標 + 半径（ランダム座標対応）
+  - バイオーム（複数指定・ランダム選択対応）
+  - 構造物
+- 累計達成数によるランク（E → S）とクエスト解放
+
+### 通貨・経済
+- 非アイテム型ギルドコイン
+- 銀行（預け入れ・引き出し、手数料制度）
+- プレイヤー間送金（手数料無料）
+- 支払い方法: 引き落とし / リボ（後払い） / 無効
+- リボ払い: 定期自動徴収、利息加算、延滞でギルド機能ロック、クエスト報酬で自動返済
+- 入金ブロック（ホッパー対応、コインを自動で残高へ換金）
+- 銀行ブロック（手数料無料で銀行を開く）
+
+### ギャンブル
+- ブラックジャック（手取り21、バースト、自然なBJは2.5倍）
+- 競馬（4頭、オッズ2〜8倍、自動レース演出）
+
+### 緊急ボスイベント
+- オンライン時に一定間隔で確率発生
+- 強化されたホストMobが出現（強制グラウ効果・专用品質装備）
+- 与ダメージに応じた報酬分配
+- 環境ダメージによる撃破は無効（対策済み）
+- クライアント側にボス位置ピン表示
+
+### その他
+- プレイヤー別永続化（コイン・クエスト進捗・累計達成数・日次カウンタ）
 - 現実時刻 00:00 リセット / Minecraftゲーム日リセットの切替
-- OP用設定リロード・コイン操作コマンド
+- GキーでクエストGUIを即時オープン
+- Create連携（ストックティッカーの支払いをギルドコインで自動決済）
 
 ## 必要環境
 
@@ -32,6 +49,7 @@ FTB Quests、Q Shop 等への依存はありません。
 - Fabric Loader 0.16.10 以上
 - Fabric API 0.92.x+1.20.1
 - Java 17
+- （任意）Create mod — ストックティッカー連携を使う場合
 
 ## ビルド
 
@@ -44,55 +62,70 @@ gradle build
 生成物:
 
 ```text
-build/libs/guildquests-1.0.0.jar
+build/libs/guildquests-26.3.0.jar
 ```
 
 ## 導入
 
-1. Fabric Loader で Minecraft 1.20.1 サーバー/クライアントを用意します。
-2. `guildquests-1.0.0.jar` と Fabric API を `mods/` に配置します。
+1. Fabric Loader で Minecraft 1.20.1 を用意します。
+2. `guildquests-26.3.0.jar` と Fabric API を `mods/` に配置します。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定変更後はサーバー再起動、または `/guildadmin reload` を実行します。
 
-GUIはMinecraft標準の6段チェスト画面を利用しているため、専用テクスチャやクライアント専用Screenクラスは不要です。
+GUIはMinecraft標準のチェスト画面を利用しているため、専用テクスチャやクライアント専用Screenクラスは不要です。
 
 ## コマンド
 
-- `/guild` - クエストGUIを開く
-- `/guild shop` - ショップGUIを開く
-- `/guild status` - 所持コイン、ランク、当日上限状況を表示
-- `/guildadmin reload` - JSON設定を再読込 (OP Lv2)
-- `/guildadmin coins set <player> <amount>` - コインを設定 (OP Lv2)
-- `/guildadmin coins add <player> <amount>` - コインを追加 (OP Lv2)
-- `/guildadmin resetdaily <player>` - 日次カウンタをリセット (OP Lv2)
+| コマンド | 説明 |
+|---|---|
+| `/guild` | クエストGUIを開く（Gキーでも可） |
+| `/guild status` | ランク・コイン・累計達成・支払い方法・債務を表示 |
+| `/guild bank` | 銀行GUIを開く |
+| `/guildadmin reload` | JSON設定を再読込 (OP Lv2) |
+| `/guildadmin boss` | 緊急ボスを即時出現 (OP Lv2) |
+| `/guildadmin coins set <player> <amount>` | コインを設定 (OP Lv2) |
+| `/guildadmin coins add <player> <amount>` | コインを追加 (OP Lv2) |
+
+## GUI構成
+
+| 画面 | サイズ | 内容 |
+|---|---|---|
+| クエスト | 9×6 | 掲示板・受注中クエスト・銀行/送金/ギャンブルへのボタン |
+| 銀行 | 9×3 | 預入/引出・数字頭で金額指定・支払い方法切替・リボ債務表示 |
+| 送金 | 9×3 | オンラインプレイヤーから宛先選択・金額指定・送信 |
+| ギャンブル | 9×3 | ブラックジャック/競馬へのハブ |
+| ブラックジャック | 9×3 | ヒット/スタンド・賭け金設定 |
+| 競馬 | 9×6 | 馬選択・賭け・レーン走行演出・結果表示 |
+| 入金ブロック設定 | 9×1 | 通知トグル・一括入金 |
 
 ## 設定ファイル
 
-実行時に以下が自動生成されます。
+初回起動時に `config/guildquests/` へ自動生成されます。
 
 ```text
 config/guildquests/config.json
 config/guildquests/quests.json
-config/guildquests/shop.json
 ```
-
-`config-examples/` に編集例も同梱しています。
 
 ### config.json
 
 主な項目:
 
-- `maxActiveQuests`: 同時受注数。GUI都合で最大9。
-- `dailyQuestLimit`: 1リセット期間あたりの達成上限。`0` で無制限。
-- `dailyCoinCapEnabled`: 日次コイン上限のON/OFF。
-- `dailyCoinCap`: 日次コイン上限。
-- `dailyResetMode`: `REAL_TIME` または `GAME_DAY`。
-- `resetTimezone`: `REAL_TIME` 時のIANAタイムゾーン。初期値 `Asia/Tokyo`。
-- `coinCapPolicy`:
-  - `BLOCK`: 報酬全額が上限を超える場合、そのクエストの報酬受領を翌リセットまでブロック。
-  - `CLAMP`: 上限までの残額のみ付与してクエスト達成扱い。
-- `exploreCheckIntervalTicks`: 探索判定間隔。初期値20tick。
-- `rankThresholds`: ランク名と累計達成数の閾値。
+- `maxActiveQuests`: 同時受注数（1〜9）
+- `dailyQuestCountMin` / `dailyQuestCountMax`: 日次掲示板の出題数範囲
+- `exploreCheckIntervalTicks`: 探索判定間隔（初期値20）
+- `exploreRandomRange`: ランダム座標の探索範囲
+- `bossEventEnabled`: 緊急ボスイベントのON/OFF
+- `bossEventIntervalMinutes`: ボス出現判定間隔（分）
+- `bossEventChancePercent`: ボス出現確率（%）
+- `bossEventReward`: ボス撃破報酬（コイン）
+- `bossEventHealth`: ボスの体力
+- `bankFeePercent`: 銀行手数料（%）
+- `riboInstallment`: リボの1回あたり徴収額
+- `riboInterestPercent`: リボの周期利息（%）
+- `riboIntervalMinutes`: リボ徴収間隔（分）
+- `rankThresholds`: ランク名と累計達成数の閾値
+- `createIntegrationEnabled`: Create連携のON/OFF
 
 ### quests.json
 
@@ -105,16 +138,21 @@ config/guildquests/shop.json
   "description": "説明",
   "type": "KILL",
   "target": "minecraft:zombie",
+  "targets": ["minecraft:zombie", "minecraft:skeleton"],
   "amount": 20,
+  "amountMin": 10,
+  "amountMax": 30,
   "reward": 30,
   "requiredCompleted": 0,
   "repeatable": true
 }
 ```
 
+`targets` を指定すると抽選時にランダム選択されます。`amountMin` / `amountMax` も同様です。
+
 #### KILL
 
-- `target`: Entity Type ID
+- `target` / `targets`: Entity Type ID
 - `amount`: 討伐数
 
 #### SUBMIT
@@ -133,9 +171,13 @@ config/guildquests/shop.json
   "x": 1000,
   "y": 64,
   "z": 1000,
-  "radius": 32
+  "radius": 32,
+  "randomCoordinates": true,
+  "coordRange": 3000
 }
 ```
+
+`randomCoordinates` を true にすると `coordRange` 範囲内で座標が抽選されます。
 
 #### EXPLORE / BIOME
 
@@ -143,7 +185,8 @@ config/guildquests/shop.json
 {
   "type": "EXPLORE",
   "exploreMode": "BIOME",
-  "target": "minecraft:desert"
+  "target": "minecraft:desert",
+  "biomes": ["minecraft:desert", "minecraft:badlands"]
 }
 ```
 
@@ -159,34 +202,13 @@ config/guildquests/shop.json
 
 STRUCTUREはプレイヤーの現在座標が対象構造物の内部に入った時点で達成になります。
 
-### shop.json
-
-```json
-{
-  "id": "diamond",
-  "title": "ダイヤモンド x1",
-  "item": "minecraft:diamond",
-  "count": 1,
-  "price": 180,
-  "requiredCompleted": 15
-}
-```
-
 ## データ保存
 
 プレイヤーデータはOverworldのPersistentStateに保存され、ワールドの `data/guildquests_players.dat` として永続化されます。
 UUIDをキーにしているため、ログアウト/再ログインやサーバー再起動後も維持されます。
 
-## デフォルトバランス
-
-- ゾンビ20体: 30コイン
-- スケルトン20体: 40コイン
-- 鉄インゴット32個納品: 50コイン
-- 指定座標探索: 100コイン
-- ウィザー1体: 300コイン（累計10件達成で解放）
-- 日次達成上限: 5件
-- 日次コイン上限: 500コイン
-
 ## 補足
 
-討伐判定は「プレイヤー自身が直接キルしたEntity」を対象にします。自動トラップ等の経済対策は、仕様通り日次クエスト件数上限と日次獲得コイン上限で制御します。
+- 討伐判定は「プレイヤー自身が直接キルしたEntity」を対象にします。自動トラップ等の経済対策は、日次クエスト件数上限と日次獲得コイン上限で制御します。
+- リボで延滞すると銀行・送金・入金ブロックがロックされます。クエスト報酬は自動で債務返済に充当されます。
+- ボスの環境ダメージ（溶岩・落下等）による撃破は無効です。対策として落下保護と脱出テレポートが入っています。
