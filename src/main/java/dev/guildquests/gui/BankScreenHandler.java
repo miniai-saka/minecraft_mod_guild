@@ -154,7 +154,8 @@ public final class BankScreenHandler extends ScreenHandler {
                     });
         }
 
-        // Row 1: help / paper buttons (right of blank).
+        // Row 1: ribo debt info / help / paper buttons.
+        riboDebtInfo(9, data);
         set(13, item(Items.WRITABLE_BOOK, "ギルド銀行",
                 "数字頭・紙で金額を選択してから",
                 "下段の入金・出金ボタンで実行",
@@ -273,6 +274,38 @@ public final class BankScreenHandler extends ScreenHandler {
         setAction(slot, item(icon, name, lore), (p, b, t) -> {
             if (b == 0) GuildService.setPaymentMode(p, id);
         });
+    }
+
+    private void riboDebtInfo(int startSlot, PlayerGuildData data) {
+        boolean hasDebt = data.debt > 0;
+        boolean delinquent = data.delinquent;
+        long minutesLeft = Math.max(0, (data.nextRiboDueAt - System.currentTimeMillis()) / 60_000L);
+        var cfg = ConfigManager.config();
+
+        if (delinquent) {
+            set(startSlot, item(Items.REDSTONE_BLOCK, "リボ債務: " + data.debt,
+                    "⚠ 延滞中：ギルド機能ロック中",
+                    "クエスト報酬は全額自動で返済に充当",
+                    "完済するまで銀行・残高支払い不可"));
+        } else if (hasDebt) {
+            set(startSlot, item(Items.REDSTONE, "リボ債務: " + data.debt,
+                    "次回の自動徴収まで約 " + minutesLeft + " 分",
+                    "残高から " + cfg.riboInstallment + " コインを定期徴収"));
+        } else {
+            set(startSlot, item(Items.GOLD_NUGGET, "リボ債務: なし",
+                    "支払い方法をリボにすると",
+                    "後払い購入（債務）が使える"));
+        }
+
+        set(startSlot + 1, item(Items.CLOCK, "次回徴収まで: " + minutesLeft + " 分",
+                "周期: " + cfg.riboIntervalMinutes + " 分ごと",
+                hasDebt ? "自動で残高から徴収" : "現在債務なし"));
+        set(startSlot + 2, item(Items.COPPER_INGOT, "自動徴収額: " + cfg.riboInstallment,
+                "周期ごとに徴収される金額",
+                "利息 " + cfg.riboInterestPercent + "% が周期ごとに加算"));
+        set(startSlot + 3, item(Items.AMETHYST_SHARD, "利息: " + cfg.riboInterestPercent + "%",
+                "周期ごとに債務へ加算",
+                "延滞でロック → クエストで返済"));
     }
 
     private String feeLine(long fee) {
