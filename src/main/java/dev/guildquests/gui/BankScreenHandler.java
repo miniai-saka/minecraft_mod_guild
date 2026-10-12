@@ -158,7 +158,6 @@ public final class BankScreenHandler extends ScreenHandler {
 
         // Columns 1-3, row 1: payment modes / amount summary.
         String mode = GuildService.paymentMode(data);
-        paymentModeButton(10, GuildService.MODE_RIBO, "リボ", mode);
         paymentModeButton(11, GuildService.MODE_DEBIT, "引き落とし", mode);
         long fee = GuildService.bankFee(bankAmount, feeWaived);
         set(12, item(Items.PAPER, "入出金額: " + bankAmount,
@@ -176,14 +175,13 @@ public final class BankScreenHandler extends ScreenHandler {
         addPaper(16, 100);
         addPaper(17, 64);
 
-        // Columns 1-3, row 2: debt / help.
-        debtDisplay(19, data);
+        // Columns 1-3, row 2: help.
         set(20, item(Items.WRITABLE_BOOK, "ギルド銀行",
                 "数字頭・紙で金額を選択してから",
                 "下段の入金・出金ボタンで実行",
                 "所持金全部ボタンで全額をまとめて選択",
-                "中央列: 送金 / 支払い無効 / 閉じる",
-                "リボは定期自動徴収・延滞でロック"));
+                "支払い方法: 引き落とし / 無効",
+                "中央列: 送金 / 支払い無効 / 閉じる"));
 
         // Column 4, row 2: close (center action column).
         setAction(22, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeHandledScreen());
@@ -268,14 +266,6 @@ public final class BankScreenHandler extends ScreenHandler {
         Item icon = active ? Items.LIME_CONCRETE : Items.GRAY_CONCRETE;
         String name = (active ? "● " : "") + "支払い: " + label;
         String[] lore = switch (id) {
-            case GuildService.MODE_RIBO -> new String[]{
-                    "クリックでリボ払いに切替",
-                    "残高がなくても購入でき、価格は債務化",
-                    "利息 " + ConfigManager.config().riboInterestPercent + "% / "
-                            + ConfigManager.config().riboIntervalMinutes + "分ごとに "
-                            + ConfigManager.config().riboInstallment + " コインを自動徴収",
-                    "返済不能で延滞ロック → クエストで返済"
-            };
             case GuildService.MODE_DISABLED -> new String[]{
                     "クリックで無効に切替",
                     "残高からの支払いを禁止",
@@ -291,27 +281,6 @@ public final class BankScreenHandler extends ScreenHandler {
         setAction(slot, item(icon, name, lore), (p, b, t) -> {
             if (b == 0) GuildService.setPaymentMode(p, id);
         });
-    }
-
-    private void debtDisplay(int slot, PlayerGuildData data) {
-        if (data.debt > 0) {
-            long minutesLeft = Math.max(0, (data.nextRiboDueAt - System.currentTimeMillis()) / 60_000L);
-            if (data.delinquent) {
-                set(slot, item(Items.REDSTONE_BLOCK, "リボ債務: " + data.debt,
-                        "⚠ 延滞中：ギルド機能ロック中",
-                        "クエスト報酬は全額自動で返済に充当",
-                        "完済するまで銀行・残高支払い不可"));
-            } else {
-                set(slot, item(Items.REDSTONE, "リボ債務: " + data.debt,
-                        "次回の自動徴収まで約 " + minutesLeft + " 分",
-                        "残高から " + ConfigManager.config().riboInstallment + " コインを定期徴収",
-                        "利息 " + ConfigManager.config().riboInterestPercent + "% が周期ごとに加算"));
-            }
-        } else {
-            set(slot, item(Items.GOLD_NUGGET, "リボ債務: なし",
-                    "支払い方法をリボにすると",
-                    "後払い購入（債務）が使える"));
-        }
     }
 
     private String feeLine(long fee) {
