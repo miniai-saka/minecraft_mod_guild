@@ -34,7 +34,7 @@ public class GuildBankBlock extends Block {
 
     @Override
     public boolean canPlaceAt(BlockState state, WorldView world, BlockPos pos) {
-        return super.canPlaceAt(state, world, pos) && world.getBlockState(pos.up()).isReplaceable();
+        return super.canPlaceAt(state, world, pos) && world.getBlockState(pos.up()).getMaterial().isReplaceable();
     }
 
     @Override

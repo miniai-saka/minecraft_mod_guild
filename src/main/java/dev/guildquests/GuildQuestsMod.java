@@ -91,7 +91,7 @@ public final class GuildQuestsMod implements ModInitializer {
             guildAdmin.then(CommandManager.literal("reload")
                     .executes(context -> {
                         ConfigManager.loadAll();
-                        context.getSource().sendFeedback(() -> Text.literal("GuildQuests configuration reloaded."), true);
+                        context.getSource().sendFeedback(Text.literal("GuildQuests configuration reloaded."), true);
                         return 1;
                     }));
 
@@ -99,7 +99,7 @@ public final class GuildQuestsMod implements ModInitializer {
                     .executes(context -> {
                         boolean spawned = BossEvent.spawnNow(context.getSource().getServer());
                         boolean result = spawned;
-                        context.getSource().sendFeedback(() -> Text.literal(result
+                        context.getSource().sendFeedback(Text.literal(result
                                 ? "Emergency boss spawned (chance roll skipped)."
                                 : "Boss spawn failed: no players online or a boss is already alive."), false);
                         return spawned ? 1 : 0;
@@ -116,7 +116,7 @@ public final class GuildQuestsMod implements ModInitializer {
                                         PlayerGuildData data = state.get(target.getUuid());
                                         data.coins = amount;
                                         state.markDirty();
-                                        context.getSource().sendFeedback(() -> Text.literal("Set " + target.getName().getString() + " coins to " + amount), true);
+                                        context.getSource().sendFeedback(Text.literal("Set " + target.getName().getString() + " coins to " + amount), true);
                                         return 1;
                                     }))));
             coins.then(CommandManager.literal("add")
@@ -129,7 +129,7 @@ public final class GuildQuestsMod implements ModInitializer {
                                         PlayerGuildData data = state.get(target.getUuid());
                                         data.coins = data.coins > Long.MAX_VALUE - amount ? Long.MAX_VALUE : data.coins + amount;
                                         state.markDirty();
-                                        context.getSource().sendFeedback(() -> Text.literal("Added " + amount + " coins to " + target.getName().getString()), true);
+                                        context.getSource().sendFeedback(Text.literal("Added " + amount + " coins to " + target.getName().getString()), true);
                                         return 1;
                                     }))));
             guildAdmin.then(coins);

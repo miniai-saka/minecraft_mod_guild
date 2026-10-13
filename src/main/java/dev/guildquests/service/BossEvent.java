@@ -14,7 +14,6 @@ import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.boss.BossBar;
 import net.minecraft.entity.boss.ServerBossBar;
 import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.MobEntity;
@@ -89,7 +88,7 @@ public final class BossEvent {
         ServerTickEvents.END_SERVER_TICK.register(BossEvent::tick);
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
             // Environmental kill cheese (lava, void, fall, etc.) is ignored for the boss.
-            if (entity.getCommandTags().contains(BOSS_TAG) && isEnvironmental(source)) {
+            if (entity.getScoreboardTags().contains(BOSS_TAG) && isEnvironmental(source)) {
                 return false;
             }
             onDamage(entity, source, amount);
@@ -99,17 +98,17 @@ public final class BossEvent {
     }
 
     private static boolean isEnvironmental(DamageSource source) {
-        return source.isOf(DamageTypes.LAVA)
-                || source.isOf(DamageTypes.IN_FIRE)
-                || source.isOf(DamageTypes.ON_FIRE)
-                || source.isOf(DamageTypes.OUT_OF_WORLD)
-                || source.isOf(DamageTypes.FALL)
-                || source.isOf(DamageTypes.DROWN)
-                || source.isOf(DamageTypes.CACTUS)
-                || source.isOf(DamageTypes.HOT_FLOOR)
-                || source.isOf(DamageTypes.FREEZE)
-                || source.isOf(DamageTypes.STALAGMITE)
-                || source.isOf(DamageTypes.SWEET_BERRY_BUSH);
+        return source == DamageSource.LAVA
+                || source == DamageSource.IN_FIRE
+                || source == DamageSource.ON_FIRE
+                || source == DamageSource.OUT_OF_WORLD
+                || source == DamageSource.FALL
+                || source == DamageSource.DROWN
+                || source == DamageSource.CACTUS
+                || source == DamageSource.HOT_FLOOR
+                || source == DamageSource.FREEZE
+                || source == DamageSource.STALAGMITE
+                || source == DamageSource.SWEET_BERRY_BUSH;
     }
 
     private static void tick(MinecraftServer server) {
@@ -171,7 +170,7 @@ public final class BossEvent {
                         tz = MathHelper.floor(boss.getZ());
                     }
                     int ty = world.getTopY(Heightmap.Type.MOTION_BLOCKING, tx, tz);
-                    boss.teleport(tx + 0.5, ty + 0.1, tz + 0.5, false);
+                    boss.teleport(tx + 0.5, ty + 0.1, tz + 0.5);
                     boss.extinguish();
                     boss.fallDistance = 0;
                     stuckTicks = 0;
@@ -213,7 +212,7 @@ public final class BossEvent {
 
         for (Entity entity : world.iterateEntities()) {
             if (entity instanceof LivingEntity living && living.isAlive()
-                    && living.getCommandTags().contains(BOSS_TAG)) {
+                    && living.getScoreboardTags().contains(BOSS_TAG)) {
                 adopt(living);
                 return false;
             }
@@ -240,7 +239,7 @@ public final class BossEvent {
         mob.refreshPositionAndAngles(x + 0.5, y, z + 0.5, RANDOM.nextFloat() * 360.0f, 0.0f);
         mob.setCustomName(Text.literal(bossName).formatted(Formatting.RED));
         mob.setCustomNameVisible(true);
-        mob.addCommandTag(BOSS_TAG);
+        mob.addScoreboardTag(BOSS_TAG);
         mob.setPersistent();
 
         double health = Math.max(1, config.bossEventHealth);
@@ -327,7 +326,7 @@ public final class BossEvent {
     }
 
     private static void onDamage(LivingEntity entity, DamageSource source, float amount) {
-        if (!entity.getCommandTags().contains(BOSS_TAG)) return;
+        if (!entity.getScoreboardTags().contains(BOSS_TAG)) return;
         if (!(source.getAttacker() instanceof ServerPlayerEntity attacker)) return;
         damage.merge(attacker.getUuid(), (double) amount, Double::sum);
         damageNames.put(attacker.getUuid(), attacker.getName().getString());
@@ -335,7 +334,7 @@ public final class BossEvent {
     }
 
     private static void onDeath(LivingEntity entity, DamageSource source) {
-        if (!entity.getCommandTags().contains(BOSS_TAG)) return;
+        if (!entity.getScoreboardTags().contains(BOSS_TAG)) return;
         MinecraftServer server = entity.getWorld().getServer();
         if (server == null) return;
         clearBossPins(server);

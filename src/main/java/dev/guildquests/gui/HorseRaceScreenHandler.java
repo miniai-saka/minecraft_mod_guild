@@ -303,7 +303,7 @@ public final class HorseRaceScreenHandler extends ScreenHandler {
     }
 
     @Override
-    public ItemStack quickMove(PlayerEntity player, int slot) { return ItemStack.EMPTY; }
+    public ItemStack transferSlot(PlayerEntity player, int slot) { return ItemStack.EMPTY; }
 
     @Override
     public boolean canUse(PlayerEntity player) { return player == owner && !owner.isRemoved(); }

@@ -11,9 +11,10 @@ import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.Matrix4f;
+import net.minecraft.util.math.Quaternion;
 import net.minecraft.util.math.Vec3d;
-import org.joml.Matrix4f;
-import org.joml.Vector3f;
+import net.minecraft.util.math.Vec3f;
 
 /**
  * Client-side boss pin: a rotating red beacon beam at the boss spawn.
@@ -69,7 +70,7 @@ public final class BossPinRenderer {
         matrices.push();
         matrices.translate(x - camPos.x, y - camPos.y, z - camPos.z);
         float rot = (System.currentTimeMillis() % 36000L) / 100f;
-        matrices.multiply(new org.joml.Quaternionf().fromAxisAngleDeg(new Vector3f(0, 1, 0), rot));
+        matrices.multiply(new Quaternion(new Vec3f(0, 1, 0), rot, true));
         drawBeam(matrices, alpha);
         matrices.pop();
     }
@@ -85,7 +86,7 @@ public final class BossPinRenderer {
 
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
         RenderSystem.disableCull();
 
         buffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);

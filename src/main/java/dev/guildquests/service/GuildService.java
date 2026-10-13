@@ -17,9 +17,8 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.registry.Registry;
+import net.minecraft.util.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -174,7 +173,7 @@ public final class GuildService {
         GuildPersistentState state = GuildPersistentState.get(player.getServer());
         PlayerGuildData data = state.get(player.getUuid());
         boolean changed = false;
-        String killedId = Registries.ENTITY_TYPE.getId(killed.getType()).toString();
+        String killedId = Registry.ENTITY_TYPE.getId(killed.getType()).toString();
 
         for (ActiveQuest active : data.activeQuests) {
             QuestDefinition quest = resolveQuest(player.getServer(), active.questId);
@@ -221,11 +220,11 @@ public final class GuildService {
         int amount = effectiveAmount(active, quest);
         if (quest.type == QuestType.SUBMIT && active.progress < amount) {
             Identifier itemId = safeIdentifier(quest.target);
-            if (itemId == null || !Registries.ITEM.containsId(itemId)) {
+            if (itemId == null || !Registry.ITEM.containsId(itemId)) {
                 message(player, "納品対象アイテムの設定が不正です: " + quest.target, Formatting.RED);
                 return false;
             }
-            Item target = Registries.ITEM.get(itemId);
+            Item target = Registry.ITEM.get(itemId);
             int remaining = amount - active.progress;
             int available = countItem(player.getInventory(), target);
             int consume = Math.min(remaining, available);
@@ -567,7 +566,7 @@ public final class GuildService {
     }
 
     private static boolean isExploreTargetReached(ServerPlayerEntity player, QuestDefinition quest, ActiveQuest active) {
-        ServerWorld world = player.getServerWorld();
+        ServerWorld world = player.getWorld();
         BlockPos pos = player.getBlockPos();
 
         if (quest.exploreMode == ExploreMode.COORDINATE) {
@@ -592,7 +591,7 @@ public final class GuildService {
         if (quest.exploreMode == ExploreMode.STRUCTURE) {
             Identifier id = safeIdentifier(quest.target);
             if (id == null) return false;
-            RegistryKey<Structure> key = RegistryKey.of(RegistryKeys.STRUCTURE, id);
+            RegistryKey<Structure> key = RegistryKey.of(Registry.STRUCTURE_KEY, id);
             StructureStart start = world.getStructureAccessor().getStructureContaining(pos, key);
             return start != null && start.hasChildren();
         }
@@ -655,7 +654,7 @@ public final class GuildService {
                 ServerWorld targetWorld = null;
                 try {
                     targetWorld = server.getWorld(
-                            RegistryKey.of(RegistryKeys.WORLD, new Identifier(quest.dimension)));
+                            RegistryKey.of(Registry.WORLD_KEY, new Identifier(quest.dimension)));
                 } catch (RuntimeException ignored) {
                 }
                 if (targetWorld != null) {
@@ -694,8 +693,8 @@ public final class GuildService {
     /** Human readable item name for an item id, falling back to the raw id. */
     public static String itemName(String id) {
         Identifier rid = safeIdentifier(id);
-        if (rid != null && Registries.ITEM.containsId(rid)) {
-            Item item = Registries.ITEM.get(rid);
+        if (rid != null && Registry.ITEM.containsId(rid)) {
+            Item item = Registry.ITEM.get(rid);
             return item.getName(new ItemStack(item)).getString();
         }
         return id == null || id.isBlank() ? "?" : id;
@@ -747,7 +746,7 @@ public final class GuildService {
     /** Human readable entity name for an entity id, falling back to the raw id. */
     public static String entityName(String id) {
         Identifier rid = safeIdentifier(id);
-        if (rid != null && Registries.ENTITY_TYPE.containsId(rid)) {
+        if (rid != null && Registry.ENTITY_TYPE.containsId(rid)) {
             return Text.translatable("entity." + rid.getNamespace() + "." + rid.getPath()).getString();
         }
         return id == null || id.isBlank() ? "?" : id;

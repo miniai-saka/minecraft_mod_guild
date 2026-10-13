@@ -2,6 +2,7 @@
   "item.guildquests.coin": "Guild Coin",
   "block.guildquests.guild_bank": "Guild Bank",
   "block.guildquests.guild_deposit": "Guild Deposit Block",
+  "itemGroup.guildquests.guild": "GuildQuests",
   "key.categories.guildquests": "Guild Quests",
   "key.guildquests.openguild": "Open Guild Quests"
 }

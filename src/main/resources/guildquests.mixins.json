@@ -2,9 +2,7 @@
   "required": true,
   "package": "dev.guildquests.mixin",
   "compatibilityLevel": "JAVA_17",
-  "mixins": [
-    "StockTickerInteractionHandlerMixin"
-  ],
+  "mixins": [],
   "injectors": {
     "defaultRequire": 1
   }

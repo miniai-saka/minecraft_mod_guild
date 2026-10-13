@@ -3,7 +3,7 @@
   "id": "guildquests",
   "version": "${version}",
   "name": "Guild Quests & Economy",
-  "description": "Standalone guild quests, electronic coins, rank progression and guild shop for Fabric 1.20.1.",
+  "description": "Standalone guild quests, electronic coins, rank progression and guild shop for Fabric 1.19.2.",
   "authors": ["OpenAI"],
   "license": "MIT",
   "environment": "*",
@@ -12,13 +12,10 @@
     "client": ["dev.guildquests.client.GuildQuestsClient"]
   },
   "mixins": ["guildquests.mixins.json"],
-  "suggests": {
-    "create": "*"
-  },
   "depends": {
-    "fabricloader": ">=0.16.10",
-    "fabric-api": ">=0.92.0",
-    "minecraft": "~1.20.1",
+    "fabricloader": ">=0.15.11",
+    "fabric-api": ">=0.77.0",
+    "minecraft": "~1.19.2",
     "java": ">=17"
   }
 }

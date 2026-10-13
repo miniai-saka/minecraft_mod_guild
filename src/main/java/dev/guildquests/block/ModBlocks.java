@@ -5,23 +5,23 @@ import dev.guildquests.item.ModItems;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.MapColor;
+import net.minecraft.block.Material;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
+import net.minecraft.util.registry.Registry;
 import net.minecraft.util.Identifier;
 
 public final class ModBlocks {
     public static final Block GUILD_BANK = new GuildBankBlock(
-            AbstractBlock.Settings.create()
+            AbstractBlock.Settings.of(Material.METAL, MapColor.GOLD)
                     .mapColor(MapColor.GOLD)
                     .strength(3.5f, 6.0f)
                     .requiresTool()
                     .nonOpaque());
 
     public static final Block GUILD_DEPOSIT = new GuildDepositBlock(
-            AbstractBlock.Settings.create()
+            AbstractBlock.Settings.of(Material.METAL, MapColor.GOLD)
                     .mapColor(MapColor.GOLD)
                     .strength(2.5f, 6.0f)
                     .requiresTool());
@@ -34,12 +34,12 @@ public final class ModBlocks {
 
     public static void register() {
         Identifier bankId = new Identifier(GuildQuestsMod.MOD_ID, "guild_bank");
-        Registry.register(Registries.BLOCK, bankId, GUILD_BANK);
-        Registry.register(Registries.ITEM, bankId, new BlockItem(GUILD_BANK, new Item.Settings()));
+        Registry.register(Registry.BLOCK, bankId, GUILD_BANK);
+        Registry.register(Registry.ITEM, bankId, new BlockItem(GUILD_BANK, new Item.Settings().group(ModItems.GUILD_TAB)));
 
         Identifier depositId = new Identifier(GuildQuestsMod.MOD_ID, "guild_deposit");
-        Registry.register(Registries.BLOCK, depositId, GUILD_DEPOSIT);
-        Registry.register(Registries.BLOCK_ENTITY_TYPE, depositId, GUILD_DEPOSIT_BE);
-        Registry.register(Registries.ITEM, depositId, new BlockItem(GUILD_DEPOSIT, new Item.Settings()));
+        Registry.register(Registry.BLOCK, depositId, GUILD_DEPOSIT);
+        Registry.register(Registry.BLOCK_ENTITY_TYPE, depositId, GUILD_DEPOSIT_BE);
+        Registry.register(Registry.ITEM, depositId, new BlockItem(GUILD_DEPOSIT, new Item.Settings().group(ModItems.GUILD_TAB)));
     }
 }
