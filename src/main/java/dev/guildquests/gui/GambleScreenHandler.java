@@ -7,9 +7,6 @@ import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtString;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
@@ -81,23 +78,10 @@ public final class GambleScreenHandler extends ScreenHandler {
     }
 
     private static ItemStack item(Item item, String name, String... lore) {
-        ItemStack stack = new ItemStack(item);
-        stack.setCustomName(Text.literal(name).formatted(Formatting.WHITE));
-        Text[] lines = new Text[lore.length];
-        for (int i = 0; i < lore.length; i++) lines[i] = Text.literal(lore[i]).formatted(Formatting.GRAY);
-        setLore(stack, lines);
-        return stack;
+        return GuildItems.item(item, name, lore);
     }
 
-    private static void setLore(ItemStack stack, Text... lines) {
-        if (lines.length == 0) return;
-        NbtCompound display = stack.getOrCreateSubNbt("display");
-        NbtList lore = new NbtList();
-        for (Text line : lines) {
-            lore.add(NbtString.of(Text.Serializer.toJson(line)));
-        }
-        display.put("Lore", lore);
-    }
+
 
     private void set(int slot, ItemStack stack) {
         display.setStack(slot, stack);
