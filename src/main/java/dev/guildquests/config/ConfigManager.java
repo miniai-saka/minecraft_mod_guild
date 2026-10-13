@@ -6,7 +6,7 @@ import dev.guildquests.GuildQuestsMod;
 import dev.guildquests.model.ExploreMode;
 import dev.guildquests.model.QuestDefinition;
 import dev.guildquests.model.QuestType;
-import net.fabricmc.loader.api.FabricLoader;
+import dev.guildquests.platform.Platform;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -22,7 +22,7 @@ import java.util.Set;
 
 public final class ConfigManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path DIR = FabricLoader.getInstance().getConfigDir().resolve("guildquests");
+    private static final Path DIR = Platform.configDir();
     private static final Path CONFIG = DIR.resolve("config.json");
     private static final Path QUESTS = DIR.resolve("quests.json");
 

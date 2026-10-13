@@ -2,10 +2,9 @@ package dev.guildquests.service;
 
 import dev.guildquests.config.ConfigManager;
 import dev.guildquests.config.ModConfig;
+import dev.guildquests.platform.Platform;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -287,13 +286,13 @@ public final class BossEvent {
 
     /** Sends the boss pin packet to one player. lifetimeTicks 0 clears the pin. */
     private static void sendBossPin(ServerPlayerEntity player, int x, int y, int z, int lifetimeTicks) {
-        if (!ServerPlayNetworking.canSend(player, BOSS_PIN)) return;
-        PacketByteBuf buf = PacketByteBufs.create();
+        if (!Platform.canSend(player, BOSS_PIN)) return;
+        PacketByteBuf buf = new PacketByteBuf(io.netty.buffer.Unpooled.buffer());
         buf.writeVarInt(x);
         buf.writeVarInt(y);
         buf.writeVarInt(z);
         buf.writeVarInt(lifetimeTicks);
-        ServerPlayNetworking.send(player, BOSS_PIN, buf);
+        Platform.send(player, BOSS_PIN, buf);
     }
 
     private static void clearBossPins(MinecraftServer server) {

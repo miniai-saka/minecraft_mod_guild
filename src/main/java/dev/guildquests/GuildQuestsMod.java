@@ -8,28 +8,21 @@ import dev.guildquests.data.PlayerGuildData;
 import dev.guildquests.gui.BankScreenHandler;
 import dev.guildquests.gui.GuildScreenHandler;
 import dev.guildquests.item.ModItems;
+import dev.guildquests.platform.Platform;
 import dev.guildquests.service.BossEvent;
 import dev.guildquests.service.GuildService;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class GuildQuestsMod implements ModInitializer {
     public static final String MOD_ID = "guildquests";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-    /** C2S: ask the server to open the guild quest screen (keybinding). */
-    private static final Identifier OPEN_GUILD = new Identifier(MOD_ID, "open_guild");
     private static int exploreTicker = 0;
     private static int riboTicker = 0;
 
@@ -40,19 +33,14 @@ public final class GuildQuestsMod implements ModInitializer {
         ModBlocks.register();
         BossEvent.init();
 
-        ServerPlayNetworking.registerGlobalReceiver(OPEN_GUILD, (server, player, handler, buf, responseSender) ->
-                server.execute(() -> GuildScreenHandler.openQuests(player)));
+        Platform.onOpenGuildRequest(GuildScreenHandler::openQuests);
 
         // The player-published quest (bounty board) system was removed; clean up old saves.
-        ServerLifecycleEvents.SERVER_STARTED.register(GuildService::purgePublishedQuests);
+        Platform.onServerStarted(GuildService::purgePublishedQuests);
 
-        ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, entity, killedEntity) -> {
-            if (entity instanceof ServerPlayerEntity player) {
-                GuildService.onKill(player, killedEntity);
-            }
-        });
+        Platform.onPlayerKill(GuildService::onKill);
 
-        ServerTickEvents.END_SERVER_TICK.register(server -> {
+        Platform.onServerTick(server -> {
             GuildService.ensureDailyBoard(server);
             dev.guildquests.gui.HorseRaceScreenHandler.tickAll(server);
 
@@ -72,7 +60,7 @@ public final class GuildQuestsMod implements ModInitializer {
             }
         });
 
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+        Platform.onCommands((dispatcher, registryAccess) -> {
             dispatcher.register(CommandManager.literal("guild")
                     .executes(context -> {
                         GuildScreenHandler.openQuests(context.getSource().getPlayerOrThrow());
