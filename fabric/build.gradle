@@ -8,7 +8,7 @@ architectury {
 }
 
 base {
-    archivesName = 'guildquests-fa1.20.1'
+    archivesName = 'guildquests_fabric-1.20.1'
 }
 
 configurations {
