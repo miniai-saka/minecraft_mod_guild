@@ -303,17 +303,28 @@ public final class BossEvent {
 
     /** Equips the boss with a unified, always-full enchanted diamond set. */
     private static void equip(Mob mob) {
-        Item weaponItem = WEAPONS[RANDOM.nextInt(WEAPONS.length)];
-        ItemStack weapon = new ItemStack(weaponItem);
-        weapon.enchant(Enchantments.SHARPNESS, 5);
-        weapon.enchant(Enchantments.FIRE_ASPECT, 2);
-        weapon.enchant(Enchantments.UNBREAKING, 3);
-        if (weaponItem instanceof SwordItem) {
-            weapon.enchant(Enchantments.KNOCKBACK, 2);
-            weapon.enchant(Enchantments.SWEEPING_EDGE, 2);
+        if (mob.getType() == EntityType.PILLAGER) {
+            // Pillagers only have a crossbow AI goal; giving them a melee weapon
+            // makes them unable to attack (they stand around "non-hostile").
+            ItemStack crossbow = new ItemStack(Items.CROSSBOW);
+            crossbow.enchant(Enchantments.QUICK_CHARGE, 3);
+            crossbow.enchant(Enchantments.MULTISHOT, 1);
+            crossbow.enchant(Enchantments.UNBREAKING, 3);
+            mob.setItemSlot(EquipmentSlot.MAINHAND, crossbow);
+            mob.setDropChance(EquipmentSlot.MAINHAND, 0f);
+        } else {
+            Item weaponItem = WEAPONS[RANDOM.nextInt(WEAPONS.length)];
+            ItemStack weapon = new ItemStack(weaponItem);
+            weapon.enchant(Enchantments.SHARPNESS, 5);
+            weapon.enchant(Enchantments.FIRE_ASPECT, 2);
+            weapon.enchant(Enchantments.UNBREAKING, 3);
+            if (weaponItem instanceof SwordItem) {
+                weapon.enchant(Enchantments.KNOCKBACK, 2);
+                weapon.enchant(Enchantments.SWEEPING_EDGE, 2);
+            }
+            mob.setItemSlot(EquipmentSlot.MAINHAND, weapon);
+            mob.setDropChance(EquipmentSlot.MAINHAND, 0f);
         }
-        mob.setItemSlot(EquipmentSlot.MAINHAND, weapon);
-        mob.setDropChance(EquipmentSlot.MAINHAND, 0f);
 
         for (int i = 0; i < ARMOR_SET.length; i++) {
             ItemStack armor = new ItemStack(ARMOR_SET[i]);
