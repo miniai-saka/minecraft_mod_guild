@@ -32,6 +32,7 @@ public class GuildDepositBlockEntity extends BlockEntity implements WorldlyConta
     private long lastNoticeAt = -100;
     private long unnotifiedCoins;
     private boolean notifyOnDeposit = true;
+    private boolean redstoneOnDeposit = false;
 
     public GuildDepositBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlocks.GUILD_DEPOSIT_BE, pos, state);
@@ -60,6 +61,27 @@ public class GuildDepositBlockEntity extends BlockEntity implements WorldlyConta
         setChanged();
     }
 
+    public boolean isRedstoneOnDeposit() {
+        return redstoneOnDeposit;
+    }
+
+    public void setRedstoneOnDeposit(boolean redstoneOnDeposit) {
+        this.redstoneOnDeposit = redstoneOnDeposit;
+        setChanged();
+    }
+
+    /** Emits a ~1s redstone pulse from the block if the setting is enabled. */
+    public void pulseRedstone() {
+        if (!redstoneOnDeposit) return;
+        Level world = getLevel();
+        if (world == null || world.isClientSide) return;
+        BlockPos pos = getBlockPos();
+        BlockState state = world.getBlockState(pos);
+        if (!state.is(ModBlocks.GUILD_DEPOSIT)) return;
+        world.setBlock(pos, state.setValue(GuildDepositBlock.POWERED, true), 3);
+        world.scheduleTick(pos, ModBlocks.GUILD_DEPOSIT, 20);
+    }
+
     /**
      * Server ticker: periodically converts held coins into the owner's account balance.
      * Conversion is skipped while the owner is delinquent so coins wait in the block.
@@ -84,6 +106,7 @@ public class GuildDepositBlockEntity extends BlockEntity implements WorldlyConta
         be.setItem(0, ItemStack.EMPTY);
         GuildService.creditCoins(server, be.ownerId, count);
         be.unnotifiedCoins += count;
+        be.pulseRedstone();
 
         if (be.notifyOnDeposit && world.getGameTime() - be.lastNoticeAt >= 100 && be.unnotifiedCoins > 0) {
             ServerPlayer owner = server.getPlayerList().getPlayer(be.ownerId);
@@ -191,6 +214,7 @@ public class GuildDepositBlockEntity extends BlockEntity implements WorldlyConta
         }
         nbt.putString("OwnerName", ownerName);
         nbt.putBoolean("NotifyOnDeposit", notifyOnDeposit);
+        nbt.putBoolean("RedstoneOnDeposit", redstoneOnDeposit);
         ContainerHelper.saveAllItems(nbt, inventory);
     }
 
@@ -200,6 +224,7 @@ public class GuildDepositBlockEntity extends BlockEntity implements WorldlyConta
         ownerId = nbt.contains("OwnerId") ? nbt.getUUID("OwnerId") : null;
         ownerName = nbt.getString("OwnerName");
         notifyOnDeposit = !nbt.contains("NotifyOnDeposit") || nbt.getBoolean("NotifyOnDeposit");
+        redstoneOnDeposit = nbt.getBoolean("RedstoneOnDeposit");
         inventory.clear();
         ContainerHelper.loadAllItems(nbt, inventory);
     }

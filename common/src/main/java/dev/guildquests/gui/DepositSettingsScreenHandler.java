@@ -129,6 +129,16 @@ public final class DepositSettingsScreenHandler extends AbstractContainerMenu {
         depositButton(4, 64, held);
         depositAllButton(5, held);
 
+        // Redstone pulse toggle.
+        boolean redstone = deposit.isRedstoneOnDeposit();
+        setAction(6, item(redstone ? Items.REDSTONE_BLOCK : Items.GRAY_CONCRETE,
+                        (redstone ? "● " : "") + "レッドストーン出力: " + (redstone ? "ON" : "OFF"),
+                        "クリックで切り替え",
+                        redstone ? "コイン入金時にレッドストーン信号を出します" : "レッドストーン出力は無効です"),
+                (p, b, t) -> {
+                    if (b == 0) deposit.setRedstoneOnDeposit(!deposit.isRedstoneOnDeposit());
+                });
+
         setAction(8, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeContainer());
     }
 
@@ -145,7 +155,9 @@ public final class DepositSettingsScreenHandler extends AbstractContainerMenu {
                         "手持ち -" + take + " → 残高 +" + take,
                         "手数料: 無料"),
                 (p, b, t) -> {
-                    if (b == 0) GuildService.depositHeldCoinsTo(p, deposit.getOwnerId(), deposit.getOwnerName(), amount);
+                    if (b == 0 && GuildService.depositHeldCoinsTo(p, deposit.getOwnerId(), deposit.getOwnerName(), amount)) {
+                        deposit.pulseRedstone();
+                    }
                 });
     }
 
@@ -161,7 +173,9 @@ public final class DepositSettingsScreenHandler extends AbstractContainerMenu {
                         "手持ち -" + held + " → 残高 +" + held,
                         "手数料: 無料"),
                 (p, b, t) -> {
-                    if (b == 0) GuildService.depositHeldCoinsTo(p, deposit.getOwnerId(), deposit.getOwnerName(), Long.MAX_VALUE);
+                    if (b == 0 && GuildService.depositHeldCoinsTo(p, deposit.getOwnerId(), deposit.getOwnerName(), Long.MAX_VALUE)) {
+                        deposit.pulseRedstone();
+                    }
                 });
     }
 
