@@ -14,7 +14,7 @@ architectury {
 }
 
 base {
-    archivesName = 'guildquests-forge1.20.1'
+    archivesName = 'guildquests-fo1.20.1'
 }
 
 configurations {
