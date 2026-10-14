@@ -311,6 +311,10 @@ public final class GuildService {
         if (amount <= 0) return false;
         GuildPersistentState state = GuildPersistentState.get(player.getServer());
         PlayerGuildData data = state.get(player.getUUID());
+        if (data.delinquent) {
+            riboLockMessage(player, data);
+            return false;
+        }
         if (data.coins < amount) return false;
         data.coins -= amount;
         state.setDirty();
@@ -434,7 +438,9 @@ public final class GuildService {
 
             data.nextRiboDueAt = now + interval;
             if (config.riboInterestPercent > 0) {
-                long interest = Math.round(data.debt * config.riboInterestPercent / 100.0);
+                // Avoid double overflow on huge debts: compute as double, clamp, then round.
+                double rawInterest = data.debt * (config.riboInterestPercent / 100.0);
+                long interest = rawInterest >= Long.MAX_VALUE ? Long.MAX_VALUE : Math.round(rawInterest);
                 if (interest > 0) data.debt = safeAdd(data.debt, interest);
             }
 
@@ -677,9 +683,15 @@ public final class GuildService {
                 } catch (RuntimeException ignored) {
                 }
                 if (targetWorld != null) {
-                    int top = targetWorld.getHeight(Heightmap.Types.MOTION_BLOCKING,
-                            (int) Math.floor(daily.x), (int) Math.floor(daily.z));
-                    if (top > targetWorld.getMinBuildHeight()) daily.y = top;
+                    int cx = (int) Math.floor(daily.x) >> 4;
+                    int cz = (int) Math.floor(daily.z) >> 4;
+                    // Only resolve Y when the chunk is already loaded; generating chunks
+                    // here would hitch the server and leave stray generated chunks.
+                    if (targetWorld.getChunkSource().getChunkNow(cx, cz) != null) {
+                        int top = targetWorld.getHeight(Heightmap.Types.MOTION_BLOCKING,
+                                (int) Math.floor(daily.x), (int) Math.floor(daily.z));
+                        if (top > targetWorld.getMinBuildHeight()) daily.y = top;
+                    }
                 }
             }
         }

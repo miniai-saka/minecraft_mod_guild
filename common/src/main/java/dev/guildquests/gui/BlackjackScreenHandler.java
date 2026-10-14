@@ -120,7 +120,12 @@ public final class BlackjackScreenHandler extends AbstractContainerMenu {
         dealerHand.add(drawCard());
         int pv = handValue(playerHand);
         int dv = handValue(dealerHand);
-        if (pv == 21) {
+        if (pv == 21 && dv == 21) {
+            state = State.DONE;
+            payout = betAmount;
+            result = "引き分け（返金）";
+            GuildService.creditCoins(owner.getServer(), owner.getUUID(), payout);
+        } else if (pv == 21) {
             state = State.DONE;
             payout = (long) (betAmount * 2.5);
             result = "ブラックジャック！";
@@ -261,7 +266,8 @@ public final class BlackjackScreenHandler extends AbstractContainerMenu {
 
     @Override
     public void clicked(int slotIndex, int button, ClickType actionType, Player player) {
-        if (slotIndex >= 0 && slotIndex < DISPLAY_SLOTS && player instanceof ServerPlayer serverPlayer) {
+        if (slotIndex >= 0 && slotIndex < DISPLAY_SLOTS && player instanceof ServerPlayer serverPlayer
+                && actionType == ClickType.PICKUP) {
             MenuAction action = actions.get(slotIndex);
             if (action != null) {
                 action.run(serverPlayer, button, actionType);
@@ -272,6 +278,7 @@ public final class BlackjackScreenHandler extends AbstractContainerMenu {
             }
             return;
         }
+        if (slotIndex >= 0 && slotIndex < DISPLAY_SLOTS) return;
         super.clicked(slotIndex, button, actionType, player);
     }
 

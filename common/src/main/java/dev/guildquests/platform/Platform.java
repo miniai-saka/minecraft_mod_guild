@@ -50,6 +50,10 @@ public final class Platform {
         b().onServerStarted(handler);
     }
 
+    public static void onServerStopped(Consumer<MinecraftServer> handler) {
+        b().onServerStopped(handler);
+    }
+
     public static void onPlayerKill(BiConsumer<ServerPlayer, LivingEntity> handler) {
         b().onPlayerKill(handler);
     }
@@ -95,6 +99,8 @@ public final class Platform {
         void onOpenGuildRequest(Consumer<ServerPlayer> handler);
 
         void onServerStarted(Consumer<MinecraftServer> handler);
+
+        void onServerStopped(Consumer<MinecraftServer> handler);
 
         void onPlayerKill(BiConsumer<ServerPlayer, LivingEntity> handler);
 

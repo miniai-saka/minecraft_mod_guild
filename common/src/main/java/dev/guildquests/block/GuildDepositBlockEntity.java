@@ -215,6 +215,8 @@ public class GuildDepositBlockEntity extends BlockEntity implements WorldlyConta
         nbt.putString("OwnerName", ownerName);
         nbt.putBoolean("NotifyOnDeposit", notifyOnDeposit);
         nbt.putBoolean("RedstoneOnDeposit", redstoneOnDeposit);
+        nbt.putLong("UnnotifiedCoins", unnotifiedCoins);
+        nbt.putLong("LastNoticeAt", lastNoticeAt);
         ContainerHelper.saveAllItems(nbt, inventory);
     }
 
@@ -225,6 +227,8 @@ public class GuildDepositBlockEntity extends BlockEntity implements WorldlyConta
         ownerName = nbt.getString("OwnerName");
         notifyOnDeposit = !nbt.contains("NotifyOnDeposit") || nbt.getBoolean("NotifyOnDeposit");
         redstoneOnDeposit = nbt.getBoolean("RedstoneOnDeposit");
+        unnotifiedCoins = nbt.getLong("UnnotifiedCoins");
+        lastNoticeAt = nbt.contains("LastNoticeAt") ? nbt.getLong("LastNoticeAt") : -100;
         inventory.clear();
         ContainerHelper.loadAllItems(nbt, inventory);
     }

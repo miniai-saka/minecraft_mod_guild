@@ -87,7 +87,8 @@ public final class TransferScreenHandler extends AbstractContainerMenu {
 
     @Override
     public void clicked(int slotIndex, int button, ClickType actionType, Player player) {
-        if (slotIndex >= 0 && slotIndex < DISPLAY_SLOTS && player instanceof ServerPlayer serverPlayer) {
+        if (slotIndex >= 0 && slotIndex < DISPLAY_SLOTS && player instanceof ServerPlayer serverPlayer
+                && actionType == ClickType.PICKUP) {
             MenuAction action = actions.get(slotIndex);
             if (action != null) {
                 action.run(serverPlayer, button, actionType);
@@ -98,6 +99,7 @@ public final class TransferScreenHandler extends AbstractContainerMenu {
             }
             return;
         }
+        if (slotIndex >= 0 && slotIndex < DISPLAY_SLOTS) return;
         super.clicked(slotIndex, button, actionType, player);
     }
 
@@ -185,14 +187,11 @@ public final class TransferScreenHandler extends AbstractContainerMenu {
         String[] labels = {"千の位", "百の位", "十の位", "一の位"};
         for (int i = 0; i < 4; i++) {
             int place = places[i];
-            int digit = (int) ((transferAmount / place) % 10);
-            setAction(5 + i, digitHead(digit, labels[i]),
+            setAction(5 + i, digitHead((int) ((transferAmount / place) % 10), labels[i]),
                     (p, b, t) -> {
-                        if (b == 0) {
-                            transferAmount = Math.floorMod(transferAmount + place, 10000);
-                        } else if (b == 1) {
-                            transferAmount = Math.floorMod(transferAmount - place, 10000);
-                        }
+                        int digit = (int) ((transferAmount / place) % 10);
+                        int next = Math.floorMod(digit + (b == 0 ? 1 : -1), 10);
+                        transferAmount = Math.min(9999, transferAmount - (long) digit * place + (long) next * place);
                     });
         }
 

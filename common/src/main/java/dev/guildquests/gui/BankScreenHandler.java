@@ -93,7 +93,8 @@ public final class BankScreenHandler extends AbstractContainerMenu {
 
     @Override
     public void clicked(int slotIndex, int button, ClickType actionType, Player player) {
-        if (slotIndex >= 0 && slotIndex < DISPLAY_SLOTS && player instanceof ServerPlayer serverPlayer) {
+        if (slotIndex >= 0 && slotIndex < DISPLAY_SLOTS && player instanceof ServerPlayer serverPlayer
+                && actionType == ClickType.PICKUP) {
             MenuAction action = actions.get(slotIndex);
             if (action != null) {
                 action.run(serverPlayer, button, actionType);
@@ -104,6 +105,7 @@ public final class BankScreenHandler extends AbstractContainerMenu {
             }
             return;
         }
+        if (slotIndex >= 0 && slotIndex < DISPLAY_SLOTS) return;
         super.clicked(slotIndex, button, actionType, player);
     }
 

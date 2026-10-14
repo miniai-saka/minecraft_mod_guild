@@ -52,6 +52,7 @@ public final class GuildQuestsMod {
 
         // The player-published quest (bounty board) system was removed; clean up old saves.
         Platform.onServerStarted(GuildService::purgePublishedQuests);
+        Platform.onServerStopped(server -> dev.guildquests.gui.HorseRaceScreenHandler.clearAll());
 
         Platform.onPlayerKill(GuildService::onKill);
 

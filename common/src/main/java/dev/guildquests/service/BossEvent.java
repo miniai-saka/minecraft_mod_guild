@@ -28,6 +28,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.Level;
@@ -108,7 +109,14 @@ public final class BossEvent {
                 || source.is(DamageTypes.HOT_FLOOR)
                 || source.is(DamageTypes.FREEZE)
                 || source.is(DamageTypes.STALAGMITE)
-                || source.is(DamageTypes.SWEET_BERRY_BUSH);
+                || source.is(DamageTypes.SWEET_BERRY_BUSH)
+                || source.is(DamageTypes.IN_WALL)
+                || source.is(DamageTypes.FALLING_BLOCK)
+                || source.is(DamageTypes.MAGIC)
+                || source.is(DamageTypes.WITHER)
+                || source.is(DamageTypes.DRAGON_BREATH)
+                || source.is(DamageTypes.CRAMMING)
+                || source.is(DamageTypes.WITHER_SKULL);
     }
 
     private static void tick(MinecraftServer server) {
@@ -132,11 +140,21 @@ public final class BossEvent {
                     needsRescue = true;
                 }
 
-                // Walled in: the block at the boss's feet is a full solid cube.
+                // Walled in: any solid block intersecting the boss's collision box.
                 if (!needsRescue) {
-                    var state = world.getBlockState(boss.blockPosition());
-                    if (state.isSolidRender(world, boss.blockPosition())) {
-                        needsRescue = true;
+                    var bounds = boss.getBoundingBox();
+                    for (int bx = Mth.floor(bounds.minX); bx <= Mth.floor(bounds.maxX); bx++) {
+                        for (int by = Mth.floor(bounds.minY); by <= Mth.floor(bounds.maxY); by++) {
+                            for (int bz = Mth.floor(bounds.minZ); bz <= Mth.floor(bounds.maxZ); bz++) {
+                                var state = world.getBlockState(new BlockPos(bx, by, bz));
+                                if (state.isSolidRender(world, new BlockPos(bx, by, bz))) {
+                                    needsRescue = true;
+                                    break;
+                                }
+                            }
+                            if (needsRescue) break;
+                        }
+                        if (needsRescue) break;
                     }
                 }
 
@@ -274,6 +292,7 @@ public final class BossEvent {
         double bestDist = Double.MAX_VALUE;
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (p.isRemoved() || !p.isAlive()) continue;
+            if (p.level() != from.level()) continue;
             double d = p.distanceToSqr(from);
             if (d < bestDist) {
                 bestDist = d;
@@ -339,6 +358,9 @@ public final class BossEvent {
     private static void onDamage(LivingEntity entity, DamageSource source, float amount) {
         if (!entity.getTags().contains(BOSS_TAG)) return;
         if (!(source.getEntity() instanceof ServerPlayer attacker)) return;
+        // Skip hits vanilla will reject: hurt cooldown (spam-click) or already dead.
+        if (entity.invulnerableTime > 10 && !source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_COOLDOWN)) return;
+        if (entity.isDeadOrDying()) return;
         damage.merge(attacker.getUUID(), (double) amount, Double::sum);
         damageNames.put(attacker.getUUID(), attacker.getName().getString());
         if (boss == null || boss.isRemoved() || !boss.isAlive()) adopt(entity);
@@ -404,6 +426,7 @@ public final class BossEvent {
 
     private static void adopt(LivingEntity entity) {
         boss = entity;
+        stuckTicks = 0;
         if (entity.getCustomName() != null) {
             bossName = entity.getCustomName().getString();
         }
@@ -434,6 +457,11 @@ public final class BossEvent {
             if (tracked == null) {
                 bar.addPlayer(player);
                 viewers.put(player.getUUID(), player);
+                // Late joiners need the map pin too.
+                if (markerLife > 0 && boss != null) {
+                    sendBossPin(player, Mth.floor(boss.getX()), Mth.floor(boss.getY()),
+                            Mth.floor(boss.getZ()), markerLife);
+                }
             } else if (tracked != player) {
                 bar.removePlayer(tracked);
                 bar.addPlayer(player);
@@ -455,5 +483,8 @@ public final class BossEvent {
         bar = null;
         boss = null;
         viewers.clear();
+        damage.clear();
+        damageNames.clear();
+        stuckTicks = 0;
     }
 }

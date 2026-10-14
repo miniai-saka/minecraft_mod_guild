@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 /** Forge implementation of the loader-neutral {@link Platform.Backend}. */
 public final class ForgeBackend implements Platform.Backend {
     private Consumer<MinecraftServer> serverStarted;
+    private Consumer<MinecraftServer> serverStopped;
     private Consumer<MinecraftServer> serverTick;
     private Platform.CommandHandler commands;
     private Platform.AllowDamageHandler allowDamage;
@@ -33,6 +34,7 @@ public final class ForgeBackend implements Platform.Backend {
     /** Wire the stored handlers up to the Forge event bus. Safe to call once at construction. */
     public void registerForgeEvents() {
         MinecraftForge.EVENT_BUS.addListener(this::handleServerStarted);
+        MinecraftForge.EVENT_BUS.addListener(this::handleServerStopped);
         MinecraftForge.EVENT_BUS.addListener(this::handleServerTick);
         MinecraftForge.EVENT_BUS.addListener(this::handleCommands);
         MinecraftForge.EVENT_BUS.addListener(this::handleLivingAttack);
@@ -42,6 +44,12 @@ public final class ForgeBackend implements Platform.Backend {
     private void handleServerStarted(ServerStartedEvent event) {
         if (serverStarted != null) {
             serverStarted.accept(event.getServer());
+        }
+    }
+
+    private void handleServerStopped(net.minecraftforge.event.server.ServerStoppedEvent event) {
+        if (serverStopped != null) {
+            serverStopped.accept(event.getServer());
         }
     }
 
@@ -91,6 +99,11 @@ public final class ForgeBackend implements Platform.Backend {
     @Override
     public void onServerStarted(Consumer<MinecraftServer> handler) {
         this.serverStarted = handler;
+    }
+
+    @Override
+    public void onServerStopped(Consumer<MinecraftServer> handler) {
+        this.serverStopped = handler;
     }
 
     @Override

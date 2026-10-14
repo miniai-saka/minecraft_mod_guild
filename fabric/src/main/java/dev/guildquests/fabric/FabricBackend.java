@@ -38,6 +38,11 @@ public final class FabricBackend implements Platform.Backend {
     }
 
     @Override
+    public void onServerStopped(Consumer<MinecraftServer> handler) {
+        ServerLifecycleEvents.SERVER_STOPPED.register(handler::accept);
+    }
+
+    @Override
     public void onPlayerKill(BiConsumer<ServerPlayer, LivingEntity> handler) {
         ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, entity, killedEntity) -> {
             if (entity instanceof ServerPlayer player) {
