@@ -42,6 +42,12 @@ processResources {
     filesMatching('fabric.mod.json') {
         expand version: inputs.properties.version
     }
+
+    // Fabric Loader resolves the access widener and mixin config from this module's
+    // own root in the dev runtime (where fabric.mod.json lives), so expose common's
+    // copies there too.
+    from(rootProject.file('common/src/main/resources/guildquests.accesswidener'))
+    from(rootProject.file('common/src/main/resources/guildquests.mixins.json'))
 }
 
 shadowJar {
