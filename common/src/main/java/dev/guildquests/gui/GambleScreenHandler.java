@@ -67,6 +67,8 @@ public final class GambleScreenHandler extends AbstractContainerMenu {
         set(4, item(Items.GOLD_INGOT, "所持コイン: " + balance));
 
         // Row 1: game selection
+        setAction(10, item(Items.AMETHYST_SHARD, "チンチロ", "クリックでプレイ", "サイコロで勝負！"),
+                (p, b, t) -> { if (b == 0) ChinchirorinScreenHandler.open(p); });
         setAction(11, item(Items.PLAYER_HEAD, "ブラックジャック", "クリックでプレイ", "21に近い方が勝ち"),
                 (p, b, t) -> { if (b == 0) BlackjackScreenHandler.open(p); });
         setAction(13, item(Items.HAY_BLOCK, "競馬", "クリックでプレイ", "馬に賭けて大勝負！"),

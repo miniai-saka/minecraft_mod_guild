@@ -1,7 +1,8 @@
 {
   "variants": {
-    "": {
-      "model": "guildquests:block/guild_bank"
-    }
+    "facing=north": { "model": "guildquests:block/guild_bank" },
+    "facing=south": { "model": "guildquests:block/guild_bank", "y": 180 },
+    "facing=east": { "model": "guildquests:block/guild_bank", "y": 270 },
+    "facing=west": { "model": "guildquests:block/guild_bank", "y": 90 }
   }
 }
