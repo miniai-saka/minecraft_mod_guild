@@ -22,12 +22,30 @@ public final class PlayerGuildData {
     public long nextRiboDueAt = 0;
     public final List<ActiveQuest> activeQuests = new ArrayList<>();
     public final Set<String> completedQuestIds = new HashSet<>();
+    /** Board day (floor(dayTime/24000)) that claimedExploreQuestIds belongs to; -1 when unset. */
+    public long claimedBoardDay = -1;
+    /** EXPLORE quest ids already claimed on claimedBoardDay; blocked from re-acceptance until the next draw. */
+    public final Set<String> claimedExploreQuestIds = new HashSet<>();
 
     public ActiveQuest findActive(String questId) {
         for (ActiveQuest active : activeQuests) {
             if (active.questId.equals(questId)) return active;
         }
         return null;
+    }
+
+    /** Records an explore-quest claim for the given board day, resetting when the day changes. */
+    public void markExploreClaimed(long boardDay, String questId) {
+        if (claimedBoardDay != boardDay) {
+            claimedBoardDay = boardDay;
+            claimedExploreQuestIds.clear();
+        }
+        claimedExploreQuestIds.add(questId);
+    }
+
+    /** True when this explore quest was already claimed on the given board day. */
+    public boolean exploreClaimedToday(long boardDay, String questId) {
+        return claimedBoardDay == boardDay && claimedExploreQuestIds.contains(questId);
     }
 
     public CompoundTag toNbt() {
@@ -50,6 +68,15 @@ public final class PlayerGuildData {
             completedList.add(entry);
         }
         nbt.put("CompletedQuestIds", completedList);
+
+        nbt.putLong("ClaimedBoardDay", claimedBoardDay);
+        ListTag claimedList = new ListTag();
+        for (String id : claimedExploreQuestIds) {
+            CompoundTag entry = new CompoundTag();
+            entry.putString("Id", id);
+            claimedList.add(entry);
+        }
+        nbt.put("ClaimedExploreQuestIds", claimedList);
         return nbt;
     }
 
@@ -77,6 +104,14 @@ public final class PlayerGuildData {
         for (int i = 0; i < completedList.size(); i++) {
             String id = completedList.getCompound(i).getString("Id");
             if (!id.isBlank()) data.completedQuestIds.add(id);
+        }
+
+        // Absent on old saves: keep the -1 default so nothing is treated as claimed.
+        if (nbt.contains("ClaimedBoardDay")) data.claimedBoardDay = nbt.getLong("ClaimedBoardDay");
+        ListTag claimedList = nbt.getList("ClaimedExploreQuestIds", Tag.TAG_COMPOUND);
+        for (int i = 0; i < claimedList.size(); i++) {
+            String id = claimedList.getCompound(i).getString("Id");
+            if (!id.isBlank()) data.claimedExploreQuestIds.add(id);
         }
         return data;
     }

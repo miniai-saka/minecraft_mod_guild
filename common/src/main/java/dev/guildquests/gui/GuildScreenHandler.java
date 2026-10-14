@@ -173,6 +173,12 @@ public final class GuildScreenHandler extends AbstractContainerMenu {
                 icon = item(Items.GRAY_DYE, "[達成済] " + title,
                         quest.description,
                         "このクエストは再受注できません。");
+            } else if (quest.type == QuestType.EXPLORE
+                    && data.exploreClaimedToday(GuildService.boardDay(owner.getServer()), quest.id)) {
+                icon = item(Items.GRAY_DYE, "[本日達成済] " + title,
+                        quest.description,
+                        "この探索クエストは本日はもう受注できません。",
+                        "次の抽選でお挑戦できます。");
             } else if (active != null) {
                 int amount = GuildService.effectiveAmount(active, quest);
                 icon = questIcon(quest, "[受注中] " + title,

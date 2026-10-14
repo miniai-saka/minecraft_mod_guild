@@ -76,6 +76,10 @@ public final class GuildService {
             message(player, "本日のクエストではありません（次回の抽選をお待ちください）。", ChatFormatting.YELLOW);
             return false;
         }
+        if (quest.type == QuestType.EXPLORE && data.exploreClaimedToday(boardDay(player.getServer()), quest.id)) {
+            message(player, "この探索クエストは本日達成済みです（次の抽選でお挑戦ください）。", ChatFormatting.YELLOW);
+            return false;
+        }
 
         ActiveQuest active = new ActiveQuest(quest.id, 0);
         active.target = daily.target.isBlank() ? null : daily.target;
@@ -269,6 +273,9 @@ public final class GuildService {
         data.coins = safeAdd(data.coins, reward);
         data.completedTotal++;
         data.completedQuestIds.add(quest.id);
+        if (quest.type == QuestType.EXPLORE) {
+            data.markExploreClaimed(boardDay(player.getServer()), quest.id);
+        }
         data.activeQuests.remove(active);
         state.setDirty();
 
@@ -603,10 +610,15 @@ public final class GuildService {
     // Daily board (server-wide draw, refreshed once per in-game day)
     // ---------------------------------------------------------------------
 
+    /** Current daily-board day index; changes once per 24000 ticks. */
+    public static long boardDay(MinecraftServer server) {
+        return Math.floorDiv(server.overworld().getDayTime(), 24000L);
+    }
+
     /** Draws today's quest board when the in-game day changed. Safe to call every tick. */
     public static void ensureDailyBoard(MinecraftServer server) {
         GuildPersistentState state = GuildPersistentState.get(server);
-        long day = Math.floorDiv(server.overworld().getDayTime(), 24000L);
+        long day = boardDay(server);
         if (day == state.dailyBoardDay) return;
 
         state.dailyBoard.clear();
