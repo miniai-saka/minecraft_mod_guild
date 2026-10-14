@@ -1,0 +1,157 @@
+package dev.guildquests;
+
+import com.mojang.brigadier.arguments.LongArgumentType;
+import dev.guildquests.block.ModBlocks;
+import dev.guildquests.config.ConfigManager;
+import dev.guildquests.data.GuildPersistentState;
+import dev.guildquests.data.PlayerGuildData;
+import dev.guildquests.gui.BankScreenHandler;
+import dev.guildquests.gui.GuildScreenHandler;
+import dev.guildquests.item.ModItems;
+import dev.guildquests.platform.ContentRegistrar;
+import dev.guildquests.platform.Platform;
+import dev.guildquests.service.BossEvent;
+import dev.guildquests.service.GuildService;
+import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.Commands;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public final class GuildQuestsMod {
+    public static final String MOD_ID = "guildquests";
+    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+    private static int exploreTicker = 0;
+    private static int riboTicker = 0;
+
+    private GuildQuestsMod() {
+    }
+
+    /**
+     * Registers this mod's content (blocks, items, block entities, creative tab).
+     * <p>
+     * Fabric calls this once from its initializer; Forge instead calls the individual
+     * {@code register*} methods from per-registry {@code RegisterEvent} handlers,
+     * because its vanilla registries are locked by the time mods construct.
+     */
+    public static void registerContent(ContentRegistrar registrar) {
+        ModBlocks.registerBlocks(registrar);
+        ModBlocks.registerBlockItems(registrar);
+        ModBlocks.registerBlockEntityTypes(registrar);
+        ModItems.registerItems(registrar);
+        ModItems.registerCreativeTab(registrar);
+    }
+
+    public static void init() {
+        ConfigManager.loadAll();
+        BossEvent.init();
+
+        Platform.onOpenGuildRequest(GuildScreenHandler::openQuests);
+
+        // The player-published quest (bounty board) system was removed; clean up old saves.
+        Platform.onServerStarted(GuildService::purgePublishedQuests);
+
+        Platform.onPlayerKill(GuildService::onKill);
+
+        Platform.onServerTick(server -> {
+            GuildService.ensureDailyBoard(server);
+            dev.guildquests.gui.HorseRaceScreenHandler.tickAll(server);
+
+            int interval = ConfigManager.config().exploreCheckIntervalTicks;
+            exploreTicker++;
+            if (exploreTicker >= interval) {
+                exploreTicker = 0;
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    GuildService.checkExplore(player);
+                }
+            }
+
+            riboTicker++;
+            if (riboTicker >= 100) {
+                riboTicker = 0;
+                GuildService.runRiboCycles(server);
+            }
+        });
+
+        Platform.onCommands((dispatcher, registryAccess) -> {
+            dispatcher.register(Commands.literal("guild")
+                    .executes(context -> {
+                        GuildScreenHandler.openQuests(context.getSource().getPlayerOrException());
+                        return 1;
+                    })
+                    .then(Commands.literal("status")
+                            .executes(context -> {
+                                ServerPlayer player = context.getSource().getPlayerOrException();
+                                PlayerGuildData data = GuildService.data(player);
+                                player.sendSystemMessage(Component.literal("[Guild] ").withStyle(ChatFormatting.GOLD)
+                                        .append(Component.literal("Rank " + GuildService.rank(data)
+                                                + " | Coins " + data.coins
+                                                + " | Total " + data.completedTotal
+                                                + " | Pay " + GuildService.paymentModeLabel(GuildService.paymentMode(data))
+                                                + (data.debt > 0 ? " | Debt " + data.debt + (data.delinquent ? "（延滞中・ロック）" : "") : "")
+                                        ).withStyle(ChatFormatting.YELLOW)));
+                                return 1;
+                            }))
+                    .then(Commands.literal("bank")
+                            .executes(context -> {
+                                BankScreenHandler.open(context.getSource().getPlayerOrException());
+                                return 1;
+                            })));
+
+            var guildAdmin = Commands.literal("guildadmin")
+                    .requires(source -> source.hasPermission(2));
+
+            guildAdmin.then(Commands.literal("reload")
+                    .executes(context -> {
+                        ConfigManager.loadAll();
+                        context.getSource().sendSuccess(() -> Component.literal("GuildQuests configuration reloaded."), true);
+                        return 1;
+                    }));
+
+            guildAdmin.then(Commands.literal("boss")
+                    .executes(context -> {
+                        boolean spawned = BossEvent.spawnNow(context.getSource().getServer());
+                        boolean result = spawned;
+                        context.getSource().sendSuccess(() -> Component.literal(result
+                                ? "Emergency boss spawned (chance roll skipped)."
+                                : "Boss spawn failed: no players online or a boss is already alive."), false);
+                        return spawned ? 1 : 0;
+                    }));
+
+            var coins = Commands.literal("coins");
+            coins.then(Commands.literal("set")
+                    .then(Commands.argument("player", EntityArgument.player())
+                            .then(Commands.argument("amount", LongArgumentType.longArg(0))
+                                    .executes(context -> {
+                                        ServerPlayer target = EntityArgument.getPlayer(context, "player");
+                                        long amount = LongArgumentType.getLong(context, "amount");
+                                        GuildPersistentState state = GuildPersistentState.get(context.getSource().getServer());
+                                        PlayerGuildData data = state.get(target.getUUID());
+                                        data.coins = amount;
+                                        state.setDirty();
+                                        context.getSource().sendSuccess(() -> Component.literal("Set " + target.getName().getString() + " coins to " + amount), true);
+                                        return 1;
+                                    }))));
+            coins.then(Commands.literal("add")
+                    .then(Commands.argument("player", EntityArgument.player())
+                            .then(Commands.argument("amount", LongArgumentType.longArg(0))
+                                    .executes(context -> {
+                                        ServerPlayer target = EntityArgument.getPlayer(context, "player");
+                                        long amount = LongArgumentType.getLong(context, "amount");
+                                        GuildPersistentState state = GuildPersistentState.get(context.getSource().getServer());
+                                        PlayerGuildData data = state.get(target.getUUID());
+                                        data.coins = data.coins > Long.MAX_VALUE - amount ? Long.MAX_VALUE : data.coins + amount;
+                                        state.setDirty();
+                                        context.getSource().sendSuccess(() -> Component.literal("Added " + amount + " coins to " + target.getName().getString()), true);
+                                        return 1;
+                                    }))));
+            guildAdmin.then(coins);
+
+            dispatcher.register(guildAdmin);
+        });
+
+        LOGGER.info("Guild Quests & Economy initialized (multi-loader 1.20.1)");
+    }
+}

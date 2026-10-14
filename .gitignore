@@ -37,5 +37,5 @@ run/
 *.iws
 .vscode/
 
-# Gradle wrapper (not used in this project)
-gradle/wrapper/
+# Gradle wrapper (committed so the multi-loader build works out of the box)
+!gradle/wrapper/gradle-wrapper.jar

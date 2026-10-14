@@ -1,71 +1,56 @@
 plugins {
-    id 'fabric-loom' version '1.18.2'
-    id 'maven-publish'
+    id 'dev.architectury.loom' version '1.17-SNAPSHOT' apply false
+    id 'architectury-plugin' version '3.5-SNAPSHOT'
+    id 'com.gradleup.shadow' version '9.4.3' apply false
 }
 
-version = project.mod_version
-group = project.group
-
-base {
-    archivesName = project.archives_base_name
+architectury {
+    minecraft = project.minecraft_version
 }
 
-repositories {
-    mavenCentral()
-    maven {
-        name = "curse maven"
-        url = "https://cursemaven.com"
+allprojects {
+    group = rootProject.maven_group
+    version = rootProject.mod_version
+}
+
+subprojects {
+    apply plugin: 'dev.architectury.loom'
+    apply plugin: 'architectury-plugin'
+
+    base {
+        archivesName = "$rootProject.archives_name-$project.name"
     }
-}
 
-dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-
-    modImplementation "curse.maven:create-fabric-624165:7286603"
-
-    modCompileOnly fileTree(dir: 'libs/nested-mods', include: '*.jar')
-}
-
-processResources {
-    inputs.property "version", project.version
-    filesMatching("fabric.mod.json") {
-        expand "version": project.version
-    }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    it.options.release = 17
-    it.options.encoding = 'UTF-8'
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
-    withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-}
-
-jar {
-    from("LICENSE") {
-        rename { "${it}_${project.archives_base_name}" }
-    }
-}
-
-// LoomのremapJar後にバージョン区切りをアンダースコアへリネーム
-tasks.matching { it.name == 'remapJar' }.configureEach {
-    doLast {
-        def f = archiveFile.get().asFile
-        def name = f.name
-        def idx = name.lastIndexOf('-')
-        if (idx > 0) {
-            def target = new File(f.parentFile, name.substring(0, idx) + '_' + name.substring(idx + 1))
-            f.renameTo(target)
+    repositories {
+        mavenCentral()
+        maven {
+            name = 'curse maven'
+            url = 'https://cursemaven.com'
+        }
+        maven {
+            name = 'modrinth'
+            url = 'https://api.modrinth.com/maven'
         }
     }
-}
 
+    loom {
+        silentMojangMappingsLicense()
+    }
+
+    dependencies {
+        minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
+        mappings loom.officialMojangMappings()
+    }
+
+    java {
+        withSourcesJar()
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        it.options.release = 17
+        it.options.encoding = 'UTF-8'
+        it.options.compilerArgs << '-Xmaxerrs' << '5000'
+    }
+}
