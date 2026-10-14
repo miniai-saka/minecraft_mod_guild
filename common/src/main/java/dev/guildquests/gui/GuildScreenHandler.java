@@ -120,6 +120,10 @@ public final class GuildScreenHandler extends AbstractContainerMenu {
                 "累計達成: " + data.completedTotal + " 件"));
         set(2, item(Items.CLOCK, "同時受注上限: " + ConfigManager.config().maxActiveQuests + " 件",
                 "クエスト報酬に日次上限はありません。"));
+        setAction(5, item(Items.SPYGLASS, "ランキング",
+                "クリックでギルドランキングを開きます",
+                "コイン / クエスト達成数で順位表示"),
+                (p, b, t) -> { if (b == 0) RankingScreenHandler.open(p); });
 
         populateQuests(data);
     }

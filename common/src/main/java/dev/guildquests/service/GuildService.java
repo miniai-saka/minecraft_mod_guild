@@ -46,7 +46,13 @@ public final class GuildService {
     }
 
     public static PlayerGuildData data(ServerPlayer player) {
-        return GuildPersistentState.get(player.getServer()).get(player.getUUID());
+        PlayerGuildData data = GuildPersistentState.get(player.getServer()).get(player.getUUID());
+        String name = player.getGameProfile().getName();
+        if (!name.equals(data.playerName)) {
+            data.playerName = name;
+            GuildPersistentState.get(player.getServer()).setDirty();
+        }
+        return data;
     }
 
     public static boolean acceptQuest(ServerPlayer player, QuestDefinition quest) {

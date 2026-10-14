@@ -12,6 +12,8 @@ import java.util.Set;
 public final class PlayerGuildData {
     public long coins = 0;
     public int completedTotal = 0;
+    /** Last known player name; used for the ranking when the player is offline. */
+    public String playerName = "";
     /** Payment mode for Create shop purchases: RIBO / DEBIT / DISABLED. */
     public String paymentMode = "DEBIT";
     /** Outstanding revolving-credit (ribo) debt in coins, including accrued interest. */
@@ -52,6 +54,7 @@ public final class PlayerGuildData {
         CompoundTag nbt = new CompoundTag();
         nbt.putLong("Coins", coins);
         nbt.putInt("CompletedTotal", completedTotal);
+        nbt.putString("PlayerName", playerName == null ? "" : playerName);
         nbt.putString("PaymentMode", paymentMode == null ? "DEBIT" : paymentMode);
         nbt.putLong("Debt", debt);
         nbt.putBoolean("Delinquent", delinquent);
@@ -84,6 +87,7 @@ public final class PlayerGuildData {
         PlayerGuildData data = new PlayerGuildData();
         data.coins = Math.max(0L, nbt.getLong("Coins"));
         data.completedTotal = Math.max(0, nbt.getInt("CompletedTotal"));
+        data.playerName = nbt.getString("PlayerName");
         data.paymentMode = nbt.getString("PaymentMode");
         if (data.paymentMode.isBlank()) data.paymentMode = "DEBIT";
         data.debt = Math.max(0L, nbt.getLong("Debt"));
