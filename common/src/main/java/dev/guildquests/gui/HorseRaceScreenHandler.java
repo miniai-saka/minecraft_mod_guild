@@ -40,6 +40,7 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
         int selectedHorse = -1;
         boolean raceActive;
         boolean raceDone;
+        boolean menuOpen;
         int winner = -1;
         final int[] positions = {0, 0, 0, 0};
         int raceTicks;
@@ -61,6 +62,7 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
         super(MenuType.GENERIC_9x6, syncId);
         this.owner = owner;
         this.state = RACES.computeIfAbsent(owner.getUUID(), ignored -> new RaceState());
+        this.state.menuOpen = true;
 
         // 54 display slots (9x6)
         for (int i = 0; i < DISPLAY_SLOTS; i++) {
@@ -128,9 +130,12 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
             }
             return false;
         });
-        // Drop finished/idle entries so the map does not grow forever.
-        RACES.entrySet().removeIf(entry -> !entry.getValue().raceActive && entry.getValue().betAmount <= 0
-                && !entry.getValue().raceDone);
+        // Keep a state only while its menu is open or a race is in progress; drop the rest
+        // so the map cannot grow. Crucially, do NOT drop a state mid-selection (menu open).
+        RACES.entrySet().removeIf(entry -> {
+            RaceState s = entry.getValue();
+            return !s.raceActive && !s.menuOpen;
+        });
     }
 
     private static void finishRace(MinecraftServer server, UUID playerId, RaceState s) {
@@ -144,6 +149,8 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
         if (state.raceActive) return;
         if (state.betAmount <= 0 || state.selectedHorse < 0) return;
         if (!GuildService.payCoins(owner, state.betAmount)) return;
+        // Ensure the tick loop can see this race even if the entry was evicted while idle.
+        RACES.put(owner.getUUID(), state);
         state.raceActive = true;
         state.raceDone = false;
         state.winner = -1;
@@ -302,4 +309,10 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) { return player == owner && !owner.isRemoved(); }
+
+    @Override
+    public void removed(Player player) {
+        super.removed(player);
+        state.menuOpen = false;
+    }
 }
