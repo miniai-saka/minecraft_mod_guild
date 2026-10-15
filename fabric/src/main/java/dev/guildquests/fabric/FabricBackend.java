@@ -27,6 +27,16 @@ public final class FabricBackend implements Platform.Backend {
     }
 
     @Override
+    public String getLoaderName() {
+        return "fabric";
+    }
+
+    @Override
+    public Path getModsDir() {
+        return FabricLoader.getInstance().getGameDir().resolve("mods");
+    }
+
+    @Override
     public void onOpenGuildRequest(Consumer<ServerPlayer> handler) {
         ServerPlayNetworking.registerGlobalReceiver(Platform.OPEN_GUILD,
                 (server, player, listener, buf, sender) -> server.execute(() -> handler.accept(player)));

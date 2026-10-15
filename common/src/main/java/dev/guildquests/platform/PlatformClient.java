@@ -46,6 +46,11 @@ public final class PlatformClient {
         b().onDisconnect(handler);
     }
 
+    /** Called every client tick. currentScreen is the active screen, or null. */
+    public static void onClientTick(java.util.function.Consumer<net.minecraft.client.gui.screens.Screen> handler) {
+        b().onClientTick(handler);
+    }
+
     public static void onWorldRender(WorldRenderHandler handler) {
         b().onWorldRender(handler);
     }
@@ -70,6 +75,8 @@ public final class PlatformClient {
         void onBossPin(BossPinHandler handler);
 
         void onDisconnect(Runnable handler);
+
+        void onClientTick(java.util.function.Consumer<net.minecraft.client.gui.screens.Screen> handler);
 
         void onWorldRender(WorldRenderHandler handler);
     }

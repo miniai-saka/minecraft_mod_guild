@@ -3,6 +3,7 @@ package dev.guildquests.data;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,6 +29,8 @@ public final class PlayerGuildData {
     public long claimedBoardDay = -1;
     /** EXPLORE quest ids already claimed on claimedBoardDay; blocked from re-acceptance until the next draw. */
     public final Set<String> claimedExploreQuestIds = new HashSet<>();
+    /** Auction-house mailbox: items owed to this player (winnings, refunds, expired listings). */
+    public final List<ItemStack> mailbox = new ArrayList<>();
 
     public ActiveQuest findActive(String questId) {
         for (ActiveQuest active : activeQuests) {
@@ -80,6 +83,12 @@ public final class PlayerGuildData {
             claimedList.add(entry);
         }
         nbt.put("ClaimedExploreQuestIds", claimedList);
+
+        ListTag mailboxList = new ListTag();
+        for (ItemStack stack : mailbox) {
+            if (stack != null && !stack.isEmpty()) mailboxList.add(stack.save(new CompoundTag()));
+        }
+        nbt.put("AuctionMailbox", mailboxList);
         return nbt;
     }
 
@@ -116,6 +125,12 @@ public final class PlayerGuildData {
         for (int i = 0; i < claimedList.size(); i++) {
             String id = claimedList.getCompound(i).getString("Id");
             if (!id.isBlank()) data.claimedExploreQuestIds.add(id);
+        }
+
+        ListTag mailboxList = nbt.getList("AuctionMailbox", Tag.TAG_COMPOUND);
+        for (int i = 0; i < mailboxList.size(); i++) {
+            ItemStack stack = ItemStack.of(mailboxList.getCompound(i));
+            if (!stack.isEmpty()) data.mailbox.add(stack);
         }
         return data;
     }

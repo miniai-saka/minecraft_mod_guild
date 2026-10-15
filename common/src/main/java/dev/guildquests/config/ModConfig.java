@@ -49,6 +49,18 @@ public final class ModConfig {
     /** Minutes between scheduled ribo collections. */
     public int riboIntervalMinutes = 60;
 
+    /** Auction house: percent fee taken from the seller's proceeds on a successful sale. */
+    public double auctionFeePercent = 5.0;
+
+    /** Minutes an auction listing stays active before it expires and settles. */
+    public int auctionDurationMinutes = 60;
+
+    /** Maximum concurrent active auction listings per player. Clamped to 1..45. */
+    public int auctionMaxListingsPerPlayer = 5;
+
+    /** Minimum increment a new bid must add over the current highest bid. */
+    public long auctionBidStep = 1;
+
     /** Rank name -> required total completions. Insertion order is used for display. */
     public Map<String, Integer> rankThresholds = new LinkedHashMap<>();
 

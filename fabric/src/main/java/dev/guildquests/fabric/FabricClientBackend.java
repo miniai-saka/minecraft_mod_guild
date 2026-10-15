@@ -67,6 +67,11 @@ public final class FabricClientBackend implements PlatformClient.ClientBackend {
     }
 
     @Override
+    public void onClientTick(java.util.function.Consumer<net.minecraft.client.gui.screens.Screen> handler) {
+        ClientTickEvents.END_CLIENT_TICK.register(client -> handler.accept(client.screen));
+    }
+
+    @Override
     public void onWorldRender(PlatformClient.WorldRenderHandler handler) {
         WorldRenderEvents.AFTER_TRANSLUCENT.register(context ->
                 handler.render(new FabricWorldRenderContext(context.camera(), context.matrixStack())));

@@ -6,6 +6,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
 
@@ -83,6 +84,27 @@ public final class GuildItems {
                 "送金額 " + placeLabel + ": " + digit,
                 "左クリックで +1（0-9 で循環）",
                 "右クリックで -1");
+    }
+
+    /**
+     * Copy of {@code base} with an overridden name and extra gray lore lines appended
+     * after the item's existing lore (so enchantments/custom lore stay visible).
+     * Used to render escrowed/mailbox items without mutating the stored stack.
+     */
+    public static ItemStack decorateCopy(ItemStack base, ChatFormatting nameFormat, String name, String... extraLore) {
+        ItemStack stack = base.copy();
+        stack.setHoverName(Component.literal(name).withStyle(nameFormat));
+        CompoundTag display = stack.getOrCreateTagElement("display");
+        ListTag lore = new ListTag();
+        if (display.contains("Lore", Tag.TAG_LIST)) {
+            ListTag existing = display.getList("Lore", Tag.TAG_STRING);
+            for (int i = 0; i < existing.size(); i++) lore.add(existing.get(i));
+        }
+        for (String line : extraLore) {
+            lore.add(StringTag.valueOf(Component.Serializer.toJson(Component.literal(line).withStyle(ChatFormatting.GRAY))));
+        }
+        display.put("Lore", lore);
+        return stack;
     }
 
     private static void setLore(ItemStack stack, Component... lines) {

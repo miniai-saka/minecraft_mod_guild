@@ -15,6 +15,7 @@ import dev.guildquests.item.ModItems;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.Container;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -845,6 +846,42 @@ public final class GuildService {
             }
         }
         return remaining <= 0;
+    }
+
+    /** True when the whole incoming stack would fit into the player's main inventory. */
+    public static boolean canFitStack(Inventory inventory, ItemStack incoming) {
+        return canFit(inventory, incoming);
+    }
+
+    /**
+     * Merges a stack into the player's main inventory (slots 0..35), returning the
+     * leftover that did not fit (empty when everything was placed). Marks the
+     * inventory dirty when anything changed.
+     */
+    public static ItemStack giveStack(Inventory inventory, ItemStack incoming) {
+        ItemStack remaining = incoming.copy();
+        boolean changed = false;
+        for (int i = 0; i < 36 && !remaining.isEmpty(); i++) {
+            ItemStack existing = inventory.getItem(i);
+            if (existing.isEmpty()) {
+                int give = (int) Math.min(remaining.getMaxStackSize(), remaining.getCount());
+                ItemStack add = remaining.copy();
+                add.setCount(give);
+                inventory.setItem(i, add);
+                remaining.shrink(give);
+                changed = true;
+            } else if (ItemStack.isSameItemSameTags(existing, remaining)) {
+                int space = Math.max(0, existing.getMaxStackSize() - existing.getCount());
+                int give = Math.min(space, remaining.getCount());
+                if (give > 0) {
+                    existing.grow(give);
+                    remaining.shrink(give);
+                    changed = true;
+                }
+            }
+        }
+        if (changed) inventory.setChanged();
+        return remaining;
     }
 
     private static ResourceLocation safeIdentifier(String raw) {

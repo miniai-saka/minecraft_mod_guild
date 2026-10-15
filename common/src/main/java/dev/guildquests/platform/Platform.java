@@ -42,6 +42,16 @@ public final class Platform {
         return b().configDir();
     }
 
+    /** Loader name: "fabric" or "forge". */
+    public static String getLoaderName() {
+        return b().getLoaderName();
+    }
+
+    /** Path to the mods folder. */
+    public static Path getModsDir() {
+        return b().getModsDir();
+    }
+
     public static void onOpenGuildRequest(Consumer<ServerPlayer> handler) {
         b().onOpenGuildRequest(handler);
     }
@@ -95,6 +105,10 @@ public final class Platform {
 
     public interface Backend {
         Path configDir();
+
+        String getLoaderName();
+
+        Path getModsDir();
 
         void onOpenGuildRequest(Consumer<ServerPlayer> handler);
 

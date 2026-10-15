@@ -92,6 +92,16 @@ public final class ForgeBackend implements Platform.Backend {
     }
 
     @Override
+    public String getLoaderName() {
+        return "forge";
+    }
+
+    @Override
+    public Path getModsDir() {
+        return FMLPaths.MODSDIR.get();
+    }
+
+    @Override
     public void onOpenGuildRequest(Consumer<ServerPlayer> handler) {
         ForgeNetwork.setOpenGuildHandler(handler);
     }

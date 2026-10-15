@@ -33,10 +33,11 @@ final class ForgeClientBackend implements PlatformClient.ClientBackend {
     private boolean keysRegistered;
     private Runnable disconnectHandler;
     private PlatformClient.WorldRenderHandler worldRenderHandler;
+    private java.util.function.Consumer<net.minecraft.client.gui.screens.Screen> clientTickHandler;
 
     ForgeClientBackend(IEventBus modBus) {
         modBus.addListener(this::onRegisterKeyMappings);
-        MinecraftForge.EVENT_BUS.addListener(this::onClientTick);
+        MinecraftForge.EVENT_BUS.addListener((net.minecraftforge.event.TickEvent.ClientTickEvent e) -> onClientTick(e));
         MinecraftForge.EVENT_BUS.addListener(this::onLoggingOut);
         MinecraftForge.EVENT_BUS.addListener(this::onRenderLevel);
     }
@@ -59,6 +60,9 @@ final class ForgeClientBackend implements PlatformClient.ClientBackend {
             while (bound.key().consumeClick()) {
                 bound.onPress().run();
             }
+        }
+        if (clientTickHandler != null) {
+            clientTickHandler.accept(Minecraft.getInstance().screen);
         }
     }
 
@@ -110,6 +114,11 @@ final class ForgeClientBackend implements PlatformClient.ClientBackend {
     @Override
     public void onDisconnect(Runnable handler) {
         this.disconnectHandler = handler;
+    }
+
+    @Override
+    public void onClientTick(java.util.function.Consumer<net.minecraft.client.gui.screens.Screen> handler) {
+        this.clientTickHandler = handler;
     }
 
     @Override

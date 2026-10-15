@@ -14,6 +14,10 @@
   "riboInstallment": 500,
   "riboInterestPercent": 2.0,
   "riboIntervalMinutes": 60,
+  "auctionFeePercent": 5.0,
+  "auctionDurationMinutes": 60,
+  "auctionMaxListingsPerPlayer": 5,
+  "auctionBidStep": 1,
   "rankThresholds": {
     "E": 0,
     "D": 5,

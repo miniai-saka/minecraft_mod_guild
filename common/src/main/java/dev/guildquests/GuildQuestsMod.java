@@ -22,9 +22,11 @@ import org.slf4j.LoggerFactory;
 
 public final class GuildQuestsMod {
     public static final String MOD_ID = "guildquests";
+    public static final String VERSION = "26.7.0";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static int exploreTicker = 0;
     private static int riboTicker = 0;
+    private static int auctionTicker = 0;
 
     private GuildQuestsMod() {
     }
@@ -51,7 +53,14 @@ public final class GuildQuestsMod {
         Platform.onOpenGuildRequest(GuildScreenHandler::openQuests);
 
         // The player-published quest (bounty board) system was removed; clean up old saves.
-        Platform.onServerStarted(GuildService::purgePublishedQuests);
+        Platform.onServerStarted(server -> GuildService.purgePublishedQuests(server));
+
+        // Clean up old JARs from a previous auto-update at mod load (no world join needed).
+        int cleaned = dev.guildquests.update.UpdateChecker.cleanupOldJars(Platform.getModsDir(), VERSION);
+        if (cleaned > 0) {
+            LOGGER.info("Cleaned up {} old guildquests JAR(s) after update.", cleaned);
+        }
+
         Platform.onServerStopped(server -> dev.guildquests.gui.HorseRaceScreenHandler.clearAll());
 
         Platform.onPlayerKill(GuildService::onKill);
@@ -73,6 +82,12 @@ public final class GuildQuestsMod {
             if (riboTicker >= 100) {
                 riboTicker = 0;
                 GuildService.runRiboCycles(server);
+            }
+
+            auctionTicker++;
+            if (auctionTicker >= 100) {
+                auctionTicker = 0;
+                dev.guildquests.service.AuctionService.tick(server);
             }
         });
 
@@ -98,6 +113,11 @@ public final class GuildQuestsMod {
                     .then(Commands.literal("bank")
                             .executes(context -> {
                                 BankScreenHandler.open(context.getSource().getPlayerOrException());
+                                return 1;
+                            }))
+                    .then(Commands.literal("auction")
+                            .executes(context -> {
+                                dev.guildquests.gui.AuctionBrowseScreenHandler.open(context.getSource().getPlayerOrException());
                                 return 1;
                             })));
 
