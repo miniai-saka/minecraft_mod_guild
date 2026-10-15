@@ -1,6 +1,7 @@
 package dev.guildquests.gui;
 
 import dev.guildquests.service.GuildService;
+import dev.guildquests.item.ModItems;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
@@ -73,6 +74,12 @@ public final class GambleScreenHandler extends AbstractContainerMenu {
                 (p, b, t) -> { if (b == 0) BlackjackScreenHandler.open(p); });
         setAction(13, item(Items.HAY_BLOCK, "競馬", "クリックでプレイ", "馬に賭けて大勝負！"),
                 (p, b, t) -> { if (b == 0) HorseRaceScreenHandler.open(p); });
+        setAction(12, item(Items.LEVER, "スロット", "クリックでプレイ", "リールを揃えて大当たり！"),
+                (p, b, t) -> { if (b == 0) SlotScreenHandler.open(p); });
+        setAction(14, item(Items.COMPASS, "ルーレット", "クリックでプレイ", "赤・黒・ゼロに賭ける"),
+                (p, b, t) -> { if (b == 0) RouletteScreenHandler.open(p); });
+        setAction(15, item(ModItems.COIN, "コイントス", "クリックでプレイ", "表か裏か、2倍勝負"),
+                (p, b, t) -> { if (b == 0) CoinFlipScreenHandler.open(p); });
 
         // Row 2: close
         setAction(22, item(Items.BARRIER, "閉じる"),
