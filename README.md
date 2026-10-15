@@ -3,7 +3,7 @@
 Minecraft 1.20.1 / Fabric 向けの、クエスト・ギルド通貨・銀行・ギャンブルを単体で実装するModです。
 FTB Quests、Q Shop 等への依存はありません。
 
-バージョン: **26.3.0**
+バージョン: **26.7.0**
 
 ## 機能
 
@@ -72,13 +72,13 @@ gradle build
 生成物:
 
 ```text
-build/libs/guildquests-fa1.20.1_26.3.0.jar
+build/libs/guildquests-fa1.20.1_26.7.0.jar
 ```
 
 ## 導入
 
 1. Fabric Loader で Minecraft 1.20.1 を用意します。
-2. `guildquests-fa1.20.1_26.3.0.jar` と Fabric API を `mods/` に配置します。
+2. `guildquests-fa1.20.1_26.7.0.jar` と Fabric API を `mods/` に配置します。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定変更後はサーバー再起動、または `/guildadmin reload` を実行します。
 
