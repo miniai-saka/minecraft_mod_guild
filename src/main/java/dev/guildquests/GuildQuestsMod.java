@@ -9,6 +9,7 @@ import dev.guildquests.gui.BankScreenHandler;
 import dev.guildquests.gui.GuildScreenHandler;
 import dev.guildquests.item.ModItems;
 import dev.guildquests.platform.Platform;
+import dev.guildquests.service.AuctionService;
 import dev.guildquests.service.BossEvent;
 import dev.guildquests.service.GuildService;
 import net.fabricmc.api.ModInitializer;
@@ -25,6 +26,7 @@ public final class GuildQuestsMod implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static int exploreTicker = 0;
     private static int riboTicker = 0;
+    private static int auctionTicker = 0;
 
     @Override
     public void onInitialize() {
@@ -58,6 +60,12 @@ public final class GuildQuestsMod implements ModInitializer {
                 riboTicker = 0;
                 GuildService.runRiboCycles(server);
             }
+
+            auctionTicker++;
+            if (auctionTicker >= 100) {
+                auctionTicker = 0;
+                AuctionService.tick(server);
+            }
         });
 
         Platform.onCommands((dispatcher, registryAccess) -> {
@@ -82,6 +90,11 @@ public final class GuildQuestsMod implements ModInitializer {
                     .then(CommandManager.literal("bank")
                             .executes(context -> {
                                 BankScreenHandler.open(context.getSource().getPlayerOrThrow());
+                                return 1;
+                            }))
+                    .then(CommandManager.literal("auction")
+                            .executes(context -> {
+                                dev.guildquests.gui.AuctionBrowseScreenHandler.open(context.getSource().getPlayerOrThrow());
                                 return 1;
                             })));
 

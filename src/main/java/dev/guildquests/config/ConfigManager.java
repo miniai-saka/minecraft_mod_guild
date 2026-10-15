@@ -80,6 +80,10 @@ public final class ConfigManager {
         c.riboInstallment = Math.max(1, c.riboInstallment);
         c.riboInterestPercent = Math.max(0, Math.min(100, c.riboInterestPercent));
         c.riboIntervalMinutes = Math.max(1, c.riboIntervalMinutes);
+        c.auctionFeePercent = Math.max(0, Math.min(100, c.auctionFeePercent));
+        c.auctionDurationMinutes = Math.max(1, Math.min(10080, c.auctionDurationMinutes));
+        c.auctionMaxListingsPerPlayer = Math.max(1, Math.min(45, c.auctionMaxListingsPerPlayer));
+        c.auctionBidStep = Math.max(1, c.auctionBidStep);
         if (c.rankThresholds == null || c.rankThresholds.isEmpty()) c.rankThresholds = new ModConfig().rankThresholds;
         return c;
     }

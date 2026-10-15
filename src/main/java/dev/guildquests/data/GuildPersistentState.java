@@ -22,6 +22,10 @@ public final class GuildPersistentState extends PersistentState {
     public final List<DailyQuest> dailyBoard = new ArrayList<>();
     /** Player-published quests (bounty board). */
     public final List<PublishedQuest> publishedQuests = new ArrayList<>();
+    /** Active auction-house listings (items escrowed server-side). */
+    public final List<AuctionListing> auctions = new ArrayList<>();
+    /** Next auction listing id to hand out. */
+    public long nextAuctionId = 1;
 
     public PlayerGuildData get(UUID uuid) {
         return players.computeIfAbsent(uuid, ignored -> new PlayerGuildData());
@@ -60,6 +64,12 @@ public final class GuildPersistentState extends PersistentState {
             publishedNbt.add(quest.toNbt());
         }
         nbt.put("PublishedQuests", publishedNbt);
+        NbtList auctionNbt = new NbtList();
+        for (AuctionListing listing : auctions) {
+            auctionNbt.add(listing.toNbt());
+        }
+        nbt.put("Auctions", auctionNbt);
+        nbt.putLong("NextAuctionId", Math.max(1, nextAuctionId));
         return nbt;
     }
 
@@ -83,6 +93,12 @@ public final class GuildPersistentState extends PersistentState {
         for (int i = 0; i < publishedNbt.size(); i++) {
             state.publishedQuests.add(PublishedQuest.fromNbt(publishedNbt.getCompound(i)));
         }
+        NbtList auctionNbt = nbt.getList("Auctions", NbtElement.COMPOUND_TYPE);
+        for (int i = 0; i < auctionNbt.size(); i++) {
+            AuctionListing listing = AuctionListing.fromNbt(auctionNbt.getCompound(i));
+            if (listing.sellerId != null && !listing.item.isEmpty()) state.auctions.add(listing);
+        }
+        state.nextAuctionId = Math.max(1, nbt.getLong("NextAuctionId"));
         return state;
     }
 

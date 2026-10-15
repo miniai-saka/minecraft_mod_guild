@@ -1,5 +1,6 @@
 package dev.guildquests.data;
 
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
@@ -22,6 +23,8 @@ public final class PlayerGuildData {
     public long nextRiboDueAt = 0;
     public final List<ActiveQuest> activeQuests = new ArrayList<>();
     public final Set<String> completedQuestIds = new HashSet<>();
+    /** Auction-house mailbox: items owed to this player (winnings, refunds, expired listings). */
+    public final List<ItemStack> mailbox = new ArrayList<>();
 
     public ActiveQuest findActive(String questId) {
         for (ActiveQuest active : activeQuests) {
@@ -50,6 +53,12 @@ public final class PlayerGuildData {
             completedList.add(entry);
         }
         nbt.put("CompletedQuestIds", completedList);
+
+        NbtList mailboxList = new NbtList();
+        for (ItemStack stack : mailbox) {
+            if (stack != null && !stack.isEmpty()) mailboxList.add(stack.writeNbt(new NbtCompound()));
+        }
+        nbt.put("AuctionMailbox", mailboxList);
         return nbt;
     }
 
@@ -77,6 +86,12 @@ public final class PlayerGuildData {
         for (int i = 0; i < completedList.size(); i++) {
             String id = completedList.getCompound(i).getString("Id");
             if (!id.isBlank()) data.completedQuestIds.add(id);
+        }
+
+        NbtList mailboxList = nbt.getList("AuctionMailbox", NbtElement.COMPOUND_TYPE);
+        for (int i = 0; i < mailboxList.size(); i++) {
+            ItemStack stack = ItemStack.fromNbt(mailboxList.getCompound(i));
+            if (!stack.isEmpty()) data.mailbox.add(stack);
         }
         return data;
     }

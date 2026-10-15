@@ -4,6 +4,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
 import net.minecraft.text.Text;
@@ -75,6 +76,27 @@ public final class GuildItems {
         Text[] lines = new Text[lore.length];
         for (int i = 0; i < lore.length; i++) lines[i] = Text.literal(lore[i]).formatted(Formatting.GRAY);
         setLore(stack, lines);
+        return stack;
+    }
+
+    /**
+     * Copy of {@code base} with an overridden name and extra gray lore lines appended
+     * after the item's existing lore (so enchantments/custom lore stay visible).
+     * Used to render escrowed/mailbox items without mutating the stored stack.
+     */
+    public static ItemStack decorateCopy(ItemStack base, Formatting nameFormat, String name, String... extraLore) {
+        ItemStack stack = base.copy();
+        stack.setCustomName(Text.literal(name).formatted(nameFormat));
+        NbtCompound display = stack.getOrCreateSubNbt("display");
+        NbtList lore = new NbtList();
+        if (display.contains("Lore", NbtElement.LIST_TYPE)) {
+            NbtList existing = display.getList("Lore", NbtElement.STRING_TYPE);
+            for (int i = 0; i < existing.size(); i++) lore.add(existing.get(i));
+        }
+        for (String line : extraLore) {
+            lore.add(NbtString.of(Text.Serializer.toJson(Text.literal(line).formatted(Formatting.GRAY))));
+        }
+        display.put("Lore", lore);
         return stack;
     }
 

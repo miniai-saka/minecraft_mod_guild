@@ -817,6 +817,42 @@ public final class GuildService {
         return remaining <= 0;
     }
 
+    /** True when the whole incoming stack would fit into the player's main inventory. */
+    public static boolean canFitStack(PlayerInventory inventory, ItemStack incoming) {
+        return canFit(inventory, incoming);
+    }
+
+    /**
+     * Merges a stack into the player's main inventory (slots 0..35), returning the
+     * leftover that did not fit (empty when everything was placed). Marks the
+     * inventory dirty when anything changed.
+     */
+    public static ItemStack giveStack(PlayerInventory inventory, ItemStack incoming) {
+        ItemStack remaining = incoming.copy();
+        boolean changed = false;
+        for (int i = 0; i < 36 && !remaining.isEmpty(); i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing.isEmpty()) {
+                int give = Math.min(remaining.getMaxCount(), remaining.getCount());
+                ItemStack add = remaining.copy();
+                add.setCount(give);
+                inventory.setStack(i, add);
+                remaining.decrement(give);
+                changed = true;
+            } else if (ItemStack.canCombine(existing, remaining)) {
+                int space = Math.max(0, existing.getMaxCount() - existing.getCount());
+                int give = Math.min(space, remaining.getCount());
+                if (give > 0) {
+                    existing.increment(give);
+                    remaining.decrement(give);
+                    changed = true;
+                }
+            }
+        }
+        if (changed) inventory.markDirty();
+        return remaining;
+    }
+
     private static Identifier safeIdentifier(String raw) {
         try {
             return raw == null ? null : new Identifier(raw);

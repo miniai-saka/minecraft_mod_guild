@@ -150,6 +150,11 @@ public final class GuildScreenHandler extends ScreenHandler {
                 "ブラックジャック・競馬",
                 "所持コインで賭けられます"),
                 (p, b, t) -> GambleScreenHandler.open(p));
+        setAction(5, item(Items.EMERALD, "オークション",
+                "クリックでオークション市場を開きます",
+                "出品・購入・入札ができます",
+                "固定価格 / 入札式を選択可能"),
+                (p, b, t) -> AuctionBrowseScreenHandler.open(p));
 
         for (int i = 0; i < Math.min(MAX_DAILY_SLOTS, board.size()); i++) {
             DailyQuest daily = board.get(i);
