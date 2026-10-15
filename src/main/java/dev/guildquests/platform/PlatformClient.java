@@ -63,6 +63,11 @@ public final class PlatformClient {
         ClientPlayConnectionEvents.DISCONNECT.register((networkHandler, client) -> handler.run());
     }
 
+    /** Called every client tick. currentScreen is the active screen, or null. */
+    public static void onClientTick(java.util.function.Consumer<net.minecraft.client.gui.screen.Screen> handler) {
+        ClientTickEvents.END_CLIENT_TICK.register(client -> handler.accept(client.currentScreen));
+    }
+
     @FunctionalInterface
     public interface BossPinHandler {
         void accept(int x, int y, int z, int lifetimeTicks);

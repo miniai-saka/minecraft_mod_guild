@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 public final class GuildQuestsMod implements ModInitializer {
     public static final String MOD_ID = "guildquests";
+    public static final String VERSION = "26.7.0";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static int exploreTicker = 0;
     private static int riboTicker = 0;
@@ -39,6 +40,12 @@ public final class GuildQuestsMod implements ModInitializer {
 
         // The player-published quest (bounty board) system was removed; clean up old saves.
         Platform.onServerStarted(GuildService::purgePublishedQuests);
+
+        // Clean up old JARs from a previous auto-update at mod load (no world join needed).
+        int cleaned = dev.guildquests.update.UpdateChecker.cleanupOldJars(Platform.getModsDir(), VERSION);
+        if (cleaned > 0) {
+            LOGGER.info("Cleaned up {} old guildquests JAR(s) after update.", cleaned);
+        }
 
         Platform.onPlayerKill(GuildService::onKill);
 

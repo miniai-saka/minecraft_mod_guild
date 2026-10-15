@@ -34,6 +34,16 @@ public final class Platform {
         return FabricLoader.getInstance().getConfigDir().resolve("guildquests");
     }
 
+    /** Loader name used for update asset lookup. */
+    public static String getLoaderName() {
+        return "fabric";
+    }
+
+    /** Path to the mods folder. */
+    public static Path getModsDir() {
+        return FabricLoader.getInstance().getGameDir().resolve("mods");
+    }
+
     public static void onOpenGuildRequest(Consumer<ServerPlayerEntity> handler) {
         ServerPlayNetworking.registerGlobalReceiver(OPEN_GUILD, (server, player, networkHandler, buf, responseSender) ->
                 server.execute(() -> handler.accept(player)));
