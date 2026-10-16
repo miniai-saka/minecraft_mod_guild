@@ -14,7 +14,7 @@ public final class GuildDebtPolicy {
     public static long repay(PlayerGuildData data, long requested) {
         long paid = Math.min(Math.max(0, requested), Math.min(data.coins, data.debt));
         data.coins -= paid; data.debt -= paid;
-        if (data.debt <= 0) { data.debt = 0; data.delinquent = false; data.nextRiboDueAt = 0; }
+        if (data.debt <= 0) { data.debt = 0; data.delinquent = data.adminDelinquent; data.nextRiboDueAt = 0; }
         return paid;
     }
 }

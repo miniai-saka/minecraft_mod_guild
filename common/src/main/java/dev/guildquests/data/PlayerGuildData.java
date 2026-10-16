@@ -21,8 +21,16 @@ public final class PlayerGuildData {
     public long debt = 0;
     /** True when a scheduled ribo collection failed; locks guild features until debt == 0. */
     public boolean delinquent = false;
+    /** Explicit administrator lock, retained until the administrator turns it off. */
+    public boolean adminDelinquent = false;
     /** Epoch millis of the next scheduled ribo collection. 0 when no debt. */
     public long nextRiboDueAt = 0;
+    /** Outstanding consumer-finance loan (principal + accrued interest); repaid manually. */
+    public long loan = 0;
+    /** Epoch millis of the next loan interest charge. 0 when no loan. */
+    public long nextLoanInterestAt = 0;
+    /** Mining-based loan repayment credit, in thousandths of a coin (0.001 coin = 1). */
+    public long loanCreditMillis = 0;
     public final List<ActiveQuest> activeQuests = new ArrayList<>();
     public final Set<String> completedQuestIds = new HashSet<>();
     /** Board day (floor(dayTime/24000)) that claimedExploreQuestIds belongs to; -1 when unset. */
@@ -31,6 +39,8 @@ public final class PlayerGuildData {
     public final Set<String> claimedExploreQuestIds = new HashSet<>();
     /** Auction-house mailbox: items owed to this player (winnings, refunds, expired listings). */
     public final List<ItemStack> mailbox = new ArrayList<>();
+    /** COLLECT quest id -> board day it was last claimed; enforces the per-quest cooldown. */
+    public final java.util.Map<String, Long> collectClaimedDay = new java.util.HashMap<>();
 
     public ActiveQuest findActive(String questId) {
         for (ActiveQuest active : activeQuests) {
@@ -53,6 +63,21 @@ public final class PlayerGuildData {
         return claimedBoardDay == boardDay && claimedExploreQuestIds.contains(questId);
     }
 
+    /**
+     * True when a COLLECT quest is still on cooldown for the given board day.
+     * {@code cooldownDays <= 0} disables the limit.
+     */
+    public boolean collectOnCooldown(long boardDay, String questId, int cooldownDays) {
+        if (cooldownDays <= 0) return false;
+        Long last = collectClaimedDay.get(questId);
+        return last != null && boardDay - last < cooldownDays;
+    }
+
+    /** Records a COLLECT claim on the given board day. */
+    public void markCollectClaimed(long boardDay, String questId) {
+        collectClaimedDay.put(questId, boardDay);
+    }
+
     public CompoundTag toNbt() {
         CompoundTag nbt = new CompoundTag();
         nbt.putLong("Coins", coins);
@@ -61,7 +86,11 @@ public final class PlayerGuildData {
         nbt.putString("PaymentMode", paymentMode == null ? "DEBIT" : paymentMode);
         nbt.putLong("Debt", debt);
         nbt.putBoolean("Delinquent", delinquent);
+        nbt.putBoolean("AdminDelinquent", adminDelinquent);
         nbt.putLong("NextRiboDueAt", nextRiboDueAt);
+        nbt.putLong("Loan", loan);
+        nbt.putLong("NextLoanInterestAt", nextLoanInterestAt);
+        nbt.putLong("LoanCreditMillis", loanCreditMillis);
 
         ListTag activeList = new ListTag();
         for (ActiveQuest active : activeQuests) activeList.add(active.toNbt());
@@ -89,6 +118,12 @@ public final class PlayerGuildData {
             if (stack != null && !stack.isEmpty()) mailboxList.add(stack.save(new CompoundTag()));
         }
         nbt.put("AuctionMailbox", mailboxList);
+
+        CompoundTag collectNbt = new CompoundTag();
+        for (java.util.Map.Entry<String, Long> entry : collectClaimedDay.entrySet()) {
+            collectNbt.putLong(entry.getKey(), entry.getValue());
+        }
+        nbt.put("CollectClaimedDays", collectNbt);
         return nbt;
     }
 
@@ -100,11 +135,21 @@ public final class PlayerGuildData {
         data.paymentMode = nbt.getString("PaymentMode");
         if (data.paymentMode.isBlank()) data.paymentMode = "DEBIT";
         data.debt = Math.max(0L, nbt.getLong("Debt"));
-        data.delinquent = nbt.getBoolean("Delinquent");
+        data.adminDelinquent = nbt.getBoolean("AdminDelinquent");
+        data.delinquent = nbt.getBoolean("Delinquent") || data.adminDelinquent;
         data.nextRiboDueAt = Math.max(0L, nbt.getLong("NextRiboDueAt"));
         if (data.debt <= 0) {
-            data.delinquent = false;
+            if (!data.adminDelinquent && nbt.getLong("Loan") <= 0) data.delinquent = false;
             data.nextRiboDueAt = 0;
+        }
+        data.loan = Math.max(0L, nbt.getLong("Loan"));
+        data.nextLoanInterestAt = Math.max(0L, nbt.getLong("NextLoanInterestAt"));
+        if (data.loan <= 0) {
+            data.nextLoanInterestAt = 0;
+        }
+        data.loanCreditMillis = Math.max(0L, nbt.getLong("LoanCreditMillis"));
+        if (data.loan <= 0) {
+            data.loanCreditMillis = 0;
         }
 
         ListTag activeList = nbt.getList("ActiveQuests", Tag.TAG_COMPOUND);
@@ -131,6 +176,13 @@ public final class PlayerGuildData {
         for (int i = 0; i < mailboxList.size(); i++) {
             ItemStack stack = ItemStack.of(mailboxList.getCompound(i));
             if (!stack.isEmpty()) data.mailbox.add(stack);
+        }
+
+        if (nbt.contains("CollectClaimedDays", Tag.TAG_COMPOUND)) {
+            CompoundTag collectNbt = nbt.getCompound("CollectClaimedDays");
+            for (String key : collectNbt.getAllKeys()) {
+                data.collectClaimedDay.put(key, collectNbt.getLong(key));
+            }
         }
         return data;
     }

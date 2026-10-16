@@ -19,11 +19,13 @@ loom {
             programArgs '--width', '1600', '--height', '1000', '--username', 'FxTester'
             vmArg '-Dguildquests.disableUpdateCheck=true'
             if (project.hasProperty('fxCapture')) vmArg '-Dguildquests.fxCapture=true'
+            if (project.hasProperty('adminDebug')) vmArg '-Dguildquests.adminDebug=true'
         }
         server {
             runDir rootProject.file('../../work/fx-debug-server').absolutePath
             vmArg '-Dguildquests.disableUpdateCheck=true'
             programArg 'nogui'
+            if (project.hasProperty('adminDebug')) vmArg '-Dguildquests.adminDebug=true'
         }
     }
 }

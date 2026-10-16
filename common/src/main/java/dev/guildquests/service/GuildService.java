@@ -29,6 +29,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.Structure;
 
@@ -87,6 +88,11 @@ public final class GuildService {
             message(player, "この探索クエストは本日達成済みです（次の抽選でお挑戦ください）。", ChatFormatting.YELLOW);
             return false;
         }
+        if (quest.type == QuestType.COLLECT
+                && data.collectOnCooldown(boardDay(player.getServer()), quest.id, quest.cooldownDays)) {
+            message(player, "この収集クエストは現在クールダウン中です（" + quest.cooldownDays + " 日に1回まで）。", ChatFormatting.YELLOW);
+            return false;
+        }
 
         ActiveQuest active = new ActiveQuest(quest.id, 0);
         active.target = daily.target.isBlank() ? null : daily.target;
@@ -104,7 +110,7 @@ public final class GuildService {
         if (quest.type == QuestType.KILL) {
             detail.append("（対象: ").append(entityName(effectiveTarget(active, quest)))
                     .append(" × ").append(active.amount).append("）");
-        } else if (quest.type == QuestType.SUBMIT) {
+        } else if (quest.type == QuestType.SUBMIT || quest.type == QuestType.COLLECT) {
             detail.append("（納品: ").append(itemName(quest.target)).append(" × ").append(active.amount).append("）");
         } else if (active.randomCoords) {
             String dim = dimensionLabel(quest.dimension);
@@ -230,7 +236,7 @@ public final class GuildService {
         if (active == null || quest == null) return false;
 
         int amount = effectiveAmount(active, quest);
-        if (quest.type == QuestType.SUBMIT && active.progress < amount) {
+        if ((quest.type == QuestType.SUBMIT || quest.type == QuestType.COLLECT) && active.progress < amount) {
             ResourceLocation itemId = safeIdentifier(quest.target);
             if (itemId == null || !BuiltInRegistries.ITEM.containsKey(itemId)) {
                 message(player, "納品対象アイテムの設定が不正です: " + quest.target, ChatFormatting.RED);
@@ -271,9 +277,9 @@ public final class GuildService {
             reward -= tribute;
             if (data.debt <= 0) {
                 data.debt = 0;
-                data.delinquent = false;
+                data.delinquent = data.adminDelinquent;
                 data.nextRiboDueAt = 0;
-                message(player, "債務を完済しました。ギルド機能のロックを解除しました。", ChatFormatting.GREEN);
+                message(player, data.adminDelinquent ? "債務を完済しました。管理者によるロックは継続中です。" : "債務を完済しました。ギルド機能のロックを解除しました。", ChatFormatting.GREEN);
             }
         }
 
@@ -282,6 +288,9 @@ public final class GuildService {
         data.completedQuestIds.add(quest.id);
         if (quest.type == QuestType.EXPLORE) {
             data.markExploreClaimed(boardDay(player.getServer()), quest.id);
+        }
+        if (quest.type == QuestType.COLLECT) {
+            data.markCollectClaimed(boardDay(player.getServer()), quest.id);
         }
         data.activeQuests.remove(active);
         state.setDirty();
@@ -405,6 +414,146 @@ public final class GuildService {
         return ConfigManager.config().riboIntervalMinutes * 60_000L;
     }
 
+    // ---------------------------------------------------------------------
+    // Consumer finance (rank-based cash loans, manual repayment only)
+    // ---------------------------------------------------------------------
+
+    private static long loanIntervalMillis() {
+        return ConfigManager.config().consumerLoanIntervalMinutes * 60_000L;
+    }
+
+    /** Current borrow ceiling for this player, derived from their guild rank. */
+    public static long loanLimit(PlayerGuildData data) {
+        ModConfig config = ConfigManager.config();
+        Long limit = config.consumerLoanLimits.get(rank(data));
+        if (limit == null) {
+            limit = config.consumerLoanLimits.values().stream().findFirst().orElse(0L);
+        }
+        return Math.max(0, limit);
+    }
+
+    /** Borrows coins against the rank-based limit; the amount is added to both loan and balance. */
+    public static boolean borrowLoan(ServerPlayer player, long amount) {
+        if (amount <= 0) return false;
+        if (!ConfigManager.config().consumerLoanEnabled) {
+            message(player, "消費者金融は現在利用できません。", ChatFormatting.YELLOW);
+            return false;
+        }
+        GuildPersistentState state = GuildPersistentState.get(player.getServer());
+        PlayerGuildData data = state.get(player.getUUID());
+        if (data.delinquent) {
+            riboLockMessage(player, data);
+            return false;
+        }
+        long limit = loanLimit(data);
+        if (data.loan > limit || amount > limit - data.loan) {
+            message(player, "借入上限を超えます。上限: " + limit + " / 現在の債務: " + data.loan
+                    + " / 借入可能: " + Math.max(0, limit - data.loan), ChatFormatting.RED);
+            return false;
+        }
+        data.loan = safeAdd(data.loan, amount);
+        data.coins = safeAdd(data.coins, amount);
+        if (data.nextLoanInterestAt <= 0) {
+            data.nextLoanInterestAt = System.currentTimeMillis() + loanIntervalMillis();
+        }
+        state.setDirty();
+        message(player, amount + " コインを借り入れました。債務: " + data.loan + " / 残高: " + data.coins, ChatFormatting.GREEN);
+        return true;
+    }
+
+    /** Repays part (or all) of the loan from the balance. Manual repayment only. */
+    public static boolean repayLoan(ServerPlayer player, long amount) {
+        GuildPersistentState state = GuildPersistentState.get(player.getServer());
+        PlayerGuildData data = state.get(player.getUUID());
+        if (data.loan <= 0) {
+            message(player, "返済する債務がありません。", ChatFormatting.YELLOW);
+            return false;
+        }
+        long want = amount <= 0 ? data.loan : amount;
+        long pay = Math.min(want, Math.min(data.loan, data.coins));
+        if (pay <= 0) {
+            message(player, "残高が不足しています。残高: " + data.coins + " / 債務: " + data.loan, ChatFormatting.RED);
+            return false;
+        }
+        data.coins -= pay;
+        data.loan -= pay;
+        if (data.loan <= 0) {
+            data.loan = 0;
+            data.nextLoanInterestAt = 0;
+        }
+        state.setDirty();
+        message(player, pay + " コインを返済しました。残債務: " + data.loan + " / 残高: " + data.coins, ChatFormatting.GREEN);
+        return true;
+    }
+
+    /**
+     * Periodic interest charge on outstanding loans. Repayment is manual, so there is no
+     * automatic collection and no delinquency lock — the loan simply grows until repaid.
+     */
+    public static void runLoanInterest(MinecraftServer server) {
+        ModConfig config = ConfigManager.config();
+        if (!config.consumerLoanEnabled || config.consumerLoanInterestPercent <= 0) return;
+        long now = System.currentTimeMillis();
+        long interval = loanIntervalMillis();
+        GuildPersistentState state = GuildPersistentState.get(server);
+        for (Map.Entry<UUID, PlayerGuildData> entry : state.players().entrySet()) {
+            PlayerGuildData data = entry.getValue();
+            if (data.loan <= 0) {
+                if (data.nextLoanInterestAt != 0) {
+                    data.nextLoanInterestAt = 0;
+                    state.setDirty();
+                }
+                continue;
+            }
+            if (data.nextLoanInterestAt <= 0) {
+                data.nextLoanInterestAt = now + interval;
+                state.setDirty();
+            }
+            if (now < data.nextLoanInterestAt) continue;
+            data.nextLoanInterestAt = now + interval;
+            double raw = data.loan * (config.consumerLoanInterestPercent / 100.0);
+            long interest = raw >= Long.MAX_VALUE ? Long.MAX_VALUE : Math.round(raw);
+            if (interest > 0) data.loan = safeAdd(data.loan, interest);
+            state.setDirty();
+        }
+    }
+
+    /**
+     * Mining-based loan repayment. While the player still owes a loan, breaking a block whose id
+     * is listed in {@code loanMiningValues} repays the loan directly (never the balance). The
+     * credit is accumulated in thousandths of a coin so fractional rates stay exact.
+     */
+    public static void onBlockBreak(ServerPlayer player, BlockState state) {
+        ModConfig config = ConfigManager.config();
+        if (!config.consumerLoanEnabled || config.loanMiningValues.isEmpty()) return;
+        if (player.isCreative()) return; // no creative mining credit
+        GuildPersistentState guildState = GuildPersistentState.get(player.getServer());
+        PlayerGuildData data = guildState.get(player.getUUID());
+        if (data.loan <= 0) return; // only while a loan is owed
+
+        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        Double value = config.loanMiningValues.get(blockId.toString());
+        if (value == null || value <= 0) return;
+
+        long add = Math.round(value * 1000.0);
+        if (add <= 0) return;
+        data.loanCreditMillis += add;
+
+        long pay = data.loanCreditMillis / 1000;
+        if (pay > 0) {
+            long applied = Math.min(pay, data.loan);
+            data.loan -= applied;
+            data.loanCreditMillis -= applied * 1000;
+            if (data.loan <= 0) {
+                data.loan = 0;
+                data.loanCreditMillis = 0;
+                data.nextLoanInterestAt = 0;
+                message(player, "採掘による返済で消費者金融の債務を完済しました。", ChatFormatting.GREEN);
+            }
+        }
+        guildState.setDirty();
+    }
+
     /**
      * Scheduled ribo collection. Runs periodically for every player with outstanding debt:
      * applies interest, then collects the fixed installment from the balance. A failed
@@ -420,9 +569,10 @@ public final class GuildService {
         for (Map.Entry<UUID, PlayerGuildData> entry : state.players().entrySet()) {
             PlayerGuildData data = entry.getValue();
             if (data.debt <= 0) {
-                if (data.nextRiboDueAt != 0 || data.delinquent) {
+                // Explicit administrator locks survive repayment and are released with delinquent off.
+                if (data.nextRiboDueAt != 0 || (data.delinquent && !data.adminDelinquent && data.loan <= 0)) {
                     data.debt = 0;
-                    data.delinquent = false;
+                    if (data.loan <= 0) data.delinquent = data.adminDelinquent;
                     data.nextRiboDueAt = 0;
                     state.setDirty();
                 }
@@ -455,9 +605,9 @@ public final class GuildService {
             boolean unlocked = false;
             if (data.debt <= 0) {
                 data.debt = 0;
-                data.delinquent = false;
+                data.delinquent = data.adminDelinquent;
                 data.nextRiboDueAt = 0;
-                unlocked = true;
+                unlocked = !data.delinquent;
             }
             state.setDirty();
 
@@ -473,6 +623,10 @@ public final class GuildService {
     }
 
     public static void riboLockMessage(ServerPlayer player, PlayerGuildData data) {
+        if (data.adminDelinquent) {
+            message(player, "管理者により滞納ロック中です。解除は管理者へ依頼してください。借入 " + data.loan + " / FX・リボ債務 " + data.debt, ChatFormatting.RED);
+            return;
+        }
         message(player, "債務の滞納中です。債務 " + data.debt
                 + " を完済するまでギルド機能がロックされています（クエスト報酬で返済できます）。", ChatFormatting.RED);
     }
@@ -658,7 +812,7 @@ public final class GuildService {
                 daily.target = quest.target;
             }
             daily.amount = rollAmount(quest);
-        } else if (quest.type == QuestType.SUBMIT) {
+        } else if (quest.type == QuestType.SUBMIT || quest.type == QuestType.COLLECT) {
             daily.target = quest.target;
             daily.amount = rollAmount(quest);
         } else {

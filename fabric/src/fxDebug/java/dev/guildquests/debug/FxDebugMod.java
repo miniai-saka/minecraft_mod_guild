@@ -23,6 +23,16 @@ public final class FxDebugMod implements ModInitializer {
         config.trendPersistence = config.meanReversion = 0;
         config.spreadBps = config.commissionBps = config.marketSlippageBps = 0;
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            Path adminExpected = Path.of("expected-admin-restart.json");
+            if (Files.exists(adminExpected)) {
+                try {
+                    var json = com.google.gson.JsonParser.parseString(Files.readString(adminExpected)).getAsJsonObject();
+                    var wallet = GuildPersistentState.get(server).get(UUID.fromString(json.get("uuid").getAsString()));
+                    if (wallet.loan != 3210 || !wallet.delinquent || !wallet.adminDelinquent) throw new IllegalStateException("Admin loan/lock lost on restart");
+                    Files.writeString(Path.of("admin-restart-results.txt"), "PASS Consumer loan and explicit admin delinquency survive restart\n");
+                    Files.delete(adminExpected);
+                } catch (Exception ex) { throw new IllegalStateException(ex); }
+            }
             Path expected = Path.of("expected-after-restart.json");
             if (!Files.exists(expected)) return;
             try {
@@ -44,6 +54,27 @@ public final class FxDebugMod implements ModInitializer {
         });
         CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) -> {
             dispatcher.register(Commands.literal("fxdebug").requires(source -> source.hasPermission(2))
+                    .then(Commands.literal("prepareadmin").executes(context -> {
+                        var player = context.getSource().getPlayerOrException(); var guild = GuildPersistentState.get(player.getServer());
+                        var own = guild.get(player.getUUID()); own.loan = 0; own.loanCreditMillis = 0; own.nextLoanInterestAt = 0; own.adminDelinquent = own.delinquent = false;
+                        UUID offline = UUID.fromString("dff00f00-0000-4000-8000-000000000001");
+                        var saved = guild.get(offline); saved.playerName = "OfflineBorrower"; saved.loan = 2000; saved.loanCreditMillis = 0; saved.nextLoanInterestAt = 0;
+                        saved.debt = 0; saved.adminDelinquent = saved.delinquent = false; guild.setDirty(); return 1;
+                    }))
+                    .then(Commands.literal("adminsecurity").executes(context -> {
+                        var player = context.getSource().getPlayerOrException(); var menu = player.containerMenu;
+                        if (!(menu instanceof dev.guildquests.gui.AdminScreenHandler)) throw new IllegalStateException("No admin confirmation menu");
+                        long previous = GuildPersistentState.get(player.getServer()).get(player.getUUID()).loan;
+                        player.getServer().getPlayerList().deop(player.getGameProfile());
+                        try {
+                            menu.clicked(33, 0, net.minecraft.world.inventory.ClickType.PICKUP, player);
+                            if (player.containerMenu == menu || GuildPersistentState.get(player.getServer()).get(player.getUUID()).loan != previous)
+                                throw new IllegalStateException("Revoked operator could mutate debt");
+                            Files.writeString(Path.of("admin-security-results.txt"), "PASS Permission revoked after opening menu blocks confirmation and closes menu\n");
+                        } catch (Exception ex) { throw new IllegalStateException(ex); }
+                        finally { player.getServer().getPlayerList().op(player.getGameProfile()); }
+                        return 1;
+                    }))
                     .then(Commands.literal("seed").executes(context -> {
                         var player = context.getSource().getPlayerOrException(); var guild = GuildPersistentState.get(player.getServer());
                         var wallet = guild.get(player.getUUID()); wallet.coins = 50000; wallet.debt = 0; wallet.delinquent = false; wallet.nextRiboDueAt = 0;
@@ -90,6 +121,7 @@ public final class FxDebugMod implements ModInitializer {
             try { FxSettings.setMarginCall(false); } catch (Exception ex) { throw new IllegalStateException(ex); }
             var guild = GuildPersistentState.get(server); var wallet = guild.get(handler.player.getUUID());
             wallet.coins = 50000; wallet.debt = 0; wallet.delinquent = false; wallet.nextRiboDueAt = 0;
+            wallet.adminDelinquent = false;
             guild.fx.engine().state.accounts.remove(handler.player.getStringUUID());
             guild.fx.engine().setPrice("AUR", 100); guild.setDirty();
             server.getPlayerList().op(handler.player.getGameProfile());

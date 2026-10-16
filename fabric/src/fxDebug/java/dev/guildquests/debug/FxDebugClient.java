@@ -28,6 +28,7 @@ public final class FxDebugClient implements ClientModInitializer {
     private boolean connecting, finished;
     private final List<String> checks = new ArrayList<>();
     @Override public void onInitializeClient() {
+        if (Boolean.getBoolean("guildquests.adminDebug")) { new AdminDebugClient().onInitializeClient(); return; }
         try { Files.deleteIfExists(Path.of("smoke-failure.txt")); FxUiPreferences.set("SERVER"); }
         catch (Exception ex) { throw new IllegalStateException(ex); }
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

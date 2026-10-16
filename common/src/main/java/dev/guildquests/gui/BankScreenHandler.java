@@ -137,6 +137,11 @@ public final class BankScreenHandler extends AbstractContainerMenu {
                 "送金先の選択・金額指定はこちらで",
                 "手数料: 無料"),
                 (p, b, t) -> TransferScreenHandler.open(p));
+        setAction(3, item(Items.REDSTONE, "消費者金融",
+                "クリックで借入メニューを開きます",
+                "ギルドランクに応じた上限まで借入できます",
+                "返済は手動（利息が付きます）"),
+                (p, b, t) -> LoanScreenHandler.open(p));
 
         // Row 0, slots 5-8: digit heads (thousands, hundreds, tens, ones).
         int[] places = {1000, 100, 10, 1};

@@ -19,6 +19,7 @@ public final class FxClient {
         if (FxNetwork.client != null) FxNetwork.client.listen(FxClient::accept);
         PlatformClient.onDisconnect(() -> latest = null);
         PlatformClient.registerKeyBinding("key.guildquests.openfx", GLFW.GLFW_KEY_F8, () -> {
+            if (!FxUiPreferences.hotkeyEnabled()) return;
             Request r = new Request(); r.op = "OPEN"; send(r);
         });
     }

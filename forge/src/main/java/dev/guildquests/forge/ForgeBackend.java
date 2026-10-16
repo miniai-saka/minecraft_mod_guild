@@ -30,6 +30,7 @@ public final class ForgeBackend implements Platform.Backend {
     private Platform.AllowDamageHandler allowDamage;
     private BiConsumer<ServerPlayer, LivingEntity> playerKill;
     private BiConsumer<LivingEntity, DamageSource> entityDeath;
+    private Platform.BlockBreakHandler blockBreak;
 
     /** Wire the stored handlers up to the Forge event bus. Safe to call once at construction. */
     public void registerForgeEvents() {
@@ -39,6 +40,13 @@ public final class ForgeBackend implements Platform.Backend {
         MinecraftForge.EVENT_BUS.addListener(this::handleCommands);
         MinecraftForge.EVENT_BUS.addListener(this::handleLivingAttack);
         MinecraftForge.EVENT_BUS.addListener(this::handleLivingDeath);
+        MinecraftForge.EVENT_BUS.addListener(this::handleBlockBreak);
+    }
+
+    private void handleBlockBreak(net.minecraftforge.event.level.BlockEvent.BreakEvent event) {
+        if (blockBreak != null && event.getPlayer() instanceof ServerPlayer player) {
+            blockBreak.accept(player, event.getState());
+        }
     }
 
     private void handleServerStarted(ServerStartedEvent event) {
@@ -139,6 +147,11 @@ public final class ForgeBackend implements Platform.Backend {
     @Override
     public void onEntityDeath(BiConsumer<LivingEntity, DamageSource> handler) {
         this.entityDeath = handler;
+    }
+
+    @Override
+    public void onBlockBreak(Platform.BlockBreakHandler handler) {
+        this.blockBreak = handler;
     }
 
     @Override

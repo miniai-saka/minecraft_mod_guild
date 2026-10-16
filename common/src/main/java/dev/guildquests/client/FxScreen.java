@@ -399,7 +399,7 @@ public final class FxScreen extends Screen {
         dot(d, 25, 662, q.event.equals("通常相場") ? GREEN : RED);
         text(d, q.event.equals("通常相場") ? "市場は稼働中" : q.event, 36, 658, q.event.equals("通常相場") ? MUTED : RED);
         text(d, "所持金 " + data.wallet + " GC    債務 " + data.guildDebt + " GC    損益 " + signed(data.account.realized), 280, 658, data.delinquent ? RED : MUTED);
-        right(d, "GUILD FX  /  架空通貨専用  /  F8で開く", 1078, 658, MUTED);
+        right(d, "GUILD FX  /  ギャンブルメニューから取引", 1078, 658, MUTED);
     }
 
     private void changeSide(Side value) { side = value; editingId = 0; tp.setValue(""); sl.setValue(""); defaults(); }

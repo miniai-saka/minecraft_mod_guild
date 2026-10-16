@@ -61,6 +61,24 @@ public final class ModConfig {
     /** Minimum increment a new bid must add over the current highest bid. */
     public long auctionBidStep = 1;
 
+    /** Consumer finance (cash loans): allow borrowing against a rank-based credit limit. */
+    public boolean consumerLoanEnabled = true;
+
+    /** Interest percent applied to an outstanding loan on every loan interval. */
+    public double consumerLoanInterestPercent = 5.0;
+
+    /** Minutes between loan interest charges. */
+    public int consumerLoanIntervalMinutes = 60;
+
+    /** Borrow limit per guild rank (rank name -> max outstanding loan). */
+    public Map<String, Long> consumerLoanLimits = new LinkedHashMap<>();
+
+    /**
+     * Mining-based loan repayment: block id -> coin value credited per block mined.
+     * Only applies while the player still owes a loan, and only repays the loan (never the balance).
+     */
+    public Map<String, Double> loanMiningValues = new LinkedHashMap<>();
+
     /** Rank name -> required total completions. Insertion order is used for display. */
     public Map<String, Integer> rankThresholds = new LinkedHashMap<>();
 
@@ -71,5 +89,23 @@ public final class ModConfig {
         rankThresholds.put("B", 30);
         rankThresholds.put("A", 50);
         rankThresholds.put("S", 80);
+
+        consumerLoanLimits.put("E", 1_000L);
+        consumerLoanLimits.put("D", 3_000L);
+        consumerLoanLimits.put("C", 8_000L);
+        consumerLoanLimits.put("B", 20_000L);
+        consumerLoanLimits.put("A", 50_000L);
+        consumerLoanLimits.put("S", 100_000L);
+
+        loanMiningValues.put("minecraft:stone", 0.001);
+        loanMiningValues.put("minecraft:cobblestone", 0.001);
+        loanMiningValues.put("minecraft:coal_ore", 0.02);
+        loanMiningValues.put("minecraft:deepslate_coal_ore", 0.02);
+        loanMiningValues.put("minecraft:iron_ore", 0.03);
+        loanMiningValues.put("minecraft:deepslate_iron_ore", 0.03);
+        loanMiningValues.put("minecraft:gold_ore", 0.08);
+        loanMiningValues.put("minecraft:deepslate_gold_ore", 0.08);
+        loanMiningValues.put("minecraft:diamond_ore", 0.2);
+        loanMiningValues.put("minecraft:deepslate_diamond_ore", 0.2);
     }
 }

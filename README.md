@@ -3,23 +3,24 @@
 Minecraft 1.20.1 / Fabric・Forge 向けの、クエスト・ギルド通貨・銀行・ギャンブルを単体で実装するModです。
 FTB Quests、Q Shop 等への依存はありません。
 
-バージョン: **26.9.0**（上流26.8.2を統合したローカル拡張版）
+バージョン: **26.11.0**（上流26.10.0を統合したローカル拡張版）
 
-### Guild FX（26.9.0）
+### Guild FX（26.11.0）
 
 暗転背景とMinecraft標準ボタンの簡易UIを既定に、Mod専用仮想通貨のFXを追加しました。
 成行・指値・逆指値に絞った簡易取引と、ローソク足付きの白背景ターミナルを「UI設定」で切り替えられます。
-**F8**、`/guild fx`、またはGキーのクエスト画面の「Guild FX」から開きます。
+Gキーのクエスト画面 →「ギャンブル」→「Guild FX」、または`/guild fx`で開きます。F8は既定で無効で、FXの「UI設定」から有効化できます。
 詳細UIは成行・指値・逆指値・OCO・IFD・IFO、最大1000倍に対応します。
 追証は既定で無効（ゼロカット）。設定と`/guildadmin fx margincall true|false`で変更できます。
 追証有効時の未払いは、既存の債務・定期返済・滞納ロック・クエスト報酬充当へ接続します。
 相場・暴落・急騰はサーバー内部で独自生成し、外部の価格APIは使用しません。
 クライアントとサーバーに同じバージョンを導入してください。
 操作・取引仕様・全設定項目は [FX.md](FX.md) を参照してください。
+管理者の借入・滞納チェストUIは、引数なしの`/guildadmin`から開けます。操作方法は [ADMIN.md](ADMIN.md) を参照してください。
 友人のリポジトリへのPR手順と記入例は [PR_GUIDE.md](PR_GUIDE.md) にあります。PR作成・pushは行っていません。
 
-上流の`port/forge-1.20.1`、`d1b6344`（26.8.2）をpullして統合しています。
-共通コード・Fabric/Forge構成、新ギャンブル、ランキング、アップデート処理、26.8.2の競馬等の修正を保持しています。
+上流の`port/forge-1.20.1`、`9960829`（26.10.0）をpullして統合しています。
+26.10.0のランク別借入・採掘返済、26.9.0の収集クエスト・クールダウン、共通コード・Fabric/Forge構成と既存FXを保持しています。
 
 ## 機能
 
@@ -89,14 +90,14 @@ FTB Quests、Q Shop 等への依存はありません。
 生成物:
 
 ```text
-fabric/build/libs/guildquests_fabric-1.20.1_26.9.0.jar
-forge/build/libs/guildquests_forge-1.20.1_26.9.0.jar
+fabric/build/libs/guildquests_fabric-1.20.1_26.11.0.jar
+forge/build/libs/guildquests_forge-1.20.1_26.11.0.jar
 ```
 
 ## 導入
 
 1. FabricまたはForgeでMinecraft 1.20.1を用意します。
-2. ローダーに合う26.9.0 JARを`mods/`へ配置します。FabricではFabric APIも必要です。ワールドと設定を保存し、旧GuildQuests JARは重複させず置き換えます。
+2. ローダーに合う26.11.0 JARを`mods/`へ配置します。FabricではFabric APIも必要です。ワールドと設定を保存し、旧GuildQuests JARは重複させず置き換えます。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定変更後はサーバー再起動、または `/guildadmin reload` を実行します。
 
@@ -110,10 +111,14 @@ forge/build/libs/guildquests_forge-1.20.1_26.9.0.jar
 | `/guild status` | ランク・コイン・累計達成・支払い方法・債務を表示 |
 | `/guild bank` | 銀行GUIを開く |
 | `/guild auction` | オークション市場GUIを開く |
-| `/guild fx` | FXを開く（F8でも可） |
+| `/guild fx` | FXを開く（F8は任意で有効化） |
 | `/guildadmin fx margincall [true\|false]` | 追証の確認・変更・保存（OP Lv2） |
 | `/guildadmin fx reload` | FX設定を再読込（OP Lv2） |
 | `/guildadmin reload` | JSON設定を再読込 (OP Lv2) |
+| `/guildadmin` | 借入・滞納の管理チェストUI（OP Lv2） |
+| `/guildadmin loan add\|set <player> <amount>` | 借入の加算・指定額設定（OP Lv2） |
+| `/guildadmin loan clear <player>` | 借入を帳消し（OP Lv2） |
+| `/guildadmin delinquent <player> on\|off` | 管理者による滞納ロック・解除（OP Lv2） |
 | `/guildadmin boss` | 緊急ボスを即時出現 (OP Lv2) |
 | `/guildadmin coins set <player> <amount>` | コインを設定 (OP Lv2) |
 | `/guildadmin coins add <player> <amount>` | コインを追加 (OP Lv2) |
@@ -125,7 +130,8 @@ forge/build/libs/guildquests_forge-1.20.1_26.9.0.jar
 | クエスト | 9×6 | 掲示板・受注中クエスト・銀行/送金/ギャンブルへのボタン |
 | 銀行 | 9×3 | 預入/引出・数字頭で金額指定・支払い方法切替・リボ債務表示 |
 | 送金 | 9×3 | オンラインプレイヤーから宛先選択・金額指定・送信 |
-| ギャンブル | 9×3 | ブラックジャック/競馬へのハブ |
+| ギャンブル | 9×3 | 各ギャンブルとGuild FXへのハブ |
+| ギルド管理 | 9×6 | プレイヤー選択・借入・滞納・数字入力・変更確認 |
 | ブラックジャック | 9×3 | ヒット/スタンド・賭け金設定 |
 | 競馬 | 9×6 | 馬選択・賭け・レーン走行演出・結果表示 |
 | オークション | 9×6 | 出品一覧（ページ送り）・購入・入札額設定 |

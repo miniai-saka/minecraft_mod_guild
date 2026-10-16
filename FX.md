@@ -1,13 +1,13 @@
 # Guild FX
 
-Minecraft Fabric / Forge 1.20.1 / Guild Quests & Economy 26.9.0。
+Minecraft Fabric / Forge 1.20.1 / Guild Quests & Economy 26.11.0。
 ギルドコイン（GC）を証拠金に、Mod専用の架空通貨を取引するサーバー共通市場です。
 実通貨・外部口座・価格APIは使用しません。
 
 ## 導入と操作
 
-1. ワールドと設定をバックアップし、サーバーとクライアントの既存GuildQuests JARを同じローダーの26.9.0へ置き換えます。旧版と重複させないでください。
-2. F8、`/guild fx`、またはクエスト画面のアメジスト「Guild FX」で開きます。キーはMinecraftの設定から変更できます。
+1. ワールドと設定をバックアップし、サーバーとクライアントの既存GuildQuests JARを同じローダーの26.11.0へ置き換えます。旧版と重複させないでください。
+2. Gキーのクエスト画面 →「ギャンブル」→エメラルドの「Guild FX」、または`/guild fx`で開きます。F8は初期設定で無効です。FXの「UI設定」で有効化できます。
 3. 既定はMinecraft風の簡易UIです。「入金 / 出金」で所持ギルドコインをFX専用口座へ入金します。アイテムのギルドコインは先に銀行へ預けて電子残高にします。
 4. 銘柄・買い／売り・成行／指値／逆指値をボタンで選び、数量・倍率・価格を入力します。「注文内容を確認」→「確定して送信」で注文します。
 5. 「建玉」で損益と全量決済、「注文」で予約注文の取消、「履歴」で取引結果を確認します。簡易UIにはチャート・OCO・IFOの発注欄を置きません。
@@ -26,6 +26,12 @@ Minecraft Fabric / Forge 1.20.1 / Guild Quests & Economy 26.9.0。
 
 UIのサーバー既定値は`fx.json`の`defaultUi`（`MINECRAFT` / `WHITE`）。各クライアントの「UI設定」は`config/guildquests/fx-client.json`へ保存されます。
 `uiStyle`は`SERVER`（サーバー既定に従う）、`MINECRAFT`、`WHITE`です。手動編集は次回のクライアント起動で反映されます。「UI設定」からの変更は即時反映です。
+`hotkeyEnabled`はF8によるFX起動の有効・無効で、既定は`false`です。FX画面の「UI設定」の標準ボタンで変更でき、同じファイルへ保存します。キー割当を変えた場合もこの設定が適用されます。
+F8を無効にしても「クエスト画面 → ギャンブル → Guild FX」と`/guild fx`は使用できます。UI選択とF8設定は各クライアントで独立しています。旧設定にこの項目がない場合も無効で読み込みます。
+
+```json
+{ "uiStyle": "SERVER", "hotkeyEnabled": false }
+```
 
 ## 通貨
 
@@ -92,6 +98,8 @@ FXも新規注文・入金を停止し、未約定注文を取り消します。
 両UIの「入金 / 出金」から金額を入力して「所持金から債務を返済」できます。入力額・所持金・債務額の最小値だけ返済し、完済までロックを維持します。完済後は新規取引を再開できます。
 ログアウト中の不足分もサーバーが同じ処理で精算します。追証・所持金・債務は同じ保存データに格納します。
 途中で追証を無効にしても、すでに発生した未精算額・債務・滞納は免除されません。
+26.10.0の消費者金融の借入（`loan`）は、FX／リボ債務（`debt`）とは別残高です。借入の管理コマンドとチェストUIは`loan`を変更します。
+管理者が`delinquent on`または管理UIで明示した固定ロックは、完済しても継続し、`delinquent off`または管理UIで解除します。自然発生したFX滞納は従来どおり完済で解除されます。
 
 ```text
 /guildadmin fx margincall         # 現在の状態
@@ -167,7 +175,7 @@ Createは任意連携用のコンパイル依存で、実行時に必須では�
 ./gradlew :common:test :fabric:build :forge:build
 ```
 
-JARは`fabric/build/libs/guildquests_fabric-1.20.1_26.9.0.jar`、`forge/build/libs/guildquests_forge-1.20.1_26.9.0.jar`です。
+JARは`fabric/build/libs/guildquests_fabric-1.20.1_26.11.0.jar`、`forge/build/libs/guildquests_forge-1.20.1_26.11.0.jar`です。
 取引計算・追証の回帰テストは`common/src/test`、Fabricの任意の開発テストModは`fabric/src/fxDebug`にあります。
 `-Penabled_platforms=fabric -PfxDebug :fabric:runServer`と`-Penabled_platforms=fabric -PfxDebug :fabric:runClient`でローカルスモークテストを実行できます。
 専用の`work/fx-debug-server`と`work/fx-debug-client`を使用します。テストサーバーは25577番、online-mode=false、localhost限定に設定し、EULA同意済みの環境で実行してください。

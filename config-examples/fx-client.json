@@ -1,3 +1,4 @@
 {
-  "uiStyle": "SERVER"
+  "uiStyle": "SERVER",
+  "hotkeyEnabled": false
 }
