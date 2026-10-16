@@ -3,7 +3,10 @@ package dev.guildquests.gui;
 import dev.guildquests.config.ConfigManager;
 import dev.guildquests.data.GuildPersistentState;
 import dev.guildquests.data.PlayerGuildData;
+import dev.guildquests.fx.FxPersistentState;
+import dev.guildquests.fx.FxSettings;
 import dev.guildquests.service.AdminLoanPolicy;
+import dev.guildquests.service.BossEvent;
 import dev.guildquests.service.GuildService;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,7 +27,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Vanilla chest menu; every selection, permission check and mutation lives on the server. */
+/**
+ * Vanilla chest menu; every selection, permission check and mutation lives on the server.
+ * Exposes every admin command: reload, boss, coins add/set, loan add/set/clear,
+ * delinquent on/off and the FX operations (margin-call toggle, reload, crash/rally).
+ */
 public final class AdminScreenHandler extends AbstractContainerMenu {
     private final ServerPlayer owner;
     private final SimpleContainer display = new SimpleContainer(54);
@@ -32,8 +39,9 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
     private String view = "PLAYERS", operation = "", notice = "";
     private UUID target;
     private int page;
-    private long amount, reviewedLoan;
+    private long amount, reviewedLoan, reviewedCoins;
     private boolean reviewedLock;
+    private String fxSymbol;
 
     public AdminScreenHandler(int id, net.minecraft.world.Container inventory, ServerPlayer owner) {
         super(MenuType.GENERIC_9x6, id); this.owner = owner;
@@ -49,7 +57,7 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
     private static boolean allowed(ServerPlayer player) { return player.createCommandSourceStack().hasPermission(2); }
     public static void open(ServerPlayer player) {
         if (!allowed(player)) return;
-        player.openMenu(new SimpleMenuProvider((id, inventory, ignored) -> new AdminScreenHandler(id, inventory, player), Component.literal("ギルド管理 - 借入・滞納")));
+        player.openMenu(new SimpleMenuProvider((id, inventory, ignored) -> new AdminScreenHandler(id, inventory, player), Component.literal("ギルド管理")));
     }
     private GuildPersistentState state() { return GuildPersistentState.get(owner.getServer()); }
     private PlayerGuildData data() { return state().get(target); }
@@ -65,8 +73,10 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
         actions.clear();
         for (int i = 0; i < 54; i++) set(i, Items.GRAY_STAINED_GLASS_PANE, " ");
         if (view.equals("PLAYERS")) players();
+        else if (view.equals("SERVER")) server();
         else {
-            set(4, Items.PLAYER_HEAD, "対象: " + name(target), "UUID: " + target, "借入: " + data().loan + " GC", "FX・リボ債務: " + data().debt + " GC", "滞納: " + (data().delinquent ? "あり" : "なし"));
+            set(4, Items.PLAYER_HEAD, "対象: " + name(target), "UUID: " + target, "所持金: " + data().coins + " GC",
+                    "借入: " + data().loan + " GC", "FX・リボ債務: " + data().debt + " GC", "滞納: " + (data().delinquent ? "あり" : "なし"));
             switch (view) { case "DETAIL" -> detail(); case "AMOUNT" -> input(); case "CONFIRM" -> confirmation(); }
         }
         if (!notice.isEmpty()) set(0, Items.PAPER, notice);
@@ -80,25 +90,82 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
         for (int i = page * 27; i < Math.min(ids.size(), (page + 1) * 27); i++) {
             UUID id = ids.get(i); var wallet = state().get(id); int slot = 9 + i % 27;
             display.setItem(slot, GuildItems.playerHead(owner.getServer(), id, name(id), name(id),
-                    owner.getServer().getPlayerList().getPlayer(id) == null ? "オフライン" : "オンライン", "借入: " + wallet.loan + " GC", "FX・リボ債務: " + wallet.debt + " GC", "滞納: " + (wallet.delinquent ? "あり" : "なし"), "クリックで管理"));
+                    owner.getServer().getPlayerList().getPlayer(id) == null ? "オフライン" : "オンライン", "所持金: " + wallet.coins + " GC",
+                    "借入: " + wallet.loan + " GC", "FX・リボ債務: " + wallet.debt + " GC", "滞納: " + (wallet.delinquent ? "あり" : "なし"), "クリックで管理"));
             actions.put(slot, () -> { target = id; view = "DETAIL"; notice = ""; });
         }
         if (page > 0) action(45, Items.ARROW, "前のページ", () -> page--);
         if (page + 1 < pages) action(53, Items.ARROW, "次のページ", () -> page++);
+        action(50, Items.COMMAND_BLOCK, "サーバー操作", () -> { view = "SERVER"; notice = ""; },
+                "設定再読込 / 緊急ボス / FX操作", "すべての管理コマンドをUIから実行");
         action(49, Items.BARRIER, "閉じる", owner::closeContainer);
     }
     private void detail() {
         action(10, Items.EMERALD, "借入を追加", () -> beginAmount("ADD"), "loan add と同じ操作", "所持金は増やさず、借入だけ加算");
         action(12, Items.WRITABLE_BOOK, "借入を指定額に設定", () -> beginAmount("SET"), "loan set と同じ操作", "0以上の整数GCを入力");
         action(14, Items.TNT, "借入を帳消し", () -> review("CLEAR"), "loan clear と同じ操作", "FX・リボ債務は変更しません", "次の画面で確認して確定");
-        set(22, Items.PAPER, "現在の管理状態", "借入: " + data().loan + " GC", "FX・リボ債務: " + data().debt + " GC",
+        action(16, Items.GOLD_NUGGET, "コインを追加", () -> beginAmount("COINS_ADD"), "coins add と同じ操作", "所持金を増やします");
+        action(17, Items.GOLD_BLOCK, "コインを設定", () -> beginAmount("COINS_SET"), "coins set と同じ操作", "所持金を指定額へ変更");
+        set(22, Items.PAPER, "現在の管理状態", "所持金: " + data().coins + " GC", "借入: " + data().loan + " GC", "FX・リボ債務: " + data().debt + " GC",
                 "滞納: " + (data().delinquent ? "あり" : "なし"), "管理者による固定ロック: " + (data().adminDelinquent ? "あり" : "なし"));
         action(29, Items.REDSTONE_TORCH, "滞納状態にする", () -> review("ON"), "delinquent on と同じ操作", "管理者が解除するまでロックを維持");
         action(33, Items.LIME_DYE, "滞納状態を解除", () -> review("OFF"), "delinquent off と同じ操作", "借入・FX債務の残高は変更しません", "後の返済失敗で再び滞納する場合があります");
         action(49, Items.ARROW, "プレイヤー選択へ戻る", () -> view = "PLAYERS");
     }
+    private void server() {
+        set(4, Items.COMMAND_BLOCK, "サーバー操作", "管理コマンドをUIから実行します");
+        action(10, Items.WRITABLE_BOOK, "設定を再読込", () -> { ConfigManager.loadAll(); notice = "設定を再読込しました。"; }, "reload と同じ操作");
+        action(12, Items.WITHER_SKELETON_SKULL, "緊急ボスを出現", () -> {
+            boolean ok = BossEvent.spawnNow(owner.getServer());
+            notice = ok ? "緊急ボスを出現させました。" : "出現できませんでした（既に生存 or プレイヤー不在）。";
+        }, "boss と同じ操作", "確率ロールをスキップ");
+        boolean mc = FxSettings.get().marginCallEnabled;
+        action(14, mc ? Items.REDSTONE_BLOCK : Items.GRAY_CONCRETE, "FX追証: " + (mc ? "あり" : "なし（ゼロカット）"),
+                this::toggleMarginCall, "fx margincall と同じ操作", "クリックで切替・fx.jsonへ保存");
+        action(16, Items.PAPER, "FX設定を再読込", () -> {
+            boolean ok = FxSettings.load();
+            notice = ok ? "FX設定を再読込しました。" : "FX設定の読込に失敗しました。";
+        }, "fx reload と同じ操作");
+        var symbols = FxSettings.get().symbols;
+        if (!symbols.isEmpty()) {
+            if (fxSymbol == null || symbols.stream().noneMatch(s -> s.id.equals(fxSymbol))) fxSymbol = symbols.get(0).id;
+            final String sym = fxSymbol;
+            action(28, Items.EMERALD, "FXショック対象: " + sym, this::cycleFxSymbol, "クリックで通貨を切替");
+            action(30, Items.REDSTONE_BLOCK, "暴落させる (" + sym + ")", () -> shock(true), "fx shock " + sym + " crash と同じ操作");
+            action(32, Items.EMERALD_BLOCK, "急騰させる (" + sym + ")", () -> shock(false), "fx shock " + sym + " rally と同じ操作");
+        } else {
+            set(28, Items.GRAY_DYE, "FX通貨が設定されていません");
+        }
+        action(49, Items.ARROW, "プレイヤー選択へ戻る", () -> view = "PLAYERS");
+    }
+    private void toggleMarginCall() {
+        try {
+            FxSettings.setMarginCall(!FxSettings.get().marginCallEnabled);
+            notice = "FX追証を切り替えました。";
+        } catch (java.io.IOException ex) {
+            notice = "fx.jsonを保存できませんでした。変更は適用していません。";
+        }
+    }
+    private void cycleFxSymbol() {
+        var symbols = FxSettings.get().symbols;
+        if (symbols.isEmpty()) return;
+        int idx = 0;
+        for (int i = 0; i < symbols.size(); i++) if (symbols.get(i).id.equals(fxSymbol)) { idx = i; break; }
+        fxSymbol = symbols.get((idx + 1) % symbols.size()).id;
+    }
+    private void shock(boolean crash) {
+        try {
+            FxPersistentState fx = FxPersistentState.get(owner.getServer());
+            fx.engine().shock(fxSymbol, crash);
+            fx.setDirty();
+            notice = fxSymbol + " を" + (crash ? "暴落" : "急騰") + "させました。";
+        } catch (RuntimeException ex) {
+            notice = "FXショックに失敗しました: " + ex.getMessage();
+        }
+    }
     private void beginAmount(String op) { operation = op; amount = 0; notice = ""; view = "AMOUNT"; }
     private void input() {
+        boolean coinsOp = operation.equals("COINS_ADD") || operation.equals("COINS_SET");
         set(13, Items.GOLD_INGOT, "入力額: " + amount + " GC", label(), "数字を順にクリックして入力", "最大 " + Long.MAX_VALUE + " GC");
         for (int digit = 1; digit <= 9; digit++) {
             int value = digit, slot = 20 + (digit - 1) / 3 * 9 + (digit - 1) % 3;
@@ -108,7 +175,7 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
         action(48, Items.WHITE_CONCRETE, "0", () -> append(0));
         action(45, Items.RED_DYE, "入力を消去", () -> amount = 0);
         action(47, Items.ARROW, "1桁消す", () -> amount /= 10);
-        action(16, Items.CHEST, "現在の借入額を入力", () -> amount = data().loan);
+        action(16, Items.CHEST, coinsOp ? "現在の所持金を入力" : "現在の借入額を入力", () -> amount = coinsOp ? data().coins : data().loan);
         action(50, Items.LIME_CONCRETE, "内容を確認", () -> review(operation));
         action(53, Items.BARRIER, "戻る", () -> view = "DETAIL");
     }
@@ -116,17 +183,42 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
         if (amount > (Long.MAX_VALUE - digit) / 10) { notice = "金額の上限を超えています。"; return; }
         amount = amount * 10 + digit; notice = "";
     }
-    private String label() { return switch (operation) { case "ADD" -> "借入に加算"; case "SET" -> "借入を指定額へ変更"; case "CLEAR" -> "借入を帳消し"; case "ON" -> "滞納状態にする"; default -> "滞納状態を解除"; }; }
-    private void review(String op) { operation = op; reviewedLoan = data().loan; reviewedLock = data().delinquent; view = "CONFIRM"; }
+    private String label() {
+        return switch (operation) {
+            case "ADD" -> "借入に加算";
+            case "SET" -> "借入を指定額へ変更";
+            case "CLEAR" -> "借入を帳消し";
+            case "COINS_ADD" -> "所持金に加算";
+            case "COINS_SET" -> "所持金を指定額へ変更";
+            case "ON" -> "滞納状態にする";
+            default -> "滞納状態を解除";
+        };
+    }
+    private void review(String op) { operation = op; reviewedLoan = data().loan; reviewedLock = data().delinquent; reviewedCoins = data().coins; view = "CONFIRM"; }
     private void confirmation() {
-        long after = switch (operation) { case "ADD" -> reviewedLoan > Long.MAX_VALUE - amount ? Long.MAX_VALUE : reviewedLoan + amount; case "SET" -> amount; case "CLEAR" -> 0; default -> reviewedLoan; };
-        set(22, Items.PAPER, "確認: " + label(), "対象: " + name(target), "借入 " + reviewedLoan + " → " + after + " GC",
-                "滞納 " + (reviewedLock ? "あり" : "なし") + " → " + (operation.equals("ON") || !operation.equals("OFF") && reviewedLock ? "あり" : "なし"), "FX・リボ債務と所持金は変更しません");
-        action(29, Items.ARROW, "戻る", () -> view = operation.equals("ADD") || operation.equals("SET") ? "AMOUNT" : "DETAIL");
+        boolean coinsOp = operation.equals("COINS_ADD") || operation.equals("COINS_SET");
+        if (coinsOp) {
+            long after = operation.equals("COINS_ADD")
+                    ? (reviewedCoins > Long.MAX_VALUE - amount ? Long.MAX_VALUE : reviewedCoins + amount) : amount;
+            set(22, Items.PAPER, "確認: " + label(), "対象: " + name(target), "所持金 " + reviewedCoins + " → " + after + " GC", "借入・債務は変更しません");
+        } else {
+            long after = switch (operation) {
+                case "ADD" -> reviewedLoan > Long.MAX_VALUE - amount ? Long.MAX_VALUE : reviewedLoan + amount;
+                case "SET" -> amount;
+                case "CLEAR" -> 0;
+                default -> reviewedLoan;
+            };
+            set(22, Items.PAPER, "確認: " + label(), "対象: " + name(target), "借入 " + reviewedLoan + " → " + after + " GC",
+                    "滞納 " + (reviewedLock ? "あり" : "なし") + " → " + (operation.equals("ON") || !operation.equals("OFF") && reviewedLock ? "あり" : "なし"), "FX・リボ債務と所持金は変更しません");
+        }
+        action(29, Items.ARROW, "戻る", () -> view = coinsOp || operation.equals("ADD") || operation.equals("SET") ? "AMOUNT" : "DETAIL");
         action(33, Items.LIME_CONCRETE, "確定する", this::apply, "対象と変更内容を確認してください");
     }
     private void apply() {
-        if (data().loan != reviewedLoan || data().delinquent != reviewedLock) { notice = "状態が変わりました。再度確認してください。"; view = "DETAIL"; return; }
+        boolean coinsOp = operation.equals("COINS_ADD") || operation.equals("COINS_SET");
+        if (data().loan != reviewedLoan || data().delinquent != reviewedLock || (coinsOp && data().coins != reviewedCoins)) {
+            notice = "状態が変わりました。再度確認してください。"; view = "DETAIL"; return;
+        }
         long due = System.currentTimeMillis() + ConfigManager.config().consumerLoanIntervalMinutes * 60_000L;
         switch (operation) {
             case "ADD" -> AdminLoanPolicy.add(data(), amount, due);
@@ -134,10 +226,12 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
             case "CLEAR" -> AdminLoanPolicy.clear(data());
             case "ON" -> AdminLoanPolicy.delinquent(data(), true);
             case "OFF" -> AdminLoanPolicy.delinquent(data(), false);
+            case "COINS_ADD" -> data().coins = data().coins > Long.MAX_VALUE - amount ? Long.MAX_VALUE : data().coins + amount;
+            case "COINS_SET" -> data().coins = amount;
             default -> throw new IllegalStateException("Unknown admin operation");
         }
         state().setDirty();
-        String result = name(target) + ": " + label() + " / 借入 " + data().loan + " GC / 滞納 " + (data().delinquent ? "あり" : "なし");
+        String result = name(target) + ": " + label() + " / 所持金 " + data().coins + " GC / 借入 " + data().loan + " GC / 滞納 " + (data().delinquent ? "あり" : "なし");
         owner.createCommandSourceStack().sendSuccess(() -> Component.literal("[Guild Admin] " + result), true);
         notice = "設定を反映しました。"; view = "DETAIL";
     }
