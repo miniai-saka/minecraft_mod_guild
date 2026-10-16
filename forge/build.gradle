@@ -67,6 +67,9 @@ tasks.matching { it.name == 'remapJar' }.configureEach {
         def idx = name.lastIndexOf('-')
         if (idx > 0) {
             def target = new File(f.parentFile, name.substring(0, idx) + '_' + name.substring(idx + 1))
+            if (target.exists()) {
+                target.delete()
+            }
             f.renameTo(target)
         }
     }

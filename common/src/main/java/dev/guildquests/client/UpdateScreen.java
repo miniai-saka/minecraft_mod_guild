@@ -12,7 +12,7 @@ public class UpdateScreen extends Screen {
     private final String currentVersion;
     private final UpdateChecker.UpdateInfo info;
 
-    private enum State { READY, DOWNLOADING, DONE, FAILED }
+    private enum State { READY, DOWNLOADING, DONE, SCHEDULED, STAGED, FAILED }
 
     private volatile State state = State.READY;
 
@@ -44,10 +44,15 @@ public class UpdateScreen extends Screen {
         if (state != State.READY) return;
         state = State.DOWNLOADING;
         new Thread(() -> {
-            boolean ok = UpdateChecker.download(info,
+            UpdateChecker.DownloadResult result = UpdateChecker.download(info,
                     dev.guildquests.platform.Platform.getModsDir(),
                     dev.guildquests.platform.Platform.getLoaderName());
-            state = ok ? State.DONE : State.FAILED;
+            state = switch (result) {
+                case OK -> State.DONE;
+                case SCHEDULED -> State.SCHEDULED;
+                case STAGED -> State.STAGED;
+                case FAILED -> State.FAILED;
+            };
         }, "GuildQuests-UpdateDownload").start();
     }
 
@@ -65,6 +70,15 @@ public class UpdateScreen extends Screen {
             case READY -> g.drawCenteredString(this.font, "ダウンロードして再起動すると適用されます", cx, cy + 5, 0xFFFFFF);
             case DOWNLOADING -> g.drawCenteredString(this.font, "ダウンロード中...", cx, cy + 5, 0xFFFF55);
             case DONE -> g.drawCenteredString(this.font, "完了！Minecraftを再起動してください", cx, cy + 5, 0x55FF55);
+            case SCHEDULED -> {
+                g.drawCenteredString(this.font, "ダウンロード完了（ゲーム終了時に自動で置き換えます）", cx, cy + 5, 0x55FF55);
+                g.drawCenteredString(this.font, "ゲームを終了してから、次回起動で新バージョンが適用されます", cx, cy + 20, 0xFFFFFF);
+            }
+            case STAGED -> {
+                g.drawCenteredString(this.font, "ダウンロード完了（手動での置き換えが必要です）", cx, cy + 5, 0xFFFF55);
+                g.drawCenteredString(this.font, "ゲーム終了後、mods内の古いJARを削除し、", cx, cy + 20, 0xFFFFFF);
+                g.drawCenteredString(this.font, "config/guildquests/update/ の新しいJARをmodsへ移動してください", cx, cy + 33, 0xFFFFFF);
+            }
             case FAILED -> g.drawCenteredString(this.font, "ダウンロードに失敗しました", cx, cy + 5, 0xFF5555);
         }
 

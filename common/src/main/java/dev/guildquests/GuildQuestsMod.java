@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 
 public final class GuildQuestsMod {
     public static final String MOD_ID = "guildquests";
-    public static final String VERSION = "26.8.0";
+    public static final String VERSION = "26.8.1";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static int exploreTicker = 0;
     private static int riboTicker = 0;
@@ -60,6 +60,9 @@ public final class GuildQuestsMod {
         if (cleaned > 0) {
             LOGGER.info("Cleaned up {} old guildquests JAR(s) after update.", cleaned);
         }
+
+        // Re-schedule a pending update swap if the game was killed before the post-exit swap ran.
+        dev.guildquests.update.UpdateChecker.recoverPendingSwap(Platform.getModsDir(), Platform.getLoaderName(), VERSION);
 
         Platform.onServerStopped(server -> {
             dev.guildquests.gui.HorseRaceScreenHandler.clearAll();
