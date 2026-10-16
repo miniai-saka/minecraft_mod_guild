@@ -112,9 +112,10 @@ public final class ChinchirorinScreenHandler extends AbstractContainerMenu {
         if (pr > dr) {
             playerWon = true;
             push = false;
-            boolean triple = isTriple(playerDice[0], playerDice[1], playerDice[2]);
-            payout = betAmount * (triple ? 3 : 2);
-            result = triple ? "大勝ち！（ゾロ目）" : "勝ち！";
+            // Flat 2x on a win. (A 3x "triple bonus" made the expected value exceed 1 —
+            // ties refund and P(win)=P(lose), so 2x keeps EV at exactly 1.0.)
+            payout = betAmount * 2;
+            result = "勝ち！";
             GuildService.creditCoins(owner.getServer(), owner.getUUID(), payout);
         } else if (pr == dr) {
             playerWon = false;

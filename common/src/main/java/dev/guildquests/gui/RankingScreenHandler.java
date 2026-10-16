@@ -134,7 +134,7 @@ public final class RankingScreenHandler extends AbstractContainerMenu {
             String name = (self ? "▶ " : "") + rankLabel + " " + e.name();
             PlayerGuildData temp = new PlayerGuildData();
             temp.completedTotal = e.completed();
-            set(9 + i, GuildItems.headItem(e.name(), e.id(), name,
+            set(9 + i, GuildItems.playerHead(owner.getServer(), e.id(), e.name(), name,
                     "所持コイン: " + e.coins,
                     "クエスト達成: " + e.completed + " 件",
                     "ランク: " + GuildService.rank(temp)));

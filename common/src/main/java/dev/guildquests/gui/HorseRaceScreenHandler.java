@@ -32,6 +32,14 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
     private static final int FINISH = 100;
     private static final String[] HORSE_NAMES = {"白馬", "黒馬", "栗毛", "鹿毛"};
     private static final int[] ODDS = {3, 5, 2, 8};
+    /**
+     * Per-horse win weights, aligned with {@link #HORSE_NAMES}/{@link #ODDS}.
+     * Chosen so {@code weight/100 * odds < 1} for every horse (house edge), which makes the
+     * game fair: e.g. 白馬 0.28×3=0.84, 黒馬 0.18×5=0.90, 栗毛 0.44×2=0.88, 鹿毛 0.10×8=0.80.
+     * Previously all horses moved identically (≈25% each), so the 8× horse paid 8×0.25=2.0× —
+     * an infinite-money exploit.
+     */
+    private static final int[] WIN_WEIGHTS = {28, 18, 44, 10};
     private static final Item[] HORSE_ICONS = {Items.WHITE_WOOL, Items.BLACK_WOOL, Items.BROWN_WOOL, Items.ORANGE_WOOL};
 
     /** Per-player race state; survives GUI reopen so an in-flight race is never orphaned. */
@@ -42,6 +50,7 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
         boolean raceDone;
         boolean menuOpen;
         int winner = -1;
+        int plannedWinner = -1;
         final int[] positions = {0, 0, 0, 0};
         int raceTicks;
     }
@@ -96,22 +105,24 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
 
             java.util.Random rand = new java.util.Random();
             for (int i = 0; i < 4; i++) {
-                if (s.positions[i] < FINISH) {
-                    s.positions[i] += 2 + rand.nextInt(4);
-                    if (s.positions[i] >= FINISH) {
+                if (s.positions[i] >= FINISH) continue;
+                // The pre-chosen winner runs slightly faster; every other horse is held at the
+                // line so only the chosen horse can cross first (keeps the odds honest).
+                int step = (i == s.plannedWinner) ? 3 + rand.nextInt(4) : 2 + rand.nextInt(4);
+                s.positions[i] += step;
+                if (s.positions[i] >= FINISH) {
+                    if (i == s.plannedWinner) {
                         s.positions[i] = FINISH;
                         if (s.winner == -1) s.winner = i;
+                    } else {
+                        s.positions[i] = FINISH - 1;
                     }
                 }
             }
             s.raceTicks++;
 
-            boolean allDone = true;
-            for (int pos : s.positions) {
-                if (pos < FINISH) { allDone = false; break; }
-            }
-
-            if (allDone || s.raceTicks > 100) {
+            if (s.winner != -1 || s.raceTicks > 100) {
+                if (s.winner == -1) s.winner = s.plannedWinner; // timeout safety
                 s.raceActive = false;
                 s.raceDone = true;
                 finishRace(server, entry.getKey(), s);
@@ -154,14 +165,28 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
         state.raceActive = true;
         state.raceDone = false;
         state.winner = -1;
+        state.plannedWinner = pickPlannedWinner();
         state.positions[0] = 0; state.positions[1] = 0; state.positions[2] = 0; state.positions[3] = 0;
         state.raceTicks = 0;
+    }
+
+    /** Weighted draw of the winner so each horse's payout matches its true chance (EV &lt; 1). */
+    private static int pickPlannedWinner() {
+        int total = 0;
+        for (int w : WIN_WEIGHTS) total += w;
+        int r = new java.util.Random().nextInt(total);
+        for (int i = 0; i < WIN_WEIGHTS.length; i++) {
+            r -= WIN_WEIGHTS[i];
+            if (r < 0) return i;
+        }
+        return WIN_WEIGHTS.length - 1;
     }
 
     private void nextRace() {
         state.raceActive = false;
         state.raceDone = false;
         state.winner = -1;
+        state.plannedWinner = -1;
         state.selectedHorse = -1;
         state.betAmount = 0;
         state.positions[0] = 0; state.positions[1] = 0; state.positions[2] = 0; state.positions[3] = 0;

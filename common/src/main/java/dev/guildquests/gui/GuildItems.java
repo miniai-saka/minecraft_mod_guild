@@ -9,6 +9,8 @@ import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.UUID;
 
@@ -52,6 +54,39 @@ public final class GuildItems {
     /** Player head showing the owner's skin (resolved client-side from the profile id). */
     public static ItemStack headItem(String ownerName, UUID ownerId, String name, String... lore) {
         return headItemWithTexture(ownerName, ownerId, null, name, lore);
+    }
+
+    /**
+     * Player head rendered from the online player's real skin. The skin texture is embedded as
+     * {@code SkullOwner.Properties.textures} — the same mechanism {@link #digitHead} uses — so the
+     * client draws the actual skin instead of falling back to the default (Steve) head, which is
+     * what happens when only the id/name are set and the client fails to resolve the profile.
+     */
+    public static ItemStack playerHead(MinecraftServer server, UUID ownerId, String ownerName, String name, String... lore) {
+        return headItemWithTexture(ownerName, ownerId, skinTexture(server, ownerId), name, lore);
+    }
+
+    /** The online player's base64 skin texture value, or null if unavailable (offline/unknown). */
+    private static String skinTexture(MinecraftServer server, UUID ownerId) {
+        if (server == null || ownerId == null) {
+            return null;
+        }
+        try {
+            ServerPlayer player = server.getPlayerList().getPlayer(ownerId);
+            if (player != null) {
+                var properties = player.getGameProfile().getProperties().get("textures");
+                if (properties != null) {
+                    for (var property : properties) {
+                        String value = property.getValue();
+                        if (value != null && !value.isEmpty()) {
+                            return value;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     /**

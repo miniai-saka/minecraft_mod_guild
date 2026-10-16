@@ -127,7 +127,7 @@ public final class TransferScreenHandler extends AbstractContainerMenu {
                 boolean selected = target != null && target.getUUID().equals(candidate.getUUID());
                 String name = candidate.getName().getString();
                 UUID id = candidate.getUUID();
-                setAction(slot, GuildItems.headItem(name, id, (selected ? "● " : "") + name,
+                setAction(slot, GuildItems.playerHead(owner.getServer(), id, name, (selected ? "● " : "") + name,
                                 selected ? "現在の送金先" : "クリックで送金先に選択",
                                 "残高: " + GuildService.data(candidate).coins),
                         (p, b, t) -> {
