@@ -6,7 +6,7 @@ public final class QuestDefinition {
     public String description = "";
     public QuestType type = QuestType.KILL;
 
-    /** Entity ID for KILL, item ID for SUBMIT. Used when targets is empty. */
+    /** Entity ID for KILL, item ID for SUBMIT / COLLECT. Used when targets is empty. */
     public String target = "minecraft:zombie";
     /** Optional pool of entity IDs for KILL. One is rolled at accept time. */
     public String[] targets;
@@ -20,6 +20,12 @@ public final class QuestDefinition {
     /** Total completed quests required before this quest can be accepted. */
     public int requiredCompleted = 0;
     public boolean repeatable = true;
+    /**
+     * COLLECT only: minimum in-game days between claims per player (2 = once every two days).
+     * Combined with the consumed items, this caps how much a player can gain from any item
+     * duplication on the server.
+     */
+    public int cooldownDays = 2;
 
     /** EXPLORE only. */
     public ExploreMode exploreMode = ExploreMode.COORDINATE;

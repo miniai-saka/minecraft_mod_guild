@@ -166,6 +166,11 @@ public final class GuildScreenHandler extends AbstractContainerMenu {
             DailyQuest daily = board.get(i);
             QuestDefinition quest = ConfigManager.quest(daily.questId);
             if (quest == null) continue;
+            // COLLECT quests are hidden entirely while this player is on cooldown.
+            if (quest.type == QuestType.COLLECT
+                    && data.collectOnCooldown(GuildService.boardDay(owner.getServer()), quest.id, quest.cooldownDays)) {
+                continue;
+            }
             int slot = 9 + i;
             ActiveQuest active = data.findActive(quest.id);
             boolean locked = data.completedTotal < quest.requiredCompleted;
@@ -233,7 +238,8 @@ public final class GuildScreenHandler extends AbstractContainerMenu {
                     activeObjectiveLine(quest, active),
                     "進捗: " + active.progress + "/" + amount,
                     rewardLine(reward),
-                    quest.type == QuestType.SUBMIT && !ready ? "左クリック: 所持アイテムを納品" : "左クリック: 報酬を受け取る",
+                    (quest.type == QuestType.SUBMIT || quest.type == QuestType.COLLECT) && !ready
+                            ? "左クリック: 所持アイテムを納品" : "左クリック: 報酬を受け取る",
                     "右クリック: 破棄");
             setAction(slot, icon, (p, b, t) -> {
                 if (b == 1) GuildService.cancelQuest(p, quest.id);
@@ -271,6 +277,7 @@ public final class GuildScreenHandler extends AbstractContainerMenu {
         return switch (quest.type) {
             case KILL -> Items.IRON_SWORD;
             case SUBMIT -> Items.HOPPER;
+            case COLLECT -> Items.CHEST;
             case EXPLORE -> Items.COMPASS;
         };
     }
@@ -284,6 +291,7 @@ public final class GuildScreenHandler extends AbstractContainerMenu {
         return switch (quest.type) {
             case KILL -> "討伐: " + GuildService.entityName(daily.target) + " × " + daily.amount;
             case SUBMIT -> "納品: " + GuildService.itemName(daily.target) + " × " + daily.amount;
+            case COLLECT -> "収集: " + GuildService.itemName(daily.target) + " × " + daily.amount;
             case EXPLORE -> switch (quest.exploreMode) {
                 case COORDINATE -> daily.hasCoords
                         ? "目的地: " + prefix + "(" + (int) daily.x + ", " + (int) daily.y + ", " + (int) daily.z
@@ -304,6 +312,8 @@ public final class GuildScreenHandler extends AbstractContainerMenu {
             case KILL -> "対象: " + GuildService.entityName(GuildService.effectiveTarget(active, quest))
                     + " × " + GuildService.effectiveAmount(active, quest);
             case SUBMIT -> "納品: " + GuildService.itemName(quest.target)
+                    + " × " + GuildService.effectiveAmount(active, quest);
+            case COLLECT -> "収集: " + GuildService.itemName(quest.target)
                     + " × " + GuildService.effectiveAmount(active, quest);
             case EXPLORE -> switch (quest.exploreMode) {
                 case COORDINATE -> active.randomCoords

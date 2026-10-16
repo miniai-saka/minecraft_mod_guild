@@ -31,6 +31,8 @@ public final class PlayerGuildData {
     public final Set<String> claimedExploreQuestIds = new HashSet<>();
     /** Auction-house mailbox: items owed to this player (winnings, refunds, expired listings). */
     public final List<ItemStack> mailbox = new ArrayList<>();
+    /** COLLECT quest id -> board day it was last claimed; enforces the per-quest cooldown. */
+    public final java.util.Map<String, Long> collectClaimedDay = new java.util.HashMap<>();
 
     public ActiveQuest findActive(String questId) {
         for (ActiveQuest active : activeQuests) {
@@ -51,6 +53,21 @@ public final class PlayerGuildData {
     /** True when this explore quest was already claimed on the given board day. */
     public boolean exploreClaimedToday(long boardDay, String questId) {
         return claimedBoardDay == boardDay && claimedExploreQuestIds.contains(questId);
+    }
+
+    /**
+     * True when a COLLECT quest is still on cooldown for the given board day.
+     * {@code cooldownDays <= 0} disables the limit.
+     */
+    public boolean collectOnCooldown(long boardDay, String questId, int cooldownDays) {
+        if (cooldownDays <= 0) return false;
+        Long last = collectClaimedDay.get(questId);
+        return last != null && boardDay - last < cooldownDays;
+    }
+
+    /** Records a COLLECT claim on the given board day. */
+    public void markCollectClaimed(long boardDay, String questId) {
+        collectClaimedDay.put(questId, boardDay);
     }
 
     public CompoundTag toNbt() {
@@ -89,6 +106,12 @@ public final class PlayerGuildData {
             if (stack != null && !stack.isEmpty()) mailboxList.add(stack.save(new CompoundTag()));
         }
         nbt.put("AuctionMailbox", mailboxList);
+
+        CompoundTag collectNbt = new CompoundTag();
+        for (java.util.Map.Entry<String, Long> entry : collectClaimedDay.entrySet()) {
+            collectNbt.putLong(entry.getKey(), entry.getValue());
+        }
+        nbt.put("CollectClaimedDays", collectNbt);
         return nbt;
     }
 
@@ -131,6 +154,13 @@ public final class PlayerGuildData {
         for (int i = 0; i < mailboxList.size(); i++) {
             ItemStack stack = ItemStack.of(mailboxList.getCompound(i));
             if (!stack.isEmpty()) data.mailbox.add(stack);
+        }
+
+        if (nbt.contains("CollectClaimedDays", Tag.TAG_COMPOUND)) {
+            CompoundTag collectNbt = nbt.getCompound("CollectClaimedDays");
+            for (String key : collectNbt.getAllKeys()) {
+                data.collectClaimedDay.put(key, collectNbt.getLong(key));
+            }
         }
         return data;
     }

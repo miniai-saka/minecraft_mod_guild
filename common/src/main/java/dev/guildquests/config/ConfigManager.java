@@ -9,6 +9,7 @@ import dev.guildquests.model.QuestType;
 import dev.guildquests.platform.Platform;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
@@ -36,7 +37,7 @@ public final class ConfigManager {
         try {
             Files.createDirectories(DIR);
             if (!Files.exists(CONFIG)) writeJson(CONFIG, new ModConfig());
-            if (!Files.exists(QUESTS)) writeJson(QUESTS, defaultQuests());
+            if (!Files.exists(QUESTS)) writeDefaultQuests(QUESTS);
 
             ModConfig loadedConfig = readJson(CONFIG, ModConfig.class);
             QuestDefinition[] loadedQuests = readJson(QUESTS, QuestDefinition[].class);
@@ -128,6 +129,7 @@ public final class ConfigManager {
             }
             q.reward = Math.max(0, q.reward);
             q.requiredCompleted = Math.max(0, q.requiredCompleted);
+            q.cooldownDays = Math.max(0, q.cooldownDays);
             if (q.exploreMode == null) q.exploreMode = ExploreMode.COORDINATE;
             if (q.dimension == null || q.dimension.isBlank()) q.dimension = "minecraft:overworld";
             q.radius = Math.max(0.5, q.radius);
@@ -148,6 +150,24 @@ public final class ConfigManager {
         try (Writer w = Files.newBufferedWriter(path)) {
             GSON.toJson(value, w);
         }
+    }
+
+    /** Bundled default quest board, shipped inside the jar (not a user-facing file). */
+    private static final String BUNDLED_QUESTS = "/guildquests_default_quests.json";
+
+    /**
+     * Seeds the player-facing quests.json on first run. Prefers the bundled resource so the
+     * default board is maintained as JSON rather than Java; falls back to {@link #defaultQuests()}.
+     */
+    private static void writeDefaultQuests(Path target) throws IOException {
+        try (InputStream in = ConfigManager.class.getResourceAsStream(BUNDLED_QUESTS)) {
+            if (in != null) {
+                Files.copy(in, target);
+                return;
+            }
+        }
+        GuildQuestsMod.LOGGER.warn("Bundled {} not found; writing built-in default quests", BUNDLED_QUESTS);
+        writeJson(target, defaultQuests());
     }
 
     public static QuestDefinition[] defaultQuests() {
@@ -294,6 +314,19 @@ public final class ConfigManager {
         dragon.reward = 25;
         dragon.requiredCompleted = 30;
 
-        return new QuestDefinition[]{undead, monsters, nether, illager, ender, explore, biome, structure, boss, dragon};
+        QuestDefinition collect = new QuestDefinition();
+        collect.id = "collect_iron";
+        collect.title = "収集：鉄インゴット";
+        collect.description = "鉄インゴットを集めてギルドに納品する";
+        collect.type = QuestType.COLLECT;
+        collect.target = "minecraft:iron_ingot";
+        collect.amount = 32;
+        collect.amountMin = 16;
+        collect.amountMax = 48;
+        collect.reward = 8;
+        collect.repeatable = true;
+        collect.cooldownDays = 2;
+
+        return new QuestDefinition[]{undead, monsters, nether, illager, ender, collect, explore, biome, structure, boss, dragon};
     }
 }

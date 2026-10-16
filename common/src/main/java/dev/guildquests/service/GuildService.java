@@ -87,6 +87,11 @@ public final class GuildService {
             message(player, "この探索クエストは本日達成済みです（次の抽選でお挑戦ください）。", ChatFormatting.YELLOW);
             return false;
         }
+        if (quest.type == QuestType.COLLECT
+                && data.collectOnCooldown(boardDay(player.getServer()), quest.id, quest.cooldownDays)) {
+            message(player, "この収集クエストは現在クールダウン中です（" + quest.cooldownDays + " 日に1回まで）。", ChatFormatting.YELLOW);
+            return false;
+        }
 
         ActiveQuest active = new ActiveQuest(quest.id, 0);
         active.target = daily.target.isBlank() ? null : daily.target;
@@ -104,7 +109,7 @@ public final class GuildService {
         if (quest.type == QuestType.KILL) {
             detail.append("（対象: ").append(entityName(effectiveTarget(active, quest)))
                     .append(" × ").append(active.amount).append("）");
-        } else if (quest.type == QuestType.SUBMIT) {
+        } else if (quest.type == QuestType.SUBMIT || quest.type == QuestType.COLLECT) {
             detail.append("（納品: ").append(itemName(quest.target)).append(" × ").append(active.amount).append("）");
         } else if (active.randomCoords) {
             String dim = dimensionLabel(quest.dimension);
@@ -230,7 +235,7 @@ public final class GuildService {
         if (active == null || quest == null) return false;
 
         int amount = effectiveAmount(active, quest);
-        if (quest.type == QuestType.SUBMIT && active.progress < amount) {
+        if ((quest.type == QuestType.SUBMIT || quest.type == QuestType.COLLECT) && active.progress < amount) {
             ResourceLocation itemId = safeIdentifier(quest.target);
             if (itemId == null || !BuiltInRegistries.ITEM.containsKey(itemId)) {
                 message(player, "納品対象アイテムの設定が不正です: " + quest.target, ChatFormatting.RED);
@@ -282,6 +287,9 @@ public final class GuildService {
         data.completedQuestIds.add(quest.id);
         if (quest.type == QuestType.EXPLORE) {
             data.markExploreClaimed(boardDay(player.getServer()), quest.id);
+        }
+        if (quest.type == QuestType.COLLECT) {
+            data.markCollectClaimed(boardDay(player.getServer()), quest.id);
         }
         data.activeQuests.remove(active);
         state.setDirty();
@@ -661,7 +669,7 @@ public final class GuildService {
                 daily.target = quest.target;
             }
             daily.amount = rollAmount(quest);
-        } else if (quest.type == QuestType.SUBMIT) {
+        } else if (quest.type == QuestType.SUBMIT || quest.type == QuestType.COLLECT) {
             daily.target = quest.target;
             daily.amount = rollAmount(quest);
         } else {
