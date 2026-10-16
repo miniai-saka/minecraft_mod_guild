@@ -30,6 +30,7 @@ out/
 
 # Runtime / IDE
 run/
+logs/
 /dev/
 .idea/
 *.iml

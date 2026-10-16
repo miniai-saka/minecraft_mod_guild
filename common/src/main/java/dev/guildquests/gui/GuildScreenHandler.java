@@ -247,6 +247,9 @@ public final class GuildScreenHandler extends AbstractContainerMenu {
             });
         }
 
+        if (owner.createCommandSourceStack().hasPermission(2))
+            setAction(48, item(Items.COMMAND_BLOCK, "ギルド管理", "借入の追加・設定・帳消し / 滞納の設定・解除", "/guildadmin でも開けます"),
+                    (p, b, t) -> { if (b == 0) AdminScreenHandler.open(p); });
         setAction(49, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeContainer());
     }
 

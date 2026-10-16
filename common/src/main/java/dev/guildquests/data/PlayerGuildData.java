@@ -21,6 +21,8 @@ public final class PlayerGuildData {
     public long debt = 0;
     /** True when a scheduled ribo collection failed; locks guild features until debt == 0. */
     public boolean delinquent = false;
+    /** Explicit administrator lock, retained until the administrator turns it off. */
+    public boolean adminDelinquent = false;
     /** Epoch millis of the next scheduled ribo collection. 0 when no debt. */
     public long nextRiboDueAt = 0;
     /** Outstanding consumer-finance loan (principal + accrued interest); repaid manually. */
@@ -84,6 +86,7 @@ public final class PlayerGuildData {
         nbt.putString("PaymentMode", paymentMode == null ? "DEBIT" : paymentMode);
         nbt.putLong("Debt", debt);
         nbt.putBoolean("Delinquent", delinquent);
+        nbt.putBoolean("AdminDelinquent", adminDelinquent);
         nbt.putLong("NextRiboDueAt", nextRiboDueAt);
         nbt.putLong("Loan", loan);
         nbt.putLong("NextLoanInterestAt", nextLoanInterestAt);
@@ -132,10 +135,11 @@ public final class PlayerGuildData {
         data.paymentMode = nbt.getString("PaymentMode");
         if (data.paymentMode.isBlank()) data.paymentMode = "DEBIT";
         data.debt = Math.max(0L, nbt.getLong("Debt"));
-        data.delinquent = nbt.getBoolean("Delinquent");
+        data.adminDelinquent = nbt.getBoolean("AdminDelinquent");
+        data.delinquent = nbt.getBoolean("Delinquent") || data.adminDelinquent;
         data.nextRiboDueAt = Math.max(0L, nbt.getLong("NextRiboDueAt"));
         if (data.debt <= 0) {
-            data.delinquent = false;
+            if (!data.adminDelinquent && nbt.getLong("Loan") <= 0) data.delinquent = false;
             data.nextRiboDueAt = 0;
         }
         data.loan = Math.max(0L, nbt.getLong("Loan"));

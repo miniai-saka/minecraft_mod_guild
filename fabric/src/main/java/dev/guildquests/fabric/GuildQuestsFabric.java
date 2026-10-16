@@ -9,6 +9,7 @@ public final class GuildQuestsFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         Platform.bind(new FabricBackend());
+        FabricFxNetwork.init();
         GuildQuestsMod.registerContent(FabricContentRegistrar.INSTANCE);
         GuildQuestsMod.init();
     }

@@ -16,6 +16,7 @@ public final class GuildQuestsClient {
     }
 
     public static void init() {
+        FxClient.init();
         GuildQuestsMod.LOGGER.info("[Client] GuildQuestsClient.init() called");
         PlatformClient.onBlockRenderCutout(ModBlocks.GUILD_BANK);
 
@@ -30,7 +31,7 @@ public final class GuildQuestsClient {
         String currentVer = GuildQuestsMod.VERSION;
         String loader = Platform.getLoaderName();
         GuildQuestsMod.LOGGER.info("[Client] Starting update check: current=v{}, loader={}", currentVer, loader);
-        UpdateChecker.checkAsync(currentVer, loader, info -> {
+        if (!Boolean.getBoolean("guildquests.disableUpdateCheck")) UpdateChecker.checkAsync(currentVer, loader, info -> {
             pendingUpdate = info;
             GuildQuestsMod.LOGGER.info("[Client] Update available: v{} (current: v{})", info.latestVersion(), currentVer);
         });

@@ -9,6 +9,7 @@ public final class GuildQuestsFabricClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         PlatformClient.bind(new FabricClientBackend());
+        dev.guildquests.fx.FxNetwork.client = new FabricFxClientNetwork();
         GuildQuestsClient.init();
     }
 }

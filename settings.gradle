@@ -10,5 +10,4 @@ pluginManagement {
 rootProject.name = 'guildquests'
 
 include 'common'
-include 'fabric'
-include 'forge'
+providers.gradleProperty('enabled_platforms').orElse('fabric,forge').get().split(',').each { include it.trim() }

@@ -15,6 +15,7 @@ import java.util.UUID;
 public final class GuildPersistentState extends SavedData {
     private static final String SAVE_ID = "guildquests_players";
     private final Map<UUID, PlayerGuildData> players = new HashMap<>();
+    public dev.guildquests.fx.FxPersistentState fx = new dev.guildquests.fx.FxPersistentState(this::setDirty);
 
     /** In-game day number the current daily board was drawn for. -1 = never drawn. */
     public long dailyBoardDay = -1;
@@ -53,6 +54,7 @@ public final class GuildPersistentState extends SavedData {
             playersNbt.put(entry.getKey().toString(), entry.getValue().toNbt());
         }
         nbt.put("Players", playersNbt);
+        nbt.put("FxExchange", fx.writeNbt(new CompoundTag()));
         nbt.putLong("DailyBoardDay", dailyBoardDay);
         ListTag dailyNbt = new ListTag();
         for (DailyQuest quest : dailyBoard) {
@@ -75,6 +77,8 @@ public final class GuildPersistentState extends SavedData {
 
     public static GuildPersistentState fromNbt(CompoundTag nbt) {
         GuildPersistentState state = new GuildPersistentState();
+        if (nbt.contains("FxExchange", Tag.TAG_COMPOUND))
+            state.fx = dev.guildquests.fx.FxPersistentState.fromNbt(nbt.getCompound("FxExchange"), state::setDirty);
         CompoundTag playersNbt = nbt.getCompound("Players");
         for (String key : playersNbt.getAllKeys()) {
             try {

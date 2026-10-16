@@ -80,6 +80,10 @@ public final class GambleScreenHandler extends AbstractContainerMenu {
                 (p, b, t) -> { if (b == 0) RouletteScreenHandler.open(p); });
         setAction(15, item(ModItems.COIN, "コイントス", "クリックでプレイ", "表か裏か、2倍勝負"),
                 (p, b, t) -> { if (b == 0) CoinFlipScreenHandler.open(p); });
+        setAction(16, item(Items.EMERALD, "Guild FX — 仮想通貨取引",
+                "クリックでFXを開きます", "成行・指値・逆指値 / Mod専用の架空通貨",
+                "F8の有効・無効にかかわらず利用できます"),
+                (p, b, t) -> { if (b == 0) dev.guildquests.fx.FxService.open(p); });
 
         // Row 2: close
         setAction(22, item(Items.BARRIER, "閉じる"),

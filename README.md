@@ -1,9 +1,26 @@
-# Guild Quests & Economy (Fabric 1.20.1)
+# Guild Quests & Economy (Fabric / Forge 1.20.1)
 
-Minecraft 1.20.1 / Fabric 向けの、クエスト・ギルド通貨・銀行・ギャンブルを単体で実装するModです。
+Minecraft 1.20.1 / Fabric・Forge 向けの、クエスト・ギルド通貨・銀行・ギャンブルを単体で実装するModです。
 FTB Quests、Q Shop 等への依存はありません。
 
-バージョン: **26.3.0**
+バージョン: **26.11.0**（上流26.10.0を統合したローカル拡張版）
+
+### Guild FX（26.11.0）
+
+暗転背景とMinecraft標準ボタンの簡易UIを既定に、Mod専用仮想通貨のFXを追加しました。
+成行・指値・逆指値に絞った簡易取引と、ローソク足付きの白背景ターミナルを「UI設定」で切り替えられます。
+Gキーのクエスト画面 →「ギャンブル」→「Guild FX」、または`/guild fx`で開きます。F8は既定で無効で、FXの「UI設定」から有効化できます。
+詳細UIは成行・指値・逆指値・OCO・IFD・IFO、最大1000倍に対応します。
+追証は既定で無効（ゼロカット）。設定と`/guildadmin fx margincall true|false`で変更できます。
+追証有効時の未払いは、既存の債務・定期返済・滞納ロック・クエスト報酬充当へ接続します。
+相場・暴落・急騰はサーバー内部で独自生成し、外部の価格APIは使用しません。
+クライアントとサーバーに同じバージョンを導入してください。
+操作・取引仕様・全設定項目は [FX.md](FX.md) を参照してください。
+管理者の借入・滞納チェストUIは、引数なしの`/guildadmin`から開けます。操作方法は [ADMIN.md](ADMIN.md) を参照してください。
+友人のリポジトリへのPR手順と記入例は [PR_GUIDE.md](PR_GUIDE.md) にあります。
+
+上流の`port/forge-1.20.1`、`9960829`（26.10.0）をpullして統合しています。
+26.10.0のランク別借入・採掘返済、26.9.0の収集クエスト・クールダウン、共通コード・Fabric/Forge構成と既存FXを保持しています。
 
 ## 機能
 
@@ -28,7 +45,18 @@ FTB Quests、Q Shop 等への依存はありません。
 
 ### ギャンブル
 - ブラックジャック（手取り21、バースト、自然なBJは2.5倍）
-- 競馬（4頭、オッズ2〜8倍、自動レース演出）
+- 競馬（上流26.8.2のオッズ・期待値修正を保持）
+- チンチロリン、コイントス、ルーレット、スロット、ランキング
+
+### オークション（プレイヤー間マーケット）
+- グローバルGUIマーケット（サーバー側でアイテムをエスクロー保管）
+- 出品時に「固定価格」または「入札式オークション」を選択
+- 固定価格: 買い手が即購入
+- 入札式: 開始価格から入札、期限到来で最高入札者が落札
+- 入札は残高から即時引き落とし、更新時は前の入札者へ自動返金
+- 落札品・期限切れ品・取消品は「受取ボックス」に届き、GUIから受け取り
+- 売却成立時に出品者へ手数料を差し引いて残高入金
+- 出品一覧はページ送り、自分の出品はキャンセル可能
 
 ### 緊急ボスイベント
 - オンライン時に一定間隔で確率発生
@@ -46,33 +74,34 @@ FTB Quests、Q Shop 等への依存はありません。
 ## 必要環境
 
 - Minecraft 1.20.1
-- Fabric Loader 0.16.10 以上
-- Fabric API 0.92.x+1.20.1
+- Fabric: Fabric Loader 0.16.10以上、Fabric API 0.92.x+1.20.1
+- Forge: Forge 47.2.0（1.20.1）
 - Java 17
 - （任意）Create mod — ストックティッカー連携を使う場合
 
 ## ビルド
 
-Gradle 8系を使用してください。
+ビルドにはJDK 21と同梱Gradle Wrapperを使用します。生成Modの動作要件はJava 17です。
 
 ```bash
-gradle build
+./gradlew :common:test :fabric:build :forge:build
 ```
 
 生成物:
 
 ```text
-build/libs/guildquests-fa1.20.1_26.3.0.jar
+fabric/build/libs/guildquests_fabric-1.20.1_26.11.0.jar
+forge/build/libs/guildquests_forge-1.20.1_26.11.0.jar
 ```
 
 ## 導入
 
-1. Fabric Loader で Minecraft 1.20.1 を用意します。
-2. `guildquests-fa1.20.1_26.3.0.jar` と Fabric API を `mods/` に配置します。
+1. FabricまたはForgeでMinecraft 1.20.1を用意します。
+2. ローダーに合う26.11.0 JARを`mods/`へ配置します。FabricではFabric APIも必要です。ワールドと設定を保存し、旧GuildQuests JARは重複させず置き換えます。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定変更後はサーバー再起動、または `/guildadmin reload` を実行します。
 
-GUIはMinecraft標準のチェスト画面を利用しているため、専用テクスチャやクライアント専用Screenクラスは不要です。
+クエスト・銀行等はMinecraft標準のチェスト画面、FXは専用のクライアント画面を使用します。
 
 ## コマンド
 
@@ -81,7 +110,15 @@ GUIはMinecraft標準のチェスト画面を利用しているため、専用�
 | `/guild` | クエストGUIを開く（Gキーでも可） |
 | `/guild status` | ランク・コイン・累計達成・支払い方法・債務を表示 |
 | `/guild bank` | 銀行GUIを開く |
+| `/guild auction` | オークション市場GUIを開く |
+| `/guild fx` | FXを開く（F8は任意で有効化） |
+| `/guildadmin fx margincall [true\|false]` | 追証の確認・変更・保存（OP Lv2） |
+| `/guildadmin fx reload` | FX設定を再読込（OP Lv2） |
 | `/guildadmin reload` | JSON設定を再読込 (OP Lv2) |
+| `/guildadmin` | 借入・滞納の管理チェストUI（OP Lv2） |
+| `/guildadmin loan add\|set <player> <amount>` | 借入の加算・指定額設定（OP Lv2） |
+| `/guildadmin loan clear <player>` | 借入を帳消し（OP Lv2） |
+| `/guildadmin delinquent <player> on\|off` | 管理者による滞納ロック・解除（OP Lv2） |
 | `/guildadmin boss` | 緊急ボスを即時出現 (OP Lv2) |
 | `/guildadmin coins set <player> <amount>` | コインを設定 (OP Lv2) |
 | `/guildadmin coins add <player> <amount>` | コインを追加 (OP Lv2) |
@@ -93,9 +130,13 @@ GUIはMinecraft標準のチェスト画面を利用しているため、専用�
 | クエスト | 9×6 | 掲示板・受注中クエスト・銀行/送金/ギャンブルへのボタン |
 | 銀行 | 9×3 | 預入/引出・数字頭で金額指定・支払い方法切替・リボ債務表示 |
 | 送金 | 9×3 | オンラインプレイヤーから宛先選択・金額指定・送信 |
-| ギャンブル | 9×3 | ブラックジャック/競馬へのハブ |
+| ギャンブル | 9×3 | 各ギャンブルとGuild FXへのハブ |
+| ギルド管理 | 9×6 | プレイヤー選択・借入・滞納・数字入力・変更確認 |
 | ブラックジャック | 9×3 | ヒット/スタンド・賭け金設定 |
 | 競馬 | 9×6 | 馬選択・賭け・レーン走行演出・結果表示 |
+| オークション | 9×6 | 出品一覧（ページ送り）・購入・入札額設定 |
+| 出品 | 9×3 | 手に持ったアイテムの形式/価格設定・出品 |
+| 自分の出品/受取 | 9×6 | 出品取消・受取ボックスからのアイテム受け取り |
 | 入金ブロック設定 | 9×1 | 通知トグル・一括入金 |
 
 ## 設定ファイル
@@ -124,6 +165,10 @@ config/guildquests/quests.json
 - `riboInstallment`: リボの1回あたり徴収額
 - `riboInterestPercent`: リボの周期利息（%）
 - `riboIntervalMinutes`: リボ徴収間隔（分）
+- `auctionFeePercent`: オークション売却時の手数料（%）
+- `auctionDurationMinutes`: 出品が期限切れになるまでの時間（分）
+- `auctionMaxListingsPerPlayer`: 1人あたりの同時出品上限
+- `auctionBidStep`: 入札時に上乗せが必要な最低単位
 - `rankThresholds`: ランク名と累計達成数の閾値
 - `createIntegrationEnabled`: Create連携のON/OFF
 
@@ -210,5 +255,6 @@ UUIDをキーにしているため、ログアウト/再ログインやサーバ
 ## 補足
 
 - 討伐判定は「プレイヤー自身が直接キルしたEntity」を対象にします。自動トラップ等の経済対策は、日次クエスト件数上限と日次獲得コイン上限で制御します。
-- リボで延滞すると銀行・送金・入金ブロックがロックされます。クエスト報酬は自動で債務返済に充当されます。
+- リボで延滞すると銀行・送金・入金ブロックがロックされます。クエスト報酬は自動で債務返済に充当されます。オークションの購入・入札も延滞中はロックされます（出品は可能）。
+- オークションの出品アイテムはサーバー側（ワールドデータ）にエスクロー保存されます。落札品・返却品は各プレイヤーの受取ボックスに届きます。
 - ボスの環境ダメージ（溶岩・落下等）による撃破は無効です。対策として落下保護と脱出テレポートが入っています。

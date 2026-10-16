@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 
 public final class GuildQuestsMod {
     public static final String MOD_ID = "guildquests";
-    public static final String VERSION = "26.10.0";
+    public static final String VERSION = "26.11.0";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static int exploreTicker = 0;
     private static int riboTicker = 0;
@@ -48,6 +48,7 @@ public final class GuildQuestsMod {
 
     public static void init() {
         ConfigManager.loadAll();
+        dev.guildquests.fx.FxService.init();
         BossEvent.init();
 
         Platform.onOpenGuildRequest(GuildScreenHandler::openQuests);
@@ -137,7 +138,8 @@ public final class GuildQuestsMod {
                             })));
 
             var guildAdmin = Commands.literal("guildadmin")
-                    .requires(source -> source.hasPermission(2));
+                    .requires(source -> source.hasPermission(2))
+                    .executes(context -> { dev.guildquests.gui.AdminScreenHandler.open(context.getSource().getPlayerOrException()); return 1; });
 
             guildAdmin.then(Commands.literal("reload")
                     .executes(context -> {
@@ -195,11 +197,7 @@ public final class GuildQuestsMod {
                                         long amount = LongArgumentType.getLong(context, "amount");
                                         GuildPersistentState state = GuildPersistentState.get(context.getSource().getServer());
                                         PlayerGuildData data = state.get(target.getUUID());
-                                        data.loan = data.loan > Long.MAX_VALUE - amount ? Long.MAX_VALUE : data.loan + amount;
-                                        if (data.loan > 0 && data.nextLoanInterestAt <= 0) {
-                                            data.nextLoanInterestAt = System.currentTimeMillis()
-                                                    + ConfigManager.config().consumerLoanIntervalMinutes * 60_000L;
-                                        }
+                                        dev.guildquests.service.AdminLoanPolicy.add(data, amount, System.currentTimeMillis() + ConfigManager.config().consumerLoanIntervalMinutes * 60_000L);
                                         state.setDirty();
                                         context.getSource().sendSuccess(() -> Component.literal(
                                                 "Gave " + target.getName().getString() + " a loan of " + amount
@@ -214,15 +212,7 @@ public final class GuildQuestsMod {
                                         long amount = LongArgumentType.getLong(context, "amount");
                                         GuildPersistentState state = GuildPersistentState.get(context.getSource().getServer());
                                         PlayerGuildData data = state.get(target.getUUID());
-                                        data.loan = amount;
-                                        if (data.loan <= 0) {
-                                            data.loan = 0;
-                                            data.loanCreditMillis = 0;
-                                            data.nextLoanInterestAt = 0;
-                                        } else if (data.nextLoanInterestAt <= 0) {
-                                            data.nextLoanInterestAt = System.currentTimeMillis()
-                                                    + ConfigManager.config().consumerLoanIntervalMinutes * 60_000L;
-                                        }
+                                        dev.guildquests.service.AdminLoanPolicy.set(data, amount, System.currentTimeMillis() + ConfigManager.config().consumerLoanIntervalMinutes * 60_000L);
                                         state.setDirty();
                                         context.getSource().sendSuccess(() -> Component.literal(
                                                 "Set " + target.getName().getString() + " loan to " + data.loan), true);
@@ -234,9 +224,7 @@ public final class GuildQuestsMod {
                                 ServerPlayer target = EntityArgument.getPlayer(context, "player");
                                 GuildPersistentState state = GuildPersistentState.get(context.getSource().getServer());
                                 PlayerGuildData data = state.get(target.getUUID());
-                                data.loan = 0;
-                                data.loanCreditMillis = 0;
-                                data.nextLoanInterestAt = 0;
+                                dev.guildquests.service.AdminLoanPolicy.clear(data);
                                 state.setDirty();
                                 context.getSource().sendSuccess(() -> Component.literal(
                                         "Wrote off " + target.getName().getString() + "'s loan（帳消し）"), true);
@@ -251,7 +239,7 @@ public final class GuildQuestsMod {
                                 ServerPlayer target = EntityArgument.getPlayer(context, "player");
                                 GuildPersistentState state = GuildPersistentState.get(context.getSource().getServer());
                                 PlayerGuildData data = state.get(target.getUUID());
-                                data.delinquent = true;
+                                dev.guildquests.service.AdminLoanPolicy.delinquent(data, true);
                                 state.setDirty();
                                 context.getSource().sendSuccess(() -> Component.literal(
                                         target.getName().getString() + " を滞納状態（ロック）にしました。"), true);
@@ -261,7 +249,7 @@ public final class GuildQuestsMod {
                                 ServerPlayer target = EntityArgument.getPlayer(context, "player");
                                 GuildPersistentState state = GuildPersistentState.get(context.getSource().getServer());
                                 PlayerGuildData data = state.get(target.getUUID());
-                                data.delinquent = false;
+                                dev.guildquests.service.AdminLoanPolicy.delinquent(data, false);
                                 state.setDirty();
                                 context.getSource().sendSuccess(() -> Component.literal(
                                         target.getName().getString() + " の滞納状態を解除しました。"), true);

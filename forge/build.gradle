@@ -60,17 +60,6 @@ remapJar {
     inputFile.set shadowJar.archiveFile
 }
 
-tasks.matching { it.name == 'remapJar' }.configureEach {
-    doLast {
-        def f = archiveFile.get().asFile
-        def name = f.name
-        def idx = name.lastIndexOf('-')
-        if (idx > 0) {
-            def target = new File(f.parentFile, name.substring(0, idx) + '_' + name.substring(idx + 1))
-            if (target.exists()) {
-                target.delete()
-            }
-            f.renameTo(target)
-        }
-    }
+remapJar {
+    archiveFileName = "${base.archivesName.get()}_${project.version}.jar"
 }

@@ -277,9 +277,9 @@ public final class GuildService {
             reward -= tribute;
             if (data.debt <= 0) {
                 data.debt = 0;
-                data.delinquent = false;
+                data.delinquent = data.adminDelinquent;
                 data.nextRiboDueAt = 0;
-                message(player, "リボ債務を完済しました。ギルド機能のロックを解除しました。", ChatFormatting.GREEN);
+                message(player, data.adminDelinquent ? "債務を完済しました。管理者によるロックは継続中です。" : "債務を完済しました。ギルド機能のロックを解除しました。", ChatFormatting.GREEN);
             }
         }
 
@@ -297,7 +297,7 @@ public final class GuildService {
 
         if (tribute > 0) {
             message(player, "クエスト「" + quest.title + "」達成！報酬 " + tribute
-                    + " コインはリボ返済に充当" + (reward > 0 ? "、残り " + reward + " コインは受け取り" : "")
+                    + " コインは債務返済に充当" + (reward > 0 ? "、残り " + reward + " コインは受け取り" : "")
                     + "（残債務 " + data.debt + "）", ChatFormatting.GOLD);
         } else {
             message(player, "クエスト「" + quest.title + "」達成！ +" + reward + " コイン", ChatFormatting.GOLD);
@@ -375,10 +375,7 @@ public final class GuildService {
         if (amount <= 0) return;
         GuildPersistentState state = GuildPersistentState.get(player.getServer());
         PlayerGuildData data = state.get(player.getUUID());
-        data.debt = safeAdd(data.debt, amount);
-        if (data.debt > 0 && data.nextRiboDueAt <= 0) {
-            data.nextRiboDueAt = System.currentTimeMillis() + riboIntervalMillis();
-        }
+        GuildDebtPolicy.addDebt(data, amount, System.currentTimeMillis() + riboIntervalMillis(), false);
         state.setDirty();
     }
 
@@ -449,7 +446,7 @@ public final class GuildService {
             return false;
         }
         long limit = loanLimit(data);
-        if (data.loan + amount > limit) {
+        if (data.loan > limit || amount > limit - data.loan) {
             message(player, "借入上限を超えます。上限: " + limit + " / 現在の債務: " + data.loan
                     + " / 借入可能: " + Math.max(0, limit - data.loan), ChatFormatting.RED);
             return false;
@@ -572,10 +569,10 @@ public final class GuildService {
         for (Map.Entry<UUID, PlayerGuildData> entry : state.players().entrySet()) {
             PlayerGuildData data = entry.getValue();
             if (data.debt <= 0) {
-                // Keep an admin-set delinquency alive while a consumer loan is still owed.
-                if (data.nextRiboDueAt != 0 || (data.delinquent && data.loan <= 0)) {
+                // Explicit administrator locks survive repayment and are released with delinquent off.
+                if (data.nextRiboDueAt != 0 || (data.delinquent && !data.adminDelinquent && data.loan <= 0)) {
                     data.debt = 0;
-                    if (data.loan <= 0) data.delinquent = false;
+                    if (data.loan <= 0) data.delinquent = data.adminDelinquent;
                     data.nextRiboDueAt = 0;
                     state.setDirty();
                 }
@@ -608,25 +605,29 @@ public final class GuildService {
             boolean unlocked = false;
             if (data.debt <= 0) {
                 data.debt = 0;
-                data.delinquent = false;
+                data.delinquent = data.adminDelinquent;
                 data.nextRiboDueAt = 0;
-                unlocked = true;
+                unlocked = !data.delinquent;
             }
             state.setDirty();
 
             ServerPlayer online = server.getPlayerList().getPlayer(entry.getKey());
             if (online != null && newlyDelinquent) {
-                message(online, "リボの定期返済が残高不足で失敗しました（債務 " + data.debt + "）。"
+                message(online, "債務の定期返済が残高不足で失敗しました（債務 " + data.debt + "）。"
                         + "完済するまでギルド機能がロックされています。クエスト報酬は自動で返済に充てられます。", ChatFormatting.RED);
             }
             if (online != null && unlocked) {
-                message(online, "リボ債務を完済しました。ギルド機能のロックを解除しました。", ChatFormatting.GREEN);
+                message(online, "債務を完済しました。ギルド機能のロックを解除しました。", ChatFormatting.GREEN);
             }
         }
     }
 
     public static void riboLockMessage(ServerPlayer player, PlayerGuildData data) {
-        message(player, "リボ払いの延滞中です。債務 " + data.debt
+        if (data.adminDelinquent) {
+            message(player, "管理者により滞納ロック中です。解除は管理者へ依頼してください。借入 " + data.loan + " / FX・リボ債務 " + data.debt, ChatFormatting.RED);
+            return;
+        }
+        message(player, "債務の滞納中です。債務 " + data.debt
                 + " を完済するまでギルド機能がロックされています（クエスト報酬で返済できます）。", ChatFormatting.RED);
     }
 

@@ -287,16 +287,16 @@ public final class BankScreenHandler extends AbstractContainerMenu {
         var cfg = ConfigManager.config();
 
         if (delinquent) {
-            set(startSlot, item(Items.REDSTONE_BLOCK, "リボ債務: " + data.debt,
+            set(startSlot, item(Items.REDSTONE_BLOCK, "債務: " + data.debt,
                     "⚠ 延滞中：ギルド機能ロック中",
                     "クエスト報酬は全額自動で返済に充当",
                     "完済するまで銀行・残高支払い不可"));
         } else if (hasDebt) {
-            set(startSlot, item(Items.REDSTONE, "リボ債務: " + data.debt,
+            set(startSlot, item(Items.REDSTONE, "債務: " + data.debt,
                     "次回の自動徴収まで約 " + minutesLeft + " 分",
                     "残高から " + cfg.riboInstallment + " コインを定期徴収"));
         } else {
-            set(startSlot, item(Items.GOLD_NUGGET, "リボ債務: なし",
+            set(startSlot, item(Items.GOLD_NUGGET, "債務: なし",
                     "支払い方法をリボにすると",
                     "後払い購入（債務）が使える"));
         }
