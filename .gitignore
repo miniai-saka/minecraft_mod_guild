@@ -27,10 +27,10 @@ replay_pid*
 .gradle/
 build/
 out/
-logs/
 
 # Runtime / IDE
 run/
+logs/
 /dev/
 .idea/
 *.iml
@@ -38,4 +38,5 @@ run/
 *.iws
 .vscode/
 
+# Gradle wrapper (committed so the multi-loader build works out of the box)
 !gradle/wrapper/gradle-wrapper.jar

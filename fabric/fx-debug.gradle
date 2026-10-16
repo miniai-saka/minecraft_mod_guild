@@ -1,0 +1,29 @@
+// Opt-in smoke test mod. These classes and its metadata never enter the release jar.
+sourceSets {
+    fxDebug {
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+tasks.matching { it.name in ['runClient', 'runServer'] }.configureEach {
+    dependsOn tasks.named('fxDebugClasses')
+    classpath += sourceSets.fxDebug.output
+}
+loom {
+    mods {
+        guildquests_fx_debug { sourceSet sourceSets.fxDebug }
+    }
+    runs {
+        client {
+            runDir rootProject.file('../../work/fx-debug-client').absolutePath
+            programArgs '--width', '1600', '--height', '1000', '--username', 'FxTester'
+            vmArg '-Dguildquests.disableUpdateCheck=true'
+            if (project.hasProperty('fxCapture')) vmArg '-Dguildquests.fxCapture=true'
+        }
+        server {
+            runDir rootProject.file('../../work/fx-debug-server').absolutePath
+            vmArg '-Dguildquests.disableUpdateCheck=true'
+            programArg 'nogui'
+        }
+    }
+}

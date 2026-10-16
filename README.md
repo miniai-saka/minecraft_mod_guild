@@ -1,18 +1,25 @@
-# Guild Quests & Economy (Fabric 1.20.1)
+# Guild Quests & Economy (Fabric / Forge 1.20.1)
 
-Minecraft 1.20.1 / Fabric 向けの、クエスト・ギルド通貨・銀行・ギャンブルを単体で実装するModです。
+Minecraft 1.20.1 / Fabric・Forge 向けの、クエスト・ギルド通貨・銀行・ギャンブルを単体で実装するModです。
 FTB Quests、Q Shop 等への依存はありません。
 
-バージョン: **26.8.0**
+バージョン: **26.9.0**（上流26.8.2を統合したローカル拡張版）
 
-### Guild FX（26.8.0）
+### Guild FX（26.9.0）
 
-白背景の独自取引画面、ローソク足チャート、Mod専用仮想通貨のFXを追加しました。
+暗転背景とMinecraft標準ボタンの簡易UIを既定に、Mod専用仮想通貨のFXを追加しました。
+成行・指値・逆指値に絞った簡易取引と、ローソク足付きの白背景ターミナルを「UI設定」で切り替えられます。
 **F8**、`/guild fx`、またはGキーのクエスト画面の「Guild FX」から開きます。
-成行・指値・逆指値・OCO・IFD・IFO、最大1000倍、ゼロカット（追証なし）に対応します。
+詳細UIは成行・指値・逆指値・OCO・IFD・IFO、最大1000倍に対応します。
+追証は既定で無効（ゼロカット）。設定と`/guildadmin fx margincall true|false`で変更できます。
+追証有効時の未払いは、既存の債務・定期返済・滞納ロック・クエスト報酬充当へ接続します。
 相場・暴落・急騰はサーバー内部で独自生成し、外部の価格APIは使用しません。
 クライアントとサーバーに同じバージョンを導入してください。
 操作・取引仕様・全設定項目は [FX.md](FX.md) を参照してください。
+友人のリポジトリへのPR手順と記入例は [PR_GUIDE.md](PR_GUIDE.md) にあります。PR作成・pushは行っていません。
+
+上流の`port/forge-1.20.1`、`d1b6344`（26.8.2）をpullして統合しています。
+共通コード・Fabric/Forge構成、新ギャンブル、ランキング、アップデート処理、26.8.2の競馬等の修正を保持しています。
 
 ## 機能
 
@@ -37,7 +44,8 @@ FTB Quests、Q Shop 等への依存はありません。
 
 ### ギャンブル
 - ブラックジャック（手取り21、バースト、自然なBJは2.5倍）
-- 競馬（4頭、オッズ2〜8倍、自動レース演出）
+- 競馬（上流26.8.2のオッズ・期待値修正を保持）
+- チンチロリン、コイントス、ルーレット、スロット、ランキング
 
 ### オークション（プレイヤー間マーケット）
 - グローバルGUIマーケット（サーバー側でアイテムをエスクロー保管）
@@ -65,8 +73,8 @@ FTB Quests、Q Shop 等への依存はありません。
 ## 必要環境
 
 - Minecraft 1.20.1
-- Fabric Loader 0.16.10 以上
-- Fabric API 0.92.x+1.20.1
+- Fabric: Fabric Loader 0.16.10以上、Fabric API 0.92.x+1.20.1
+- Forge: Forge 47.2.0（1.20.1）
 - Java 17
 - （任意）Create mod — ストックティッカー連携を使う場合
 
@@ -75,19 +83,20 @@ FTB Quests、Q Shop 等への依存はありません。
 ビルドにはJDK 21と同梱Gradle Wrapperを使用します。生成Modの動作要件はJava 17です。
 
 ```bash
-./gradlew test build
+./gradlew :common:test :fabric:build :forge:build
 ```
 
 生成物:
 
 ```text
-build/libs/guildquests_fabric-1.20.1_26.8.0.jar
+fabric/build/libs/guildquests_fabric-1.20.1_26.9.0.jar
+forge/build/libs/guildquests_forge-1.20.1_26.9.0.jar
 ```
 
 ## 導入
 
-1. Fabric Loader で Minecraft 1.20.1 を用意します。
-2. `guildquests_fabric-1.20.1_26.8.0.jar` と Fabric API を `mods/` に配置します。
+1. FabricまたはForgeでMinecraft 1.20.1を用意します。
+2. ローダーに合う26.9.0 JARを`mods/`へ配置します。FabricではFabric APIも必要です。ワールドと設定を保存し、旧GuildQuests JARは重複させず置き換えます。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定変更後はサーバー再起動、または `/guildadmin reload` を実行します。
 
@@ -101,6 +110,9 @@ build/libs/guildquests_fabric-1.20.1_26.8.0.jar
 | `/guild status` | ランク・コイン・累計達成・支払い方法・債務を表示 |
 | `/guild bank` | 銀行GUIを開く |
 | `/guild auction` | オークション市場GUIを開く |
+| `/guild fx` | FXを開く（F8でも可） |
+| `/guildadmin fx margincall [true\|false]` | 追証の確認・変更・保存（OP Lv2） |
+| `/guildadmin fx reload` | FX設定を再読込（OP Lv2） |
 | `/guildadmin reload` | JSON設定を再読込 (OP Lv2) |
 | `/guildadmin boss` | 緊急ボスを即時出現 (OP Lv2) |
 | `/guildadmin coins set <player> <amount>` | コインを設定 (OP Lv2) |

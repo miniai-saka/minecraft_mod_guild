@@ -1,5 +1,7 @@
 {
   "enabled": true,
+  "marginCallEnabled": false,
+  "defaultUi": "MINECRAFT",
   "marketIntervalTicks": 20,
   "snapshotIntervalTicks": 20,
   "maxLeverage": 1000,
