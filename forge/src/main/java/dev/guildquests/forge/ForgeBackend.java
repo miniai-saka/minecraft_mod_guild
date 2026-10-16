@@ -18,19 +18,27 @@ import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-/** Forge implementation of the loader-neutral {@link Platform.Backend}. */
+/**
+ * Forge implementation of the loader-neutral {@link Platform.Backend}.
+ * <p>
+ * Each hook keeps a list of handlers (like Fabric's event callbacks), so registering more than
+ * one handler per hook accumulates them instead of overwriting — e.g. the boss event, the FX
+ * service and the guild core all register a server tick.
+ */
 public final class ForgeBackend implements Platform.Backend {
-    private Consumer<MinecraftServer> serverStarted;
-    private Consumer<MinecraftServer> serverStopped;
-    private Consumer<MinecraftServer> serverTick;
-    private Platform.CommandHandler commands;
-    private Platform.AllowDamageHandler allowDamage;
-    private BiConsumer<ServerPlayer, LivingEntity> playerKill;
-    private BiConsumer<LivingEntity, DamageSource> entityDeath;
-    private Platform.BlockBreakHandler blockBreak;
+    private final List<Consumer<MinecraftServer>> serverStarted = new ArrayList<>();
+    private final List<Consumer<MinecraftServer>> serverStopped = new ArrayList<>();
+    private final List<Consumer<MinecraftServer>> serverTick = new ArrayList<>();
+    private final List<Platform.CommandHandler> commands = new ArrayList<>();
+    private final List<Platform.AllowDamageHandler> allowDamage = new ArrayList<>();
+    private final List<BiConsumer<ServerPlayer, LivingEntity>> playerKill = new ArrayList<>();
+    private final List<BiConsumer<LivingEntity, DamageSource>> entityDeath = new ArrayList<>();
+    private final List<Platform.BlockBreakHandler> blockBreak = new ArrayList<>();
 
     /** Wire the stored handlers up to the Forge event bus. Safe to call once at construction. */
     public void registerForgeEvents() {
@@ -44,52 +52,57 @@ public final class ForgeBackend implements Platform.Backend {
     }
 
     private void handleBlockBreak(net.minecraftforge.event.level.BlockEvent.BreakEvent event) {
-        if (blockBreak != null && event.getPlayer() instanceof ServerPlayer player) {
-            blockBreak.accept(player, event.getState());
+        if (event.getPlayer() instanceof ServerPlayer player) {
+            for (Platform.BlockBreakHandler handler : blockBreak) {
+                handler.accept(player, event.getState());
+            }
         }
     }
 
     private void handleServerStarted(ServerStartedEvent event) {
-        if (serverStarted != null) {
-            serverStarted.accept(event.getServer());
+        for (Consumer<MinecraftServer> handler : serverStarted) {
+            handler.accept(event.getServer());
         }
     }
 
     private void handleServerStopped(net.minecraftforge.event.server.ServerStoppedEvent event) {
-        if (serverStopped != null) {
-            serverStopped.accept(event.getServer());
+        for (Consumer<MinecraftServer> handler : serverStopped) {
+            handler.accept(event.getServer());
         }
     }
 
     private void handleServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && serverTick != null) {
-            serverTick.accept(event.getServer());
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
+        for (Consumer<MinecraftServer> handler : serverTick) {
+            handler.accept(event.getServer());
         }
     }
 
     private void handleCommands(RegisterCommandsEvent event) {
-        if (commands != null) {
-            commands.register(event.getDispatcher(), event.getBuildContext());
+        for (Platform.CommandHandler handler : commands) {
+            handler.register(event.getDispatcher(), event.getBuildContext());
         }
     }
 
     private void handleLivingAttack(LivingAttackEvent event) {
-        if (allowDamage == null) {
-            return;
-        }
-        if (!allowDamage.allow(event.getEntity(), event.getSource(), event.getAmount())) {
-            event.setCanceled(true);
+        for (Platform.AllowDamageHandler handler : allowDamage) {
+            if (!handler.allow(event.getEntity(), event.getSource(), event.getAmount())) {
+                event.setCanceled(true);
+                return;
+            }
         }
     }
 
     private void handleLivingDeath(LivingDeathEvent event) {
-        if (entityDeath != null) {
-            entityDeath.accept(event.getEntity(), event.getSource());
+        for (BiConsumer<LivingEntity, DamageSource> handler : entityDeath) {
+            handler.accept(event.getEntity(), event.getSource());
         }
-        if (playerKill != null) {
-            Entity killer = event.getSource().getEntity();
-            if (killer instanceof ServerPlayer player) {
-                playerKill.accept(player, event.getEntity());
+        Entity killer = event.getSource().getEntity();
+        if (killer instanceof ServerPlayer player) {
+            for (BiConsumer<ServerPlayer, LivingEntity> handler : playerKill) {
+                handler.accept(player, event.getEntity());
             }
         }
     }
@@ -116,42 +129,42 @@ public final class ForgeBackend implements Platform.Backend {
 
     @Override
     public void onServerStarted(Consumer<MinecraftServer> handler) {
-        this.serverStarted = handler;
+        serverStarted.add(handler);
     }
 
     @Override
     public void onServerStopped(Consumer<MinecraftServer> handler) {
-        this.serverStopped = handler;
+        serverStopped.add(handler);
     }
 
     @Override
     public void onPlayerKill(BiConsumer<ServerPlayer, LivingEntity> handler) {
-        this.playerKill = handler;
+        playerKill.add(handler);
     }
 
     @Override
     public void onServerTick(Consumer<MinecraftServer> handler) {
-        this.serverTick = handler;
+        serverTick.add(handler);
     }
 
     @Override
     public void onCommands(Platform.CommandHandler handler) {
-        this.commands = handler;
+        commands.add(handler);
     }
 
     @Override
     public void onAllowDamage(Platform.AllowDamageHandler handler) {
-        this.allowDamage = handler;
+        allowDamage.add(handler);
     }
 
     @Override
     public void onEntityDeath(BiConsumer<LivingEntity, DamageSource> handler) {
-        this.entityDeath = handler;
+        entityDeath.add(handler);
     }
 
     @Override
     public void onBlockBreak(Platform.BlockBreakHandler handler) {
-        this.blockBreak = handler;
+        blockBreak.add(handler);
     }
 
     @Override
