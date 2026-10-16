@@ -31,9 +31,9 @@ import java.util.List;
 final class ForgeClientBackend implements PlatformClient.ClientBackend {
     private final List<BoundKey> keys = new ArrayList<>();
     private boolean keysRegistered;
-    private Runnable disconnectHandler;
-    private PlatformClient.WorldRenderHandler worldRenderHandler;
-    private java.util.function.Consumer<net.minecraft.client.gui.screens.Screen> clientTickHandler;
+    private final List<Runnable> disconnectHandlers = new ArrayList<>();
+    private final List<PlatformClient.WorldRenderHandler> worldRenderHandlers = new ArrayList<>();
+    private final List<java.util.function.Consumer<net.minecraft.client.gui.screens.Screen>> clientTickHandlers = new ArrayList<>();
 
     ForgeClientBackend(IEventBus modBus) {
         modBus.addListener(this::onRegisterKeyMappings);
@@ -61,24 +61,26 @@ final class ForgeClientBackend implements PlatformClient.ClientBackend {
                 bound.onPress().run();
             }
         }
-        if (clientTickHandler != null) {
-            clientTickHandler.accept(Minecraft.getInstance().screen);
+        for (java.util.function.Consumer<net.minecraft.client.gui.screens.Screen> handler : clientTickHandlers) {
+            handler.accept(Minecraft.getInstance().screen);
         }
     }
 
     private void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
-        if (disconnectHandler != null) {
-            disconnectHandler.run();
+        for (Runnable handler : disconnectHandlers) {
+            handler.run();
         }
     }
 
     private void onRenderLevel(RenderLevelStageEvent event) {
-        if (worldRenderHandler == null
+        if (worldRenderHandlers.isEmpty()
                 || event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;
         }
         WorldRenderContext context = new ForgeWorldRenderContext(event.getCamera(), event.getPoseStack());
-        worldRenderHandler.render(context);
+        for (PlatformClient.WorldRenderHandler handler : worldRenderHandlers) {
+            handler.render(context);
+        }
     }
 
     @Override
@@ -113,17 +115,17 @@ final class ForgeClientBackend implements PlatformClient.ClientBackend {
 
     @Override
     public void onDisconnect(Runnable handler) {
-        this.disconnectHandler = handler;
+        disconnectHandlers.add(handler);
     }
 
     @Override
     public void onClientTick(java.util.function.Consumer<net.minecraft.client.gui.screens.Screen> handler) {
-        this.clientTickHandler = handler;
+        clientTickHandlers.add(handler);
     }
 
     @Override
     public void onWorldRender(PlatformClient.WorldRenderHandler handler) {
-        this.worldRenderHandler = handler;
+        worldRenderHandlers.add(handler);
     }
 
     private record BoundKey(KeyMapping key, Runnable onPress) {
