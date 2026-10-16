@@ -27,6 +27,7 @@ replay_pid*
 .gradle/
 build/
 out/
+logs/
 
 # Runtime / IDE
 run/
@@ -37,5 +38,4 @@ run/
 *.iws
 .vscode/
 
-# Gradle wrapper (not used in this project)
-gradle/wrapper/
+!gradle/wrapper/gradle-wrapper.jar

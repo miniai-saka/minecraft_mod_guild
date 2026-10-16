@@ -3,5 +3,6 @@
   "block.guildquests.guild_bank": "ギルド銀行",
   "block.guildquests.guild_deposit": "ギルド入金ブロック",
   "key.categories.guildquests": "ギルドクエスト",
-  "key.guildquests.openguild": "ギルドクエスト画面を開く"
+  "key.guildquests.openguild": "ギルドクエスト画面を開く",
+  "key.guildquests.openfx": "Guild FX取引画面を開く"
 }

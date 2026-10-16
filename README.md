@@ -3,7 +3,16 @@
 Minecraft 1.20.1 / Fabric 向けの、クエスト・ギルド通貨・銀行・ギャンブルを単体で実装するModです。
 FTB Quests、Q Shop 等への依存はありません。
 
-バージョン: **26.7.0**
+バージョン: **26.8.0**
+
+### Guild FX（26.8.0）
+
+白背景の独自取引画面、ローソク足チャート、Mod専用仮想通貨のFXを追加しました。
+**F8**、`/guild fx`、またはGキーのクエスト画面の「Guild FX」から開きます。
+成行・指値・逆指値・OCO・IFD・IFO、最大1000倍、ゼロカット（追証なし）に対応します。
+相場・暴落・急騰はサーバー内部で独自生成し、外部の価格APIは使用しません。
+クライアントとサーバーに同じバージョンを導入してください。
+操作・取引仕様・全設定項目は [FX.md](FX.md) を参照してください。
 
 ## 機能
 
@@ -63,26 +72,26 @@ FTB Quests、Q Shop 等への依存はありません。
 
 ## ビルド
 
-Gradle 8系を使用してください。
+ビルドにはJDK 21と同梱Gradle Wrapperを使用します。生成Modの動作要件はJava 17です。
 
 ```bash
-gradle build
+./gradlew test build
 ```
 
 生成物:
 
 ```text
-build/libs/guildquests_fabric-1.20.1_26.7.0.jar
+build/libs/guildquests_fabric-1.20.1_26.8.0.jar
 ```
 
 ## 導入
 
 1. Fabric Loader で Minecraft 1.20.1 を用意します。
-2. `guildquests_fabric-1.20.1_26.7.0.jar` と Fabric API を `mods/` に配置します。
+2. `guildquests_fabric-1.20.1_26.8.0.jar` と Fabric API を `mods/` に配置します。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定変更後はサーバー再起動、または `/guildadmin reload` を実行します。
 
-GUIはMinecraft標準のチェスト画面を利用しているため、専用テクスチャやクライアント専用Screenクラスは不要です。
+クエスト・銀行等はMinecraft標準のチェスト画面、FXは専用のクライアント画面を使用します。
 
 ## コマンド
 

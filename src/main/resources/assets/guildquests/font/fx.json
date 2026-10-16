@@ -1,0 +1,12 @@
+{
+  "providers": [
+    {
+      "type": "ttf",
+      "file": "guildquests:mplus1p-regular.ttf",
+      "size": 16.0,
+      "oversample": 3.0,
+      "shift": [0.0, -1.0]
+    },
+    { "type": "reference", "id": "minecraft:default" }
+  ]
+}

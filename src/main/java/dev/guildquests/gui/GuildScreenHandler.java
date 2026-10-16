@@ -229,6 +229,11 @@ public final class GuildScreenHandler extends ScreenHandler {
             });
         }
 
+        setAction(48, item(Items.AMETHYST_SHARD, "Guild FX — 仮想通貨取引",
+                "白基調の専用チャート・注文画面を開きます",
+                "成行 / 指値 / 逆指値 / OCO / IFD / IFO",
+                "最大1000倍・ゼロカット・追証なし"),
+                (p, b, t) -> dev.guildquests.fx.FxService.open(p));
         setAction(49, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeHandledScreen());
     }
 

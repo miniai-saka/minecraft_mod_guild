@@ -16,6 +16,7 @@ public final class GuildQuestsClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        FxClient.init();
         PlatformClient.onBlockRenderCutout(ModBlocks.GUILD_BANK);
 
         PlatformClient.registerKeyBinding("key.guildquests.openguild", GLFW.GLFW_KEY_G,
@@ -29,7 +30,7 @@ public final class GuildQuestsClient implements ClientModInitializer {
         String currentVer = GuildQuestsMod.VERSION;
         String loader = Platform.getLoaderName();
         GuildQuestsMod.LOGGER.info("[Client] Starting update check: current=v{}, loader={}", currentVer, loader);
-        UpdateChecker.checkAsync(currentVer, loader, info -> {
+        if (!Boolean.getBoolean("guildquests.disableUpdateCheck")) UpdateChecker.checkAsync(currentVer, loader, info -> {
             pendingUpdate = info;
             GuildQuestsMod.LOGGER.info("[Client] Update available: v{} (current: v{})", info.latestVersion(), currentVer);
         });

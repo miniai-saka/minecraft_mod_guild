@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "guildquests_fx_debug",
+  "version": "1.0.0",
+  "name": "Guild FX local smoke test",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["dev.guildquests.debug.FxDebugMod"],
+    "client": ["dev.guildquests.debug.FxDebugClient"]
+  },
+  "depends": { "guildquests": "*" }
+}

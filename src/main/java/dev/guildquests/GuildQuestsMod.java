@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
 
 public final class GuildQuestsMod implements ModInitializer {
     public static final String MOD_ID = "guildquests";
-    public static final String VERSION = "26.7.0";
+    public static final String VERSION = "26.8.0";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static int exploreTicker = 0;
     private static int riboTicker = 0;
@@ -32,6 +32,7 @@ public final class GuildQuestsMod implements ModInitializer {
     @Override
     public void onInitialize() {
         ConfigManager.loadAll();
+        dev.guildquests.fx.FxService.init();
         ModItems.register();
         ModBlocks.register();
         BossEvent.init();

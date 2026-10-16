@@ -15,6 +15,8 @@ import java.util.UUID;
 public final class GuildPersistentState extends PersistentState {
     private static final String SAVE_ID = "guildquests_players";
     private final Map<UUID, PlayerGuildData> players = new HashMap<>();
+    /** FX and wallets are saved in one NBT transaction so deposits cannot save only one side. */
+    public dev.guildquests.fx.FxPersistentState fx = new dev.guildquests.fx.FxPersistentState(this::markDirty);
 
     /** In-game day number the current daily board was drawn for. -1 = never drawn. */
     public long dailyBoardDay = -1;
@@ -53,6 +55,7 @@ public final class GuildPersistentState extends PersistentState {
             playersNbt.put(entry.getKey().toString(), entry.getValue().toNbt());
         }
         nbt.put("Players", playersNbt);
+        nbt.put("FxExchange", fx.writeNbt(new NbtCompound()));
         nbt.putLong("DailyBoardDay", dailyBoardDay);
         NbtList dailyNbt = new NbtList();
         for (DailyQuest quest : dailyBoard) {
@@ -75,6 +78,8 @@ public final class GuildPersistentState extends PersistentState {
 
     public static GuildPersistentState fromNbt(NbtCompound nbt) {
         GuildPersistentState state = new GuildPersistentState();
+        if (nbt.contains("FxExchange", NbtElement.COMPOUND_TYPE))
+            state.fx = dev.guildquests.fx.FxPersistentState.fromNbt(nbt.getCompound("FxExchange"), state::markDirty);
         NbtCompound playersNbt = nbt.getCompound("Players");
         for (String key : playersNbt.getKeys()) {
             try {

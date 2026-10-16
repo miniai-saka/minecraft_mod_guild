@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.18.2'
+    id 'fabric-loom' version '1.10.5'
     id 'maven-publish'
 }
 
@@ -24,9 +24,49 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-    modImplementation "curse.maven:create-fabric-624165:7286603"
+    modCompileOnly "curse.maven:create-fabric-624165:7286603"
 
     modCompileOnly fileTree(dir: 'libs/nested-mods', include: '*.jar')
+    testImplementation 'junit:junit:4.13.2'
+}
+
+test { useJUnit() }
+
+tasks.withType(JavaExec).configureEach {
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+}
+
+loom {
+    runs {
+        client { vmArg '-Dguildquests.disableUpdateCheck=true' }
+    }
+}
+
+// Optional local smoke-test mod. Its classes and resources are never included in the release JAR.
+if (project.hasProperty('fxDebug')) {
+    sourceSets {
+        fxDebug {
+            compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+            runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+        }
+    }
+    loom {
+        mods {
+            guildquests { sourceSet sourceSets.main }
+            guildquests_fx_debug { sourceSet sourceSets.fxDebug }
+        }
+        runs {
+            client {
+                runDir '../../work/fx-debug-client'
+                programArgs '--width', '1600', '--height', '1000', '--username', 'FxTester'
+            }
+            server { runDir '../../work/fx-debug-server' }
+        }
+    }
+    tasks.matching { it.name == 'runClient' || it.name == 'runServer' }.configureEach {
+        dependsOn tasks.named('fxDebugClasses')
+        classpath += sourceSets.fxDebug.output
+    }
 }
 
 processResources {
@@ -56,16 +96,8 @@ jar {
     }
 }
 
-// LoomのremapJar後にバージョン区切りをアンダースコアへリネーム
+// Declare the final name so Gradle can track the output and reproduce the build.
 tasks.matching { it.name == 'remapJar' }.configureEach {
-    doLast {
-        def f = archiveFile.get().asFile
-        def name = f.name
-        def idx = name.lastIndexOf('-')
-        if (idx > 0) {
-            def target = new File(f.parentFile, name.substring(0, idx) + '_' + name.substring(idx + 1))
-            f.renameTo(target)
-        }
-    }
+    archiveFileName = "${project.archives_base_name}_${project.version}.jar"
 }
 
