@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.FriendlyByteBuf;
@@ -80,6 +81,15 @@ public final class FabricBackend implements Platform.Backend {
     @Override
     public void onEntityDeath(BiConsumer<LivingEntity, DamageSource> handler) {
         ServerLivingEntityEvents.AFTER_DEATH.register(handler::accept);
+    }
+
+    @Override
+    public void onBlockBreak(Platform.BlockBreakHandler handler) {
+        PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, entity) -> {
+            if (player instanceof ServerPlayer serverPlayer) {
+                handler.accept(serverPlayer, state);
+            }
+        });
     }
 
     @Override

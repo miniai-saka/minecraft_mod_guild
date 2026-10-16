@@ -86,6 +86,18 @@ public final class ConfigManager {
         c.auctionMaxListingsPerPlayer = Math.max(1, Math.min(45, c.auctionMaxListingsPerPlayer));
         c.auctionBidStep = Math.max(1, c.auctionBidStep);
         if (c.rankThresholds == null || c.rankThresholds.isEmpty()) c.rankThresholds = new ModConfig().rankThresholds;
+        c.consumerLoanInterestPercent = Math.max(0, Math.min(100, c.consumerLoanInterestPercent));
+        c.consumerLoanIntervalMinutes = Math.max(1, c.consumerLoanIntervalMinutes);
+        if (c.consumerLoanLimits == null || c.consumerLoanLimits.isEmpty()) {
+            c.consumerLoanLimits = new ModConfig().consumerLoanLimits;
+        } else {
+            c.consumerLoanLimits.replaceAll((k, v) -> Math.max(0L, v == null ? 0L : v));
+        }
+        if (c.loanMiningValues == null || c.loanMiningValues.isEmpty()) {
+            c.loanMiningValues = new ModConfig().loanMiningValues;
+        } else {
+            c.loanMiningValues.replaceAll((k, v) -> v == null ? 0.0 : Math.max(0.0, v));
+        }
         return c;
     }
 

@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -85,6 +86,11 @@ public final class Platform {
         b().onEntityDeath(handler);
     }
 
+    /** Called after a server-side player breaks a block. */
+    public static void onBlockBreak(BlockBreakHandler handler) {
+        b().onBlockBreak(handler);
+    }
+
     public static boolean canSend(ServerPlayer player, ResourceLocation channel) {
         return b().canSend(player, channel);
     }
@@ -101,6 +107,11 @@ public final class Platform {
     @FunctionalInterface
     public interface AllowDamageHandler {
         boolean allow(LivingEntity entity, DamageSource source, float amount);
+    }
+
+    @FunctionalInterface
+    public interface BlockBreakHandler {
+        void accept(ServerPlayer player, BlockState state);
     }
 
     public interface Backend {
@@ -125,6 +136,8 @@ public final class Platform {
         void onAllowDamage(AllowDamageHandler handler);
 
         void onEntityDeath(BiConsumer<LivingEntity, DamageSource> handler);
+
+        void onBlockBreak(BlockBreakHandler handler);
 
         boolean canSend(ServerPlayer player, ResourceLocation channel);
 

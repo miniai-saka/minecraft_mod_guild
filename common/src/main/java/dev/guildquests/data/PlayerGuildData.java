@@ -23,6 +23,12 @@ public final class PlayerGuildData {
     public boolean delinquent = false;
     /** Epoch millis of the next scheduled ribo collection. 0 when no debt. */
     public long nextRiboDueAt = 0;
+    /** Outstanding consumer-finance loan (principal + accrued interest); repaid manually. */
+    public long loan = 0;
+    /** Epoch millis of the next loan interest charge. 0 when no loan. */
+    public long nextLoanInterestAt = 0;
+    /** Mining-based loan repayment credit, in thousandths of a coin (0.001 coin = 1). */
+    public long loanCreditMillis = 0;
     public final List<ActiveQuest> activeQuests = new ArrayList<>();
     public final Set<String> completedQuestIds = new HashSet<>();
     /** Board day (floor(dayTime/24000)) that claimedExploreQuestIds belongs to; -1 when unset. */
@@ -79,6 +85,9 @@ public final class PlayerGuildData {
         nbt.putLong("Debt", debt);
         nbt.putBoolean("Delinquent", delinquent);
         nbt.putLong("NextRiboDueAt", nextRiboDueAt);
+        nbt.putLong("Loan", loan);
+        nbt.putLong("NextLoanInterestAt", nextLoanInterestAt);
+        nbt.putLong("LoanCreditMillis", loanCreditMillis);
 
         ListTag activeList = new ListTag();
         for (ActiveQuest active : activeQuests) activeList.add(active.toNbt());
@@ -128,6 +137,15 @@ public final class PlayerGuildData {
         if (data.debt <= 0) {
             data.delinquent = false;
             data.nextRiboDueAt = 0;
+        }
+        data.loan = Math.max(0L, nbt.getLong("Loan"));
+        data.nextLoanInterestAt = Math.max(0L, nbt.getLong("NextLoanInterestAt"));
+        if (data.loan <= 0) {
+            data.nextLoanInterestAt = 0;
+        }
+        data.loanCreditMillis = Math.max(0L, nbt.getLong("LoanCreditMillis"));
+        if (data.loan <= 0) {
+            data.loanCreditMillis = 0;
         }
 
         ListTag activeList = nbt.getList("ActiveQuests", Tag.TAG_COMPOUND);
