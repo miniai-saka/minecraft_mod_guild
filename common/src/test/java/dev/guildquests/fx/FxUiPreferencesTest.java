@@ -19,9 +19,13 @@ public class FxUiPreferencesTest {
             public Path configDir() { return config; }
             public String getLoaderName() { return "test"; }
             public Path getModsDir() { return config; }
+            public String getModVersion() { return "test"; }
+            public Path getModJar() { return null; }
+            public void validateUpdateMetadata(java.util.zip.ZipFile jar, String version, boolean server) { throw new UnsupportedOperationException(); }
             public void onOpenGuildRequest(java.util.function.Consumer<net.minecraft.server.level.ServerPlayer> c) { }
             public void onServerStarted(java.util.function.Consumer<net.minecraft.server.MinecraftServer> c) { }
             public void onServerStopped(java.util.function.Consumer<net.minecraft.server.MinecraftServer> c) { }
+            public void onServerStopping(java.util.function.Consumer<net.minecraft.server.MinecraftServer> c) { }
             public void onPlayerKill(java.util.function.BiConsumer<net.minecraft.server.level.ServerPlayer, net.minecraft.world.entity.LivingEntity> c) { }
             public void onServerTick(java.util.function.Consumer<net.minecraft.server.MinecraftServer> c) { }
             public void onCommands(Platform.CommandHandler c) { }

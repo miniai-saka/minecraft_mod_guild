@@ -38,6 +38,29 @@ public final class FabricBackend implements Platform.Backend {
     }
 
     @Override
+    public String getModVersion() {
+        return FabricLoader.getInstance().getModContainer("guildquests").orElseThrow()
+                .getMetadata().getVersion().getFriendlyString();
+    }
+
+    @Override
+    public Path getModJar() {
+        var paths = FabricLoader.getInstance().getModContainer("guildquests").orElseThrow().getOrigin().getPaths();
+        return paths.size() == 1 && java.nio.file.Files.isRegularFile(paths.get(0)) ? paths.get(0) : null;
+    }
+
+    @Override
+    public void validateUpdateMetadata(java.util.zip.ZipFile jar, String version, boolean dedicatedServer) throws java.io.IOException {
+        java.util.Map<String, String> installed = new java.util.HashMap<>();
+        for (var mod : FabricLoader.getInstance().getAllMods()) {
+            installed.put(mod.getMetadata().getId(), mod.getMetadata().getVersion().getFriendlyString());
+            for (String alias : mod.getMetadata().getProvides()) installed.put(alias, mod.getMetadata().getVersion().getFriendlyString());
+        }
+        installed.put("java", Integer.toString(Runtime.version().feature()));
+        dev.guildquests.update.FabricUpdateMetadata.validate(jar, version, dedicatedServer, installed);
+    }
+
+    @Override
     public void onOpenGuildRequest(Consumer<ServerPlayer> handler) {
         ServerPlayNetworking.registerGlobalReceiver(Platform.OPEN_GUILD,
                 (server, player, listener, buf, sender) -> server.execute(() -> handler.accept(player)));
@@ -51,6 +74,11 @@ public final class FabricBackend implements Platform.Backend {
     @Override
     public void onServerStopped(Consumer<MinecraftServer> handler) {
         ServerLifecycleEvents.SERVER_STOPPED.register(handler::accept);
+    }
+
+    @Override
+    public void onServerStopping(Consumer<MinecraftServer> handler) {
+        ServerLifecycleEvents.SERVER_STOPPING.register(handler::accept);
     }
 
     @Override

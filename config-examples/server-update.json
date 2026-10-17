@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "checkOnStartup": true,
+  "checkIntervalMinutes": 30,
+  "updateDelayMinutes": 30,
+  "retryIntervalMinutes": 5,
+  "shutdownAfterDownload": true,
+  "notifyPlayers": true,
+  "countdownSeconds": [300, 60, 30, 10, 5, 4, 3, 2, 1],
+  "connectTimeoutSeconds": 10,
+  "requestTimeoutSeconds": 120,
+  "releaseApiUrl": "https://api.github.com/repos/takoyaki150141/minecraft_mod_guild/releases/latest"
+}

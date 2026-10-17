@@ -2,7 +2,7 @@
 
 Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨、銀行、ギャンブルを単体で実装した Mod です。FTB Quests や Q Shop などへの依存はありません。
 
-現在のバージョン: **26.11.1**
+現在のバージョン: **26.12.1**
 
 ## 主な機能
 
@@ -94,14 +94,14 @@ Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨�
 生成物:
 
 ```text
-fabric/build/libs/guildquests_fabric-1.20.1_26.11.1.jar
-forge/build/libs/guildquests_forge-1.20.1_26.11.1.jar
+fabric/build/libs/guildquests_fabric-1.20.1_26.12.1.jar
+forge/build/libs/guildquests_forge-1.20.1_26.12.1.jar
 ```
 
 ## 導入
 
 1. Fabric または Forge で Minecraft 1.20.1 を用意します。
-2. ローダーに合う 26.11.1 の JAR を `mods/` へ配置します。Fabric では Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
+2. ローダーに合う 26.12.1 の JAR を `mods/` へ配置します。Fabric では Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定を変更したら、サーバーを再起動するか `/guildadmin reload` を実行します。
 
@@ -149,6 +149,7 @@ forge/build/libs/guildquests_forge-1.20.1_26.11.1.jar
 ```text
 config/guildquests/config.json
 config/guildquests/quests.json
+config/guildquests/server-update.json  # Fabric / Forge 専用サーバー
 ```
 
 ### config.json
@@ -283,3 +284,13 @@ STRUCTURE は、プレイヤーの現在座標が対象構造物の内部に入�
 - オークションの出品アイテムはサーバー側（ワールドデータ）にエスクロー保存されます。落札品と返却品は、各プレイヤーの受取ボックスに届きます。
 - ボスの環境ダメージ（溶岩・落下など）による撃破は無効です。対策として、落下保護と脱出テレポートが入っています。
 - 友人のリポジトリへの PR 手順と記入例は [PR_GUIDE.md](PR_GUIDE.md) にあります。
+
+## サーバーの自動更新（Fabric / Forge）
+
+専用サーバーで GitHub Releases を定期確認し、最初の検出から設定した時間を待って更新します。
+設定は `config/guildquests/server-update.json` に自動生成されます。初期値は 30 分ごとの確認と、検出後の 30 分待機です。
+`/guildadmin reload` または管理 GUI の設定再読込で変更を反映できます。
+
+自動で起動し直すには、付属の `start-server.ps1` / `start-server.sh` から起動します。Fabric と Forge を自動判定し、Forge の引数ファイルによる起動にも対応しています。
+
+設定の全項目と、ローダー別の導入・起動・復旧手順は [SERVER_UPDATE.md](SERVER_UPDATE.md) を参照してください。
