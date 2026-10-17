@@ -29,6 +29,7 @@ public final class ConfigManager {
 
     private static volatile ModConfig config = new ModConfig();
     private static volatile List<QuestDefinition> quests = List.of();
+    private static final List<Runnable> reloadListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     private ConfigManager() {
     }
@@ -50,6 +51,12 @@ public final class ConfigManager {
         } catch (IOException | RuntimeException e) {
             GuildQuestsMod.LOGGER.error("Failed to load GuildQuests configuration. Keeping previous in-memory configuration.", e);
         }
+        for (Runnable listener : reloadListeners) listener.run();
+    }
+
+    /** Loader-specific configuration can join command and admin-GUI reloads. */
+    public static void onReload(Runnable listener) {
+        reloadListeners.add(listener);
     }
 
     public static ModConfig config() {
