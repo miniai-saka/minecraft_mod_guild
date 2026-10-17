@@ -53,7 +53,8 @@ public final class UpdateInstaller {
             Path backup = directChild(backups, p.getProperty("backupFile"));
             String expected = p.getProperty("sha256");
             String oldHash = p.getProperty("currentSha256");
-            if (current.equals(target) || !target.getFileName().toString().matches("guildquests_fabric-1\\.20\\.1_[0-9]+(?:\\.[0-9]+)*\\.jar")
+            String loader = p.getProperty("loader", "fabric");
+            if ((!"fabric".equals(loader) && !"forge".equals(loader)) || current.equals(target) || !target.getFileName().toString().matches("guildquests_" + loader + "-1\\.20\\.1_[0-9]+(?:\\.[0-9]+)*\\.jar")
                     || !expected.matches("[0-9a-f]{64}") || !oldHash.matches("[0-9a-f]{64}")) {
                 throw new IOException("Invalid installation plan");
             }

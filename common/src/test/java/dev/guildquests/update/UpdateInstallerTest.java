@@ -19,13 +19,17 @@ public class UpdateInstallerTest {
     private Path mods;
 
     private Path prepare() throws IOException {
+        return prepare("fabric");
+    }
+
+    private Path prepare(String loader) throws IOException {
         mods = temporary.newFolder("mods with spaces").toPath();
         Path dir = temporary.newFolder("config", "guildquests", "update").toPath();
         current = mods.resolve("renamed-current.jar");
         staged = dir.resolve("new.jar.download");
         Files.writeString(current, "original Mod");
         Files.writeString(staged, "verified replacement");
-        return UpdateInstallation.prepare(current, mods, dir, staged, "26.7.2", "fabric");
+        return UpdateInstallation.prepare(current, mods, dir, staged, "26.7.2", loader);
     }
 
     @Test public void installsBacksUpAndIsIdempotent() throws Exception {
@@ -49,6 +53,24 @@ public class UpdateInstallerTest {
         assertThrows(IOException.class, () -> UpdateInstaller.install(plan));
         assertEquals("original Mod", Files.readString(current));
         assertTrue(Files.exists(plan));
+    }
+
+    @Test public void installsForgeAndPreservesItsLoaderName() throws Exception {
+        Path plan = prepare("forge");
+        Properties p = UpdateInstaller.readPlan(plan);
+        assertEquals("forge", p.getProperty("loader"));
+        UpdateInstaller.install(plan);
+        assertEquals("verified replacement", Files.readString(mods.resolve("guildquests_forge-1.20.1_26.7.2.jar")));
+        assertFalse(Files.exists(current));
+    }
+
+    @Test public void acceptsLegacyFabricPlanWithoutLoaderField() throws Exception {
+        Path plan = prepare();
+        Properties p = UpdateInstaller.readPlan(plan);
+        p.remove("loader");
+        try (var out = Files.newOutputStream(plan)) { p.store(out, "legacy plan"); }
+        UpdateInstaller.install(plan);
+        assertTrue(Files.exists(mods.resolve("guildquests_fabric-1.20.1_26.7.2.jar")));
     }
 
     @Test public void rejectsChangedCurrentAndConflictingTarget() throws Exception {

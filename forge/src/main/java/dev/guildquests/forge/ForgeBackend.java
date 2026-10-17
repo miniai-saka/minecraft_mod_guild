@@ -33,6 +33,7 @@ import java.util.function.Consumer;
 public final class ForgeBackend implements Platform.Backend {
     private final List<Consumer<MinecraftServer>> serverStarted = new ArrayList<>();
     private final List<Consumer<MinecraftServer>> serverStopped = new ArrayList<>();
+    private final List<Consumer<MinecraftServer>> serverStopping = new ArrayList<>();
     private final List<Consumer<MinecraftServer>> serverTick = new ArrayList<>();
     private final List<Platform.CommandHandler> commands = new ArrayList<>();
     private final List<Platform.AllowDamageHandler> allowDamage = new ArrayList<>();
@@ -44,6 +45,7 @@ public final class ForgeBackend implements Platform.Backend {
     public void registerForgeEvents() {
         MinecraftForge.EVENT_BUS.addListener(this::handleServerStarted);
         MinecraftForge.EVENT_BUS.addListener(this::handleServerStopped);
+        MinecraftForge.EVENT_BUS.addListener(this::handleServerStopping);
         MinecraftForge.EVENT_BUS.addListener(this::handleServerTick);
         MinecraftForge.EVENT_BUS.addListener(this::handleCommands);
         MinecraftForge.EVENT_BUS.addListener(this::handleLivingAttack);
@@ -69,6 +71,10 @@ public final class ForgeBackend implements Platform.Backend {
         for (Consumer<MinecraftServer> handler : serverStopped) {
             handler.accept(event.getServer());
         }
+    }
+
+    private void handleServerStopping(net.minecraftforge.event.server.ServerStoppingEvent event) {
+        for (Consumer<MinecraftServer> handler : serverStopping) handler.accept(event.getServer());
     }
 
     private void handleServerTick(TickEvent.ServerTickEvent event) {
@@ -123,6 +129,26 @@ public final class ForgeBackend implements Platform.Backend {
     }
 
     @Override
+    public String getModVersion() {
+        return net.minecraftforge.fml.ModList.get().getModContainerById("guildquests").orElseThrow()
+                .getModInfo().getVersion().toString();
+    }
+
+    @Override
+    public Path getModJar() {
+        Path path = net.minecraftforge.fml.ModList.get().getModFileById("guildquests").getFile().getFilePath();
+        return java.nio.file.Files.isRegularFile(path) ? path : null;
+    }
+
+    @Override
+    public void validateUpdateMetadata(java.util.zip.ZipFile jar, String version, boolean dedicatedServer) throws java.io.IOException {
+        java.util.Map<String, String> installed = new java.util.HashMap<>();
+        for (var mod : net.minecraftforge.fml.ModList.get().getMods()) installed.put(mod.getModId(), mod.getVersion().toString());
+        installed.put("java", Integer.toString(Runtime.version().feature()));
+        dev.guildquests.update.ForgeUpdateMetadata.validate(jar, version, dedicatedServer, installed);
+    }
+
+    @Override
     public void onOpenGuildRequest(Consumer<ServerPlayer> handler) {
         ForgeNetwork.setOpenGuildHandler(handler);
     }
@@ -135,6 +161,11 @@ public final class ForgeBackend implements Platform.Backend {
     @Override
     public void onServerStopped(Consumer<MinecraftServer> handler) {
         serverStopped.add(handler);
+    }
+
+    @Override
+    public void onServerStopping(Consumer<MinecraftServer> handler) {
+        serverStopping.add(handler);
     }
 
     @Override

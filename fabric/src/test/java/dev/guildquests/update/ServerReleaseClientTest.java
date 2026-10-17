@@ -21,6 +21,10 @@ public class ServerReleaseClientTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private HttpServer http;
 
+    private static final ServerReleaseClient.MetadataValidator VALIDATOR = (jar, version, server) ->
+            FabricUpdateMetadata.validate(jar, version, server,
+                    java.util.Map.of("minecraft", "1.20.1", "java", "17", "fabricloader", "0.17.2"));
+
     @After public void stop() { if (http != null) http.stop(0); }
 
     private String serve(byte[] body, int status) throws IOException {
@@ -73,7 +77,7 @@ public class ServerReleaseClientTest {
         byte[] body = jar("guildquests", "26.7.2", "*", "~1.20.1");
         String url = serve(body, 200);
         Path dir = temporary.newFolder("update").toPath();
-        Path staged = ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length, null), dir, "fabric", 2, 2, true);
+        Path staged = ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length, null), dir, "fabric", 2, 2, true, VALIDATOR);
         assertTrue(staged.toString().endsWith(".jar.download"));
         assertArrayEquals(body, Files.readAllBytes(staged));
         try (var files = Files.list(dir)) { assertEquals(1, files.count()); }
@@ -82,7 +86,7 @@ public class ServerReleaseClientTest {
     @Test public void httpFailureLeavesNoJarOrPartialFile() throws Exception {
         String url = serve("not found".getBytes(StandardCharsets.UTF_8), 404);
         Path dir = temporary.newFolder("update").toPath();
-        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url), dir, "fabric", 2, 2, true));
+        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url), dir, "fabric", 2, 2, true, VALIDATOR));
         try (var files = Files.list(dir)) { assertEquals(0, files.count()); }
     }
 
@@ -90,8 +94,8 @@ public class ServerReleaseClientTest {
         byte[] body = jar("guildquests", "26.7.2", "*", "~1.20.1");
         String url = serve(body, 200);
         Path dir = temporary.newFolder("update").toPath();
-        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length + 1, null), dir, "fabric", 2, 2, true));
-        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length, "0".repeat(64)), dir, "fabric", 2, 2, true));
+        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length + 1, null), dir, "fabric", 2, 2, true, VALIDATOR));
+        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length, "0".repeat(64)), dir, "fabric", 2, 2, true, VALIDATOR));
         try (var files = Files.list(dir)) { assertEquals(0, files.count()); }
     }
 
@@ -104,7 +108,7 @@ public class ServerReleaseClientTest {
                 jar("guildquests", "26.7.2", "client", "~1.20.1"),
                 jar("guildquests", "26.7.2", "*", "~1.21")}) {
             Files.write(path, bad);
-            assertThrows(IOException.class, () -> ServerReleaseClient.validateJar(path, "26.7.2", true));
+            assertThrows(IOException.class, () -> ServerReleaseClient.validateJar(path, "26.7.2", true, VALIDATOR));
         }
     }
 
@@ -125,7 +129,7 @@ public class ServerReleaseClientTest {
         assertTrue(corrupted);
         Path path = temporary.newFile("corrupt-class.jar").toPath();
         Files.write(path, body);
-        assertThrows(IOException.class, () -> ServerReleaseClient.validateJar(path, "26.7.2", true));
+        assertThrows(IOException.class, () -> ServerReleaseClient.validateJar(path, "26.7.2", true, VALIDATOR));
     }
 
     @Test public void apiRateLimitIsFailureButNoReleaseIsNot() throws Exception {

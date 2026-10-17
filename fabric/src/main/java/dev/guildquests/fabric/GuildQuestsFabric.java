@@ -12,6 +12,5 @@ public final class GuildQuestsFabric implements ModInitializer {
         FabricFxNetwork.init();
         GuildQuestsMod.registerContent(FabricContentRegistrar.INSTANCE);
         GuildQuestsMod.init();
-        dev.guildquests.update.ServerUpdateService.register();
     }
 }

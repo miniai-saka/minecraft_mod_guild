@@ -3,12 +3,9 @@ package dev.guildquests.update;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.fabricmc.loader.api.Version;
-import net.fabricmc.loader.api.metadata.version.VersionPredicate;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -21,13 +18,18 @@ import java.time.Duration;
 import java.util.zip.CRC32;
 import java.util.zip.ZipFile;
 
-/** Fabric dedicated-server release lookup and validated downloads. */
+/** Loader-neutral dedicated-server release lookup and validated downloads. */
 public final class ServerReleaseClient {
     public static final String API_URL =
             "https://api.github.com/repos/takoyaki150141/minecraft_mod_guild/releases/latest";
     public static final long MAX_JAR_BYTES = 100L * 1024 * 1024;
 
     private ServerReleaseClient() { }
+
+    @FunctionalInterface
+    public interface MetadataValidator {
+        void validate(ZipFile jar, String version, boolean dedicatedServer) throws IOException;
+    }
 
     public record UpdateInfo(String latestVersion, String downloadUrl, long size, String sha256) {
         public UpdateInfo(String latestVersion, String downloadUrl) {
@@ -76,9 +78,9 @@ public final class ServerReleaseClient {
         return null;
     }
 
-    /** Stage outside mods so a failed/partial download can never be loaded by Fabric. */
+    /** Stage outside mods so a failed/partial download can never be loaded by a Mod loader. */
     public static Path downloadToStage(UpdateInfo info, Path updateDir, String loader,
-                                       int connectTimeout, int requestTimeout, boolean dedicatedServer)
+                                       int connectTimeout, int requestTimeout, boolean dedicatedServer, MetadataValidator metadataValidator)
             throws IOException, InterruptedException {
         Files.createDirectories(updateDir);
         Path part = Files.createTempFile(updateDir, "download-", ".part");
@@ -95,7 +97,7 @@ public final class ServerReleaseClient {
             if (info.sha256() != null && !info.sha256().equalsIgnoreCase(UpdateInstaller.sha256(part))) {
                 throw new IOException("Downloaded JAR SHA-256 does not match the release asset");
             }
-            validateJar(part, info.latestVersion(), dedicatedServer);
+            validateJar(part, info.latestVersion(), dedicatedServer, metadataValidator);
             Files.move(part, staged, StandardCopyOption.REPLACE_EXISTING);
             return staged;
         } finally {
@@ -103,28 +105,9 @@ public final class ServerReleaseClient {
         }
     }
 
-    static void validateJar(Path path, String version, boolean dedicatedServer) throws IOException {
+    static void validateJar(Path path, String version, boolean dedicatedServer, MetadataValidator metadataValidator) throws IOException {
         try (ZipFile zip = new ZipFile(path.toFile())) {
-            var metadata = zip.getEntry("fabric.mod.json");
-            if (metadata == null) throw new IOException("Missing fabric.mod.json");
-            JsonObject mod;
-            try (var reader = new InputStreamReader(zip.getInputStream(metadata), java.nio.charset.StandardCharsets.UTF_8)) {
-                mod = JsonParser.parseReader(reader).getAsJsonObject();
-            }
-            if (!"guildquests".equals(mod.get("id").getAsString()) || !version.equals(mod.get("version").getAsString())) {
-                throw new IOException("JAR mod ID/version does not match the release");
-            }
-            if (dedicatedServer && mod.has("environment") && "client".equals(mod.get("environment").getAsString())) {
-                throw new IOException("Client-only JAR cannot be installed on a server");
-            }
-            if (mod.has("depends")) {
-                JsonObject depends = mod.getAsJsonObject("depends");
-                checkDependency(depends, "minecraft", "1.20.1");
-                checkDependency(depends, "java", "17");
-                String loaderVersion = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("fabricloader")
-                        .map(info -> info.getMetadata().getVersion().getFriendlyString()).orElse("0.17.2");
-                checkDependency(depends, "fabricloader", loaderVersion);
-            }
+            metadataValidator.validate(zip, version, dedicatedServer);
             if (zip.getEntry("dev/guildquests/GuildQuestsMod.class") == null) throw new IOException("Missing Mod entrypoint");
             var entries = zip.entries();
             long total = 0;
@@ -146,21 +129,8 @@ public final class ServerReleaseClient {
         } catch (IOException e) {
             throw e;
         } catch (Exception e) {
-            throw new IOException("Invalid Fabric Mod JAR", e);
+            throw new IOException("Invalid Mod JAR", e);
         }
-    }
-
-    private static void checkDependency(JsonObject depends, String key, String installed) throws Exception {
-        if (!depends.has(key)) return;
-        JsonElement value = depends.get(key);
-        if (value.isJsonArray()) {
-            for (JsonElement predicate : value.getAsJsonArray()) {
-                if (VersionPredicate.parse(predicate.getAsString()).test(Version.parse(installed))) return;
-            }
-        } else if (VersionPredicate.parse(value.getAsString()).test(Version.parse(installed))) {
-            return;
-        }
-        throw new IOException("Incompatible " + key + " dependency: " + value);
     }
 
     static int compareVersions(String a, String b) {
@@ -179,7 +149,7 @@ public final class ServerReleaseClient {
 
     static String jarName(String loader, String version) {
         requireVersion(version);
-        if (!"fabric".equals(loader)) throw new IllegalArgumentException("Unsupported loader");
+        if (!"fabric".equals(loader) && !"forge".equals(loader)) throw new IllegalArgumentException("Unsupported loader");
         return "guildquests_" + loader + "-1.20.1_" + version + ".jar";
     }
 

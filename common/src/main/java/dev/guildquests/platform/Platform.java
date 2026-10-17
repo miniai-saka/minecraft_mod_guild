@@ -53,6 +53,18 @@ public final class Platform {
         return b().getModsDir();
     }
 
+    public static String getModVersion() {
+        return b().getModVersion();
+    }
+
+    public static Path getModJar() {
+        return b().getModJar();
+    }
+
+    public static void validateUpdateMetadata(java.util.zip.ZipFile jar, String version, boolean dedicatedServer) throws java.io.IOException {
+        b().validateUpdateMetadata(jar, version, dedicatedServer);
+    }
+
     public static void onOpenGuildRequest(Consumer<ServerPlayer> handler) {
         b().onOpenGuildRequest(handler);
     }
@@ -63,6 +75,10 @@ public final class Platform {
 
     public static void onServerStopped(Consumer<MinecraftServer> handler) {
         b().onServerStopped(handler);
+    }
+
+    public static void onServerStopping(Consumer<MinecraftServer> handler) {
+        b().onServerStopping(handler);
     }
 
     public static void onPlayerKill(BiConsumer<ServerPlayer, LivingEntity> handler) {
@@ -121,11 +137,19 @@ public final class Platform {
 
         Path getModsDir();
 
+        String getModVersion();
+
+        Path getModJar();
+
+        void validateUpdateMetadata(java.util.zip.ZipFile jar, String version, boolean dedicatedServer) throws java.io.IOException;
+
         void onOpenGuildRequest(Consumer<ServerPlayer> handler);
 
         void onServerStarted(Consumer<MinecraftServer> handler);
 
         void onServerStopped(Consumer<MinecraftServer> handler);
+
+        void onServerStopping(Consumer<MinecraftServer> handler);
 
         void onPlayerKill(BiConsumer<ServerPlayer, LivingEntity> handler);
 

@@ -20,6 +20,7 @@ final class UpdateInstallation {
         if (!dir.equals(staged.toAbsolutePath().normalize().getParent())) throw new IOException("Invalid staging directory");
         String currentHash = UpdateInstaller.sha256(current);
         Properties p = new Properties();
+        p.setProperty("loader", loader);
         p.setProperty("modsDir", mods.toString());
         p.setProperty("currentFile", current.getFileName().toString());
         p.setProperty("targetFile", ServerReleaseClient.jarName(loader, version));

@@ -8,8 +8,6 @@ import dev.guildquests.platform.Platform;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.commands.Commands;
-import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import dev.guildquests.config.ConfigManager;
 
 import java.io.IOException;
@@ -51,6 +49,7 @@ public final class ServerUpdateService {
 
     private ServerUpdateService(MinecraftServer server) {
         this.server = server;
+        GuildQuestsMod.LOGGER.info("[Server Update] Started: loader={}, current={}", Platform.getLoaderName(), currentVersion());
         reload();
         try {
             if (Files.exists(detectionFile)) {
@@ -75,13 +74,11 @@ public final class ServerUpdateService {
     }
 
     private static String currentVersion() {
-        return FabricLoader.getInstance().getModContainer("guildquests").orElseThrow()
-                .getMetadata().getVersion().getFriendlyString();
+        return Platform.getModVersion();
     }
 
     private static Path runningModJar() {
-        var paths = FabricLoader.getInstance().getModContainer("guildquests").orElseThrow().getOrigin().getPaths();
-        return paths.size() == 1 && Files.isRegularFile(paths.get(0)) ? paths.get(0) : null;
+        return Platform.getModJar();
     }
 
     public static void register() {
@@ -108,7 +105,7 @@ public final class ServerUpdateService {
         Platform.onServerTick(server -> {
             if (active != null && active.server == server) active.tick();
         });
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+        Platform.onServerStopping(server -> {
             if (active == null || active.server != server) return;
             active.close();
             active = null;
@@ -240,7 +237,7 @@ public final class ServerUpdateService {
         operation = worker.submit(() -> {
             try {
                 Path downloaded = ServerReleaseClient.downloadToStage(update, dir, Platform.getLoaderName(),
-                        settings.connectTimeoutSeconds, settings.requestTimeoutSeconds, true);
+                        settings.connectTimeoutSeconds, settings.requestTimeoutSeconds, true, Platform::validateUpdateMetadata);
                 // Publish the plan only on the server thread, after verifying this operation is still current.
                 server.execute(() -> {
                     if (closed || generation != revision || !config.enabled) return;

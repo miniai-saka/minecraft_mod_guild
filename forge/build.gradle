@@ -35,6 +35,7 @@ dependencies {
     forge "net.minecraftforge:forge:$rootProject.forge_version"
 
     modCompileOnly "maven.modrinth:create:$rootProject.create_forge_version"
+    testImplementation 'junit:junit:4.13.2'
 
     common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
     shadowBundle project(path: ':common', configuration: 'transformProductionForge')
