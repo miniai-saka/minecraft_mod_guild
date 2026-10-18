@@ -96,11 +96,12 @@ public final class GuildItems {
     public static ItemStack headItemWithTexture(String ownerName, UUID ownerId, String textureValue, String name, String... lore) {
         ItemStack stack = new ItemStack(Items.PLAYER_HEAD);
         CompoundTag skull = stack.getOrCreateTagElement("SkullOwner");
-        skull.putString("Id", ownerId.toString());
-        skull.putString("Name", ownerName);
+        if (ownerName != null && !ownerName.isEmpty()) skull.putString("Name", ownerName);
+        if (ownerId != null) skull.putUUID("Id", ownerId);
         if (textureValue != null) {
             CompoundTag property = new CompoundTag();
-            property.putString("Value", textureValue);
+            property.putString("name", "textures");
+            property.putString("value", textureValue);
             ListTag textures = new ListTag();
             textures.add(property);
             CompoundTag properties = new CompoundTag();
@@ -115,8 +116,13 @@ public final class GuildItems {
     }
 
     public static ItemStack digitHead(int digit, String placeLabel) {
+        return digitHead(digit, "送金額", placeLabel);
+    }
+
+    /** Digit head with a custom title, e.g. "入力額 千の位: 3". */
+    public static ItemStack digitHead(int digit, String title, String placeLabel) {
         return headItemWithTexture("digit", new UUID(0, digit), DIGIT_TEXTURES[digit],
-                "送金額 " + placeLabel + ": " + digit,
+                title + " " + placeLabel + ": " + digit,
                 "左クリックで +1（0-9 で循環）",
                 "右クリックで -1");
     }

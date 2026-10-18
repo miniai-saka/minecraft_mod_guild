@@ -85,6 +85,9 @@ public final class AuctionService {
         GuildService.message(seller, "「" + itemLabel(listing) + "」を"
                 + (auction ? "オークション（開始 " + price + " コイン）" : "固定価格 " + price + " コイン")
                 + "で出品しました。", ChatFormatting.GREEN);
+        GuildService.broadcast(seller.getServer(), seller.getName().getString() + " が「" + itemLabel(listing) + "」を"
+                + (auction ? "オークション（開始 " + price + " コイン）" : "固定価格 " + price + " コイン")
+                + "で出品しました。", ChatFormatting.GOLD);
         return listing.id;
     }
 

@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 
 public final class GuildQuestsMod {
     public static final String MOD_ID = "guildquests";
-    public static final String VERSION = "26.12.1";
+    public static final String VERSION = "26.12.2";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static int exploreTicker = 0;
     private static int riboTicker = 0;

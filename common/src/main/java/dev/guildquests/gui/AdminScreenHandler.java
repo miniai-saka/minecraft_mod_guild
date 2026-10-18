@@ -35,7 +35,7 @@ import java.util.UUID;
 public final class AdminScreenHandler extends AbstractContainerMenu {
     private final ServerPlayer owner;
     private final SimpleContainer display = new SimpleContainer(54);
-    private final Map<Integer, Runnable> actions = new HashMap<>();
+    private final Map<Integer, java.util.function.IntConsumer> actions = new HashMap<>();
     private String view = "PLAYERS", operation = "", notice = "";
     private UUID target;
     private int page;
@@ -68,7 +68,13 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
         return known == null || known.isBlank() ? id.toString().substring(0, 8) : known;
     }
     private void set(int slot, Item item, String title, String... lore) { display.setItem(slot, GuildItems.item(item, title, lore)); }
-    private void action(int slot, Item item, String title, Runnable action, String... lore) { set(slot, item, title, lore); actions.put(slot, action); }
+    private void action(int slot, Item item, String title, Runnable action, String... lore) {
+        set(slot, item, title, lore); actions.put(slot, b -> action.run());
+    }
+    /** Action on a prebuilt stack (e.g. a digit head) that receives the mouse button. */
+    private void actionStack(int slot, ItemStack stack, java.util.function.IntConsumer action) {
+        display.setItem(slot, stack); actions.put(slot, action);
+    }
     private void populate() {
         actions.clear();
         for (int i = 0; i < 54; i++) set(i, Items.GRAY_STAINED_GLASS_PANE, " ");
@@ -92,7 +98,7 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
             display.setItem(slot, GuildItems.playerHead(owner.getServer(), id, name(id), name(id),
                     owner.getServer().getPlayerList().getPlayer(id) == null ? "オフライン" : "オンライン", "所持金: " + wallet.coins + " GC",
                     "借入: " + wallet.loan + " GC", "FX・リボ債務: " + wallet.debt + " GC", "滞納: " + (wallet.delinquent ? "あり" : "なし"), "クリックで管理"));
-            actions.put(slot, () -> { target = id; view = "DETAIL"; notice = ""; });
+            actions.put(slot, b -> { target = id; view = "DETAIL"; notice = ""; });
         }
         if (page > 0) action(45, Items.ARROW, "前のページ", () -> page--);
         if (page + 1 < pages) action(53, Items.ARROW, "次のページ", () -> page++);
@@ -108,8 +114,12 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
         action(17, Items.GOLD_BLOCK, "コインを設定", () -> beginAmount("COINS_SET"), "coins set と同じ操作", "所持金を指定額へ変更");
         set(22, Items.PAPER, "現在の管理状態", "所持金: " + data().coins + " GC", "借入: " + data().loan + " GC", "FX・リボ債務: " + data().debt + " GC",
                 "滞納: " + (data().delinquent ? "あり" : "なし"), "管理者による固定ロック: " + (data().adminDelinquent ? "あり" : "なし"));
-        action(29, Items.REDSTONE_TORCH, "滞納状態にする", () -> review("ON"), "delinquent on と同じ操作", "管理者が解除するまでロックを維持");
-        action(33, Items.LIME_DYE, "滞納状態を解除", () -> review("OFF"), "delinquent off と同じ操作", "借入・FX債務の残高は変更しません", "後の返済失敗で再び滞納する場合があります");
+        boolean locked = data().delinquent;
+        action(31, locked ? Items.REDSTONE_BLOCK : Items.LIME_DYE,
+                "滞納ロック: " + (locked ? "あり" : "なし") + "（クリックで切替）",
+                () -> review(locked ? "OFF" : "ON"),
+                "delinquent " + (locked ? "off" : "on") + " と同じ操作",
+                locked ? "管理者ロックを解除します" : "管理者が解除するまでロックを維持");
         action(49, Items.ARROW, "プレイヤー選択へ戻る", () -> view = "PLAYERS");
     }
     private void server() {
@@ -166,22 +176,34 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
     private void beginAmount(String op) { operation = op; amount = 0; notice = ""; view = "AMOUNT"; }
     private void input() {
         boolean coinsOp = operation.equals("COINS_ADD") || operation.equals("COINS_SET");
-        set(13, Items.GOLD_INGOT, "入力額: " + amount + " GC", label(), "数字を順にクリックして入力", "最大 " + Long.MAX_VALUE + " GC");
-        for (int digit = 1; digit <= 9; digit++) {
-            int value = digit, slot = 20 + (digit - 1) / 3 * 9 + (digit - 1) % 3;
-            action(slot, Items.WHITE_CONCRETE, Integer.toString(digit), () -> append(value));
-            display.getItem(slot).setCount(digit);
+        if (amount < 0) amount = 0;
+        set(13, Items.GOLD_INGOT, "入力額: " + amount + " GC", label(), "数字頭と紙で調整", "最大 " + Integer.MAX_VALUE + " GC");
+        // Digit heads (thousands/hundreds/tens/ones): left click +1, right click -1 (bank style).
+        int[] places = {1000, 100, 10, 1};
+        String[] labels = {"千の位", "百の位", "十の位", "一の位"};
+        for (int i = 0; i < 4; i++) {
+            final long place = places[i];
+            long digit = (amount / place) % 10;
+            actionStack(5 + i, GuildItems.digitHead((int) digit, "入力額", labels[i]), button -> {
+                long cur = (amount / place) % 10;
+                long next = Math.floorMod(cur + (button == 0 ? 1 : -1), 10);
+                amount = Math.min(Integer.MAX_VALUE, Math.max(0, amount - cur * place + next * place));
+            });
         }
-        action(48, Items.WHITE_CONCRETE, "0", () -> append(0));
+        addPaper(14, 1);
+        addPaper(15, 10);
+        addPaper(16, 100);
+        addPaper(17, 1000);
         action(45, Items.RED_DYE, "入力を消去", () -> amount = 0);
-        action(47, Items.ARROW, "1桁消す", () -> amount /= 10);
-        action(16, Items.CHEST, coinsOp ? "現在の所持金を入力" : "現在の借入額を入力", () -> amount = coinsOp ? data().coins : data().loan);
+        action(48, Items.CHEST, coinsOp ? "現在の所持金を入力" : "現在の借入額を入力",
+                () -> amount = Math.min(Integer.MAX_VALUE, coinsOp ? data().coins : data().loan));
         action(50, Items.LIME_CONCRETE, "内容を確認", () -> review(operation));
         action(53, Items.BARRIER, "戻る", () -> view = "DETAIL");
     }
-    private void append(int digit) {
-        if (amount > (Long.MAX_VALUE - digit) / 10) { notice = "金額の上限を超えています。"; return; }
-        amount = amount * 10 + digit; notice = "";
+    private void addPaper(int slot, int add) {
+        long preview = Math.min(Integer.MAX_VALUE, amount + add);
+        action(slot, Items.PAPER, "＋" + add, () -> amount = Math.min(Integer.MAX_VALUE, amount + add),
+                "現在: " + amount + " → " + preview);
     }
     private String label() {
         return switch (operation) {
@@ -237,9 +259,9 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
     }
     @Override public void clicked(int slot, int button, ClickType type, Player player) {
         if (player != owner || owner.containerMenu != this || !allowed(owner)) { if (player == owner) owner.closeContainer(); return; }
-        if (type != ClickType.PICKUP || button != 0 || slot < 0 || slot >= 54) return;
-        Runnable action = actions.get(slot); if (action == null) return;
-        action.run(); if (owner.containerMenu == this) { populate(); broadcastChanges(); }
+        if (type != ClickType.PICKUP || (button != 0 && button != 1) || slot < 0 || slot >= 54) return;
+        java.util.function.IntConsumer action = actions.get(slot); if (action == null) return;
+        action.accept(button); if (owner.containerMenu == this) { populate(); broadcastChanges(); }
     }
     @Override public ItemStack quickMoveStack(Player player, int slot) { return ItemStack.EMPTY; }
     @Override public boolean stillValid(Player player) { return player == owner && allowed(owner) && !owner.isRemoved(); }
