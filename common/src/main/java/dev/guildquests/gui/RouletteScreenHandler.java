@@ -202,14 +202,14 @@ public final class RouletteScreenHandler extends AbstractContainerMenu {
         // Row 2: controls
         switch (state) {
             case BETTING -> {
-                setAction(18, item(Items.PAPER, "賭け +10", "所持: " + balance),
-                        (p, b, t) -> { if (b == 0) betAmount = Math.min(balance, betAmount + 10); });
-                setAction(19, item(Items.PAPER, "賭け +50", "所持: " + balance),
-                        (p, b, t) -> { if (b == 0) betAmount = Math.min(balance, betAmount + 50); });
-                setAction(20, item(Items.PAPER, "賭け +100", "所持: " + balance),
-                        (p, b, t) -> { if (b == 0) betAmount = Math.min(balance, betAmount + 100); });
-                setAction(21, item(Items.PAPER, "賭け +500", "所持: " + balance),
-                        (p, b, t) -> { if (b == 0) betAmount = Math.min(balance, betAmount + 500); });
+                setAction(18, item(Items.PAPER, "賭け ±10", "所持: " + balance, "右クリックで -10"),
+                        (p, b, t) -> { if (b == 0) betAmount = Math.min(balance, betAmount + 10); else if (b == 1) betAmount = Math.max(0, betAmount - 10); });
+                setAction(19, item(Items.PAPER, "賭け ±50", "所持: " + balance, "右クリックで -50"),
+                        (p, b, t) -> { if (b == 0) betAmount = Math.min(balance, betAmount + 50); else if (b == 1) betAmount = Math.max(0, betAmount - 50); });
+                setAction(20, item(Items.PAPER, "賭け ±100", "所持: " + balance, "右クリックで -100"),
+                        (p, b, t) -> { if (b == 0) betAmount = Math.min(balance, betAmount + 100); else if (b == 1) betAmount = Math.max(0, betAmount - 100); });
+                setAction(21, item(Items.PAPER, "賭け ±500", "所持: " + balance, "右クリックで -500"),
+                        (p, b, t) -> { if (b == 0) betAmount = Math.min(balance, betAmount + 500); else if (b == 1) betAmount = Math.max(0, betAmount - 500); });
                 set(23, item(Items.GOLD_INGOT, "賭け: " + betAmount));
                 if (betAmount > 0 && betAmount <= balance && choice >= 0) {
                     setAction(25, item(Items.LIME_CONCRETE, "ルーレットを回す", "クリックで勝負！"),
