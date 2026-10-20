@@ -31,8 +31,11 @@ public final class ModConfig {
     /** Total coins split among players by damage share when the boss dies. */
     public long bossEventReward = 100;
 
-    /** Max health of the emergency boss. */
+    /** Max health of the emergency boss (normal tier). */
     public double bossEventHealth = 300;
+
+    /** Spawn weights for [weak, normal, strong, elite]. Zero weights disable that tier. */
+    public int[] bossTierWeights = {30, 40, 22, 8};
 
     /** Seconds of boss protection granted after dying during a boss fight (0 disables). */
     public int bossProtectionSeconds = 300;

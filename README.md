@@ -2,7 +2,7 @@
 
 Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨、銀行、ギャンブルを単体で実装した Mod です。FTB Quests や Q Shop などへの依存はありません。
 
-現在のバージョン: **26.14.0**
+現在のバージョン: **26.15.0**
 
 ## 主な機能
 
@@ -42,6 +42,8 @@ Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨�
 - 成行・指値・逆指値・OCO・IFD・IFO、最大 1000 倍、TP/SL・トレーリング・部分決済に対応
 - 相場はサーバー内部で生成し、外部の価格 API は使わない
 - 既定はゼロカット。追証を有効にすると不足分を所持コインから精算し、未払いは既存の債務・滞納処理へ引き継ぐ
+- 出金できるのは実現済みの余剰証拠金のみ。含み益は出金できない（証拠金の余力としてのみ使用）
+- 取引所を停止すると新規注文を受け付けず、既存の未約定注文もキャンセルされる（決済・出金は可能）
 - 操作と設定は [FX.md](FX.md) を参照
 
 ### オークション（プレイヤー間マーケット）
@@ -58,8 +60,13 @@ Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨�
 ### 緊急ボスイベント
 
 - プレイヤーがオンラインのとき、一定間隔で確率発生する
-- 強化したホスト Mob が出現する（グラウ効果とダイヤ装備）
-- 与えたダメージに応じて報酬を分配する
+- 強さが4段階のボスが出現する（弱 / 並 / 強 / 最強）。階層ごとにHP・装備・エンチャント・ポーション効果・報酬が変わる
+  - 弱: HP 0.5倍・鉄装備・報酬 0.5倍
+  - 並: HP 1.0倍・ダイヤ装備・報酬 1.0倍
+  - 強: HP 2.0倍・強化ダイヤ装備・攻撃力/速度上昇・報酬 2.0倍
+  - 最強: HP 4.0倍（バニラ上限の1024で頭打ち）・ネザライト装備・攻撃力II/速度上昇/耐性・報酬 4.0倍
+  - 出現比率は `bossTierWeights`（既定 弱30 / 並40 / 強22 / 最強8）
+- 与えたダメージに応じて報酬を分配する（貢献度は防具・耐性・オーバーキルを除いた実際のHP減少量）
 - 環境ダメージによる撃破は無効
 - クライアント側にボス位置ピンを表示する
 - 管理コマンド `/guildadmin boss [count]` で同時に複数体（最大32体）を出現できる。各ボスは個別のボスバー・ダメージ集計・報酬分配を持つ
@@ -99,14 +106,14 @@ Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨�
 生成物:
 
 ```text
-fabric/build/libs/guildquests_fabric-1.20.1_26.14.0.jar
-forge/build/libs/guildquests_forge-1.20.1_26.14.0.jar
+fabric/build/libs/guildquests_fabric-1.20.1_26.15.0.jar
+forge/build/libs/guildquests_forge-1.20.1_26.15.0.jar
 ```
 
 ## 導入
 
 1. Fabric または Forge で Minecraft 1.20.1 を用意します。
-2. ローダーに合う 26.14.0 の JAR を `mods/` へ配置します。Fabric では Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
+2. ローダーに合う 26.15.0 の JAR を `mods/` へ配置します。Fabric では Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定を変更したら、サーバーを再起動するか `/guildadmin reload` を実行します。
 
@@ -123,7 +130,7 @@ forge/build/libs/guildquests_forge-1.20.1_26.14.0.jar
 | `/guild fx` | Guild FX を開く（F8 は任意で有効化） |
 | `/guildadmin` | 借入・滞納などの管理チェスト UI を開く（OP Lv2） |
 | `/guildadmin reload` | JSON 設定を再読込する（OP Lv2） |
-| `/guildadmin boss [count]` | 緊急ボスを即時に出現させる（count省略時は1体、最大32体、OP Lv2） |
+| `/guildadmin boss [count] [weak\|normal\|strong\|elite]` | 緊急ボスを即時に出現させる（count省略時は1体、最大32体、階層を省略すると抽選、OP Lv2） |
 | `/guildadmin boss info` | 生存中の緊急ボスの体力と現在のターゲットを表示する（OP Lv2） |
 | `/guildadmin coins set\|add <player> <amount>` | コインを設定・加算する（OP Lv2） |
 | `/guildadmin loan add\|set <player> <amount>` | 借入を加算・指定額に設定する（OP Lv2） |
@@ -170,7 +177,8 @@ config/guildquests/server-update.json  # Fabric / Forge 専用サーバー
 - `bossEventIntervalMinutes`: ボス出現の判定間隔（分）
 - `bossEventChancePercent`: ボス出現の確率（%）
 - `bossEventReward`: ボス撃破の報酬（コイン）
-- `bossEventHealth`: ボスの体力
+- `bossEventHealth`: ボスの体力（「並」の基準値。階層ごとに 0.5〜4.0 倍）
+- `bossTierWeights`: ボス階層の出現重み `[弱, 並, 強, 最強]`（既定 `[30, 40, 22, 8]`）
 - `bossProtectionSeconds`: 死亡時に付与する緊急ボス保護の秒数（既定300、0で無効）
 - `bossProtectionReleaseRange`: ボスからこの距離以上離れると保護を解除（既定48ブロック）
 - `bankFeePercent`: 銀行の手数料（%）

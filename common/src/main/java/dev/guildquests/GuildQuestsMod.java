@@ -13,6 +13,7 @@ import dev.guildquests.item.ModItems;
 import dev.guildquests.platform.ContentRegistrar;
 import dev.guildquests.platform.Platform;
 import dev.guildquests.service.BossEvent;
+import dev.guildquests.service.BossTier;
 import dev.guildquests.service.GuildService;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.EntityArgument;
@@ -27,7 +28,7 @@ import java.util.List;
 
 public final class GuildQuestsMod {
     public static final String MOD_ID = "guildquests";
-    public static final String VERSION = "26.14.0";
+    public static final String VERSION = "26.15.0";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static int exploreTicker = 0;
     private static int riboTicker = 0;
@@ -163,10 +164,18 @@ public final class GuildQuestsMod {
                                 : "緊急ボス " + lines.size() + "体: " + String.join(" / ", lines)), false);
                         return lines.size();
                     }))
-                    .executes(context -> spawnBosses(context.getSource(), 1))
+                    .executes(context -> spawnBosses(context.getSource(), 1, null))
                     .then(Commands.argument("count", IntegerArgumentType.integer(1, BossEvent.MAX_ACTIVE))
                             .executes(context -> spawnBosses(context.getSource(),
-                                    IntegerArgumentType.getInteger(context, "count")))));
+                                    IntegerArgumentType.getInteger(context, "count"), null))
+                            .then(Commands.literal("weak").executes(context -> spawnBosses(context.getSource(),
+                                    IntegerArgumentType.getInteger(context, "count"), BossTier.WEAK)))
+                            .then(Commands.literal("normal").executes(context -> spawnBosses(context.getSource(),
+                                    IntegerArgumentType.getInteger(context, "count"), BossTier.NORMAL)))
+                            .then(Commands.literal("strong").executes(context -> spawnBosses(context.getSource(),
+                                    IntegerArgumentType.getInteger(context, "count"), BossTier.STRONG)))
+                            .then(Commands.literal("elite").executes(context -> spawnBosses(context.getSource(),
+                                    IntegerArgumentType.getInteger(context, "count"), BossTier.ELITE)))));
 
             var coins = Commands.literal("coins");
             coins.then(Commands.literal("set")
@@ -272,20 +281,21 @@ public final class GuildQuestsMod {
         LOGGER.info("Guild Quests & Economy initialized (multi-loader 1.20.1)");
     }
 
-    /** `/guildadmin boss [count]`: spawns bosses immediately, skipping the chance roll. */
-    private static int spawnBosses(CommandSourceStack source, int count) {
-        int spawned = BossEvent.spawn(source.getServer(), count);
+    /** `/guildadmin boss [count] [tier]`: spawns bosses immediately, skipping the chance roll. */
+    private static int spawnBosses(CommandSourceStack source, int count, BossTier tier) {
+        int spawned = BossEvent.spawn(source.getServer(), count, tier);
+        String tierLabel = tier == null ? "" : " [" + tier.label() + "]";
         String message;
         if (spawned == 0) {
             message = "Boss spawn failed: no players online or the active boss limit ("
                     + BossEvent.MAX_ACTIVE + ") was reached.";
         } else if (spawned < count) {
-            message = "Spawned " + spawned + " / " + count + " emergency bosses (active limit "
-                    + BossEvent.MAX_ACTIVE + ").";
+            message = "Spawned " + spawned + " / " + count + " emergency bosses" + tierLabel
+                    + " (active limit " + BossEvent.MAX_ACTIVE + ").";
         } else if (spawned == 1) {
-            message = "Emergency boss spawned (chance roll skipped).";
+            message = "Emergency boss" + tierLabel + " spawned (chance roll skipped).";
         } else {
-            message = "Spawned " + spawned + " emergency bosses (chance roll skipped).";
+            message = "Spawned " + spawned + " emergency bosses" + tierLabel + " (chance roll skipped).";
         }
         source.sendSuccess(() -> Component.literal(message), false);
         return spawned;

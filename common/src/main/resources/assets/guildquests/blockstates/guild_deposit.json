@@ -1,7 +1,12 @@
 {
   "variants": {
-    "": {
-      "model": "guildquests:block/guild_deposit"
-    }
+    "facing=north,powered=false": { "model": "guildquests:block/guild_deposit" },
+    "facing=east,powered=false": { "model": "guildquests:block/guild_deposit", "y": 90 },
+    "facing=south,powered=false": { "model": "guildquests:block/guild_deposit", "y": 180 },
+    "facing=west,powered=false": { "model": "guildquests:block/guild_deposit", "y": 270 },
+    "facing=north,powered=true": { "model": "guildquests:block/guild_deposit_on" },
+    "facing=east,powered=true": { "model": "guildquests:block/guild_deposit_on", "y": 90 },
+    "facing=south,powered=true": { "model": "guildquests:block/guild_deposit_on", "y": 180 },
+    "facing=west,powered=true": { "model": "guildquests:block/guild_deposit_on", "y": 270 }
   }
 }

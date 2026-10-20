@@ -59,6 +59,16 @@ public final class FxEngine {
     public double reserved(Account a) { return a.orders.stream().mapToDouble(o -> o.reserved).sum(); }
     public double free(Account a) { return equity(a) - margin(a) - reserved(a); }
 
+    /**
+     * Cash that may leave the FX account: realised balance above the used and reserved margin.
+     * Unrealised profit counts towards margin headroom but must not be withdrawable, otherwise a
+     * player could recover the initial margin on a winning position and keep the upside with no
+     * downside (especially with zero-cut enabled).
+     */
+    public double withdrawable(Account a) {
+        return Math.max(0, Math.min(free(a), a.balance - margin(a) - reserved(a)));
+    }
+
     public void deposit(Account a, long amount) {
         require(amount > 0 && amount <= config.maxAccountBalance - a.balance, "入金額が口座上限を超えています。");
         a.balance += amount;
@@ -67,7 +77,7 @@ public final class FxEngine {
 
     public void withdraw(Account a, long amount) {
         protect(a);
-        require(amount > 0 && amount <= Math.floor(Math.min(a.balance, free(a)) + 1e-8), "出金可能な余剰証拠金が不足しています。");
+        require(amount > 0 && amount <= Math.floor(withdrawable(a) + 1e-8), "出金可能な余剰証拠金が不足しています。");
         a.balance -= amount;
         record(a, 0, "GC", "出金", amount + " GC", 0, 0, -amount, 0);
     }
@@ -201,7 +211,7 @@ public final class FxEngine {
     }
 
     private void process(Account a) {
-        if (a.tradingLocked || a.pendingMarginCall > 0) cancelAll(a);
+        if (!config.enabled || a.tradingLocked || a.pendingMarginCall > 0) cancelAll(a);
         for (Position p : new ArrayList<>(a.positions)) {
             double quote = exitQuote(market(p.symbol), p.side);
             if (p.trailingDistance > 0) {
@@ -311,7 +321,7 @@ public final class FxEngine {
         s.selected = state.markets.containsKey(selected) ? selected : config.symbols.get(0).id;
         s.config = config; s.account = a;
         s.unrealized = unrealized(a); s.equity = equity(a); s.usedMargin = margin(a);
-        s.reservedMargin = reserved(a); s.freeMargin = free(a);
+        s.reservedMargin = reserved(a); s.freeMargin = free(a); s.withdrawable = withdrawable(a);
         for (Market m : state.markets.values()) {
             FxConfig.Symbol setting = settings(m.symbol);
             Quote q = new Quote(); q.symbol = m.symbol; q.name = setting.name; q.color = setting.color;

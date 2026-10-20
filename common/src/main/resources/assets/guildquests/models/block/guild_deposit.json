@@ -1,25 +1,23 @@
 {
   "parent": "minecraft:block/block",
   "textures": {
-    "particle": "guildquests:block/guild_deposit",
-    "down": "guildquests:block/guild_deposit",
-    "up": "guildquests:block/guild_deposit",
-    "north": "guildquests:block/guild_deposit",
-    "south": "guildquests:block/guild_deposit",
-    "east": "guildquests:block/guild_deposit",
-    "west": "guildquests:block/guild_deposit"
+    "particle": "guildquests:block/guild_deposit_side",
+    "front": "guildquests:block/guild_deposit_front",
+    "side": "guildquests:block/guild_deposit_side",
+    "top": "guildquests:block/guild_deposit_top",
+    "bottom": "guildquests:block/guild_deposit_bottom"
   },
   "elements": [
     {
       "from": [1, 0, 1],
       "to": [15, 14, 15],
       "faces": {
-        "down": { "texture": "#down" },
-        "up": { "texture": "#up" },
-        "north": { "texture": "#north" },
-        "south": { "texture": "#south" },
-        "east": { "texture": "#east" },
-        "west": { "texture": "#west" }
+        "down": { "texture": "#bottom" },
+        "up": { "texture": "#top" },
+        "north": { "texture": "#front" },
+        "south": { "texture": "#side" },
+        "east": { "texture": "#side" },
+        "west": { "texture": "#side" }
       }
     }
   ]

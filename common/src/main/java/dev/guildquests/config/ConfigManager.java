@@ -85,6 +85,16 @@ public final class ConfigManager {
         c.bossEventChancePercent = Math.max(0, Math.min(100, c.bossEventChancePercent));
         c.bossEventReward = Math.max(0, c.bossEventReward);
         c.bossEventHealth = Math.max(1, Math.min(100000, c.bossEventHealth));
+        if (c.bossTierWeights == null || c.bossTierWeights.length != 4) {
+            c.bossTierWeights = new int[]{30, 40, 22, 8};
+        } else {
+            boolean any = false;
+            for (int i = 0; i < c.bossTierWeights.length; i++) {
+                c.bossTierWeights[i] = Math.max(0, Math.min(1000, c.bossTierWeights[i]));
+                any |= c.bossTierWeights[i] > 0;
+            }
+            if (!any) c.bossTierWeights = new int[]{30, 40, 22, 8};
+        }
         c.bossProtectionSeconds = Math.max(0, Math.min(3600, c.bossProtectionSeconds));
         c.bossProtectionReleaseRange = Math.max(8, Math.min(128, c.bossProtectionReleaseRange));
         c.bankFeePercent = Math.max(0, Math.min(100, c.bankFeePercent));

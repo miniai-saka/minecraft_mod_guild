@@ -452,7 +452,7 @@ public final class FxScreen extends Screen {
         if (modal.equals("TRANSFER")) {
             text(d, "所持ギルドコイン", 345, 229, MUTED); right(d, data.wallet + " GC", 753, 229, INK);
             text(d, "出金可能額（整数）", 345, 251, MUTED);
-            right(d, money(Math.floor(Math.max(0, Math.min(data.account.balance, data.freeMargin)))) + " GC", 753, 251, INK);
+            right(d, money(Math.floor(data.withdrawable)) + " GC", 753, 251, INK);
             text(d, "金額 (GC) / 1以上の整数", 345, 282, MUTED);
             modalField(d, delta);
             text(d, data.config.marginCallEnabled ? "追証あり: ロスカット後の不足を所持金から自動精算。" : "追証なし: 損失はFX口座の資金内でゼロカット。", 345, 345, data.config.marginCallEnabled ? RED : MUTED);

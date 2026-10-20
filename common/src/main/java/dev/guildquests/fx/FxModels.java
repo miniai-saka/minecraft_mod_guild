@@ -122,6 +122,8 @@ public final class FxModels {
         public FxConfig config;
         public Account account;
         public double equity, usedMargin, reservedMargin, freeMargin, unrealized;
+        /** Realised cash above margin; the only amount that may be withdrawn. */
+        public double withdrawable;
         public long guildDebt;
         public boolean delinquent;
         public List<Quote> quotes = new ArrayList<>();

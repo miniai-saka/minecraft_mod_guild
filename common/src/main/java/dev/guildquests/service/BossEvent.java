@@ -9,7 +9,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.BossEvent.BossBarColor;
 import net.minecraft.world.BossEvent.BossBarOverlay;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.world.damagesource.DamageSource;
@@ -54,7 +53,6 @@ import java.util.UUID;
 public final class BossEvent {
     private static final Random RANDOM = new Random();
     private static final String BOSS_TAG = "guildquests_emergency_boss";
-    private static final String BOSS_NAME_PREFIX = "【緊急ボス】";
     private static final int TICKS_PER_MINUTE = 1200;
     /** S2C: show/clear the client-side boss pin (x,y,z + lifetime ticks; lifetime 0 = clear). */
     public static final ResourceLocation BOSS_PIN = new ResourceLocation("guildquests", "boss_pin");
@@ -63,21 +61,8 @@ public final class BossEvent {
     private static final int PIN_LIFETIME_TICKS = 6000;
     /** Viewers only need re-checking once per second. */
     private static final int VIEW_RECONCILE_INTERVAL = 20;
-
-    private static final List<EntityType<?>> BOSSES = List.of(
-            EntityType.ZOMBIE, EntityType.HUSK, EntityType.DROWNED,
-            EntityType.SKELETON, EntityType.STRAY, EntityType.CREEPER,
-            EntityType.SPIDER, EntityType.CAVE_SPIDER, EntityType.ENDERMAN,
-            EntityType.WITCH, EntityType.PILLAGER, EntityType.VINDICATOR,
-            EntityType.EVOKER, EntityType.RAVAGER);
-
-    /** Boss weapon: always diamond tier (sword or axe). */
-    private static final Item[] WEAPONS = {Items.DIAMOND_SWORD, Items.DIAMOND_AXE};
-
-    /** Full diamond armor, always all four slots. */
-    private static final Item[] ARMOR_SET = {
-            Items.DIAMOND_HELMET, Items.DIAMOND_CHESTPLATE,
-            Items.DIAMOND_LEGGINGS, Items.DIAMOND_BOOTS};
+    /** Vanilla's generic.max_health attribute cannot exceed 1024. */
+    private static final double MAX_HEALTH_VALUE = 1024.0;
 
     private static final EquipmentSlot[] ARMOR_SLOTS = {
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
@@ -113,7 +98,6 @@ public final class BossEvent {
                 if (isEnvironmental(source)) {
                     return false;
                 }
-                onDamage(entity, source, amount);
                 return true;
             }
             if (entity instanceof ServerPlayer player && BossProtection.isBossDamage(source)) {
@@ -209,6 +193,11 @@ public final class BossEvent {
      * they regain a bar, but they are not counted as newly spawned.
      */
     public static int spawn(MinecraftServer server, int count) {
+        return spawn(server, count, null);
+    }
+
+    /** Spawns bosses with a forced tier, or a weighted random tier when {@code forced} is null. */
+    public static int spawn(MinecraftServer server, int count, BossTier forced) {
         if (count <= 0) return 0;
         ServerLevel world = server.getLevel(Level.OVERWORLD);
         if (world == null) return 0;
@@ -220,14 +209,18 @@ public final class BossEvent {
 
         int spawned = 0;
         for (int i = 0; i < count && bosses.size() < MAX_ACTIVE; i++) {
-            if (spawnOne(server, world, players)) {
+            if (spawnOne(server, world, players, forced)) {
                 spawned++;
             }
         }
         return spawned;
     }
 
-    private static boolean spawnOne(MinecraftServer server, ServerLevel world, List<ServerPlayer> players) {
+    private static boolean spawnOne(MinecraftServer server, ServerLevel world, List<ServerPlayer> players,
+                                    BossTier forced) {
+        ModConfig config = ConfigManager.config();
+        BossTier tier = forced != null ? forced : BossTier.roll(RANDOM, config.bossTierWeights);
+
         ServerPlayer anchor = players.get(RANDOM.nextInt(players.size()));
         double angle = RANDOM.nextDouble() * Math.PI * 2.0;
         double distance = 50 + RANDOM.nextDouble() * 50;
@@ -238,19 +231,19 @@ public final class BossEvent {
         world.getChunk(x >> 4, z >> 4);
         int y = world.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
 
-        EntityType<?> type = BOSSES.get(RANDOM.nextInt(BOSSES.size()));
+        EntityType<?> type = tier.randomMob(RANDOM);
         if (!(type.create(world) instanceof Mob mob)) return false;
 
-        ModConfig config = ConfigManager.config();
         String mobName = type.getDescription().getString();
-        String bossName = BOSS_NAME_PREFIX + mobName;
+        String bossName = "【緊急ボス・" + tier.label() + "】" + mobName;
         mob.moveTo(x + 0.5, y, z + 0.5, RANDOM.nextFloat() * 360.0f, 0.0f);
         mob.setCustomName(Component.literal(bossName).withStyle(ChatFormatting.RED));
         mob.setCustomNameVisible(true);
         mob.addTag(BOSS_TAG);
         mob.setPersistenceRequired();
 
-        double health = Math.max(1, config.bossEventHealth);
+        // Vanilla caps the max-health attribute at 1024, so elite HP tops out there.
+        double health = Math.max(1, Math.min(MAX_HEALTH_VALUE, config.bossEventHealth * tier.healthMultiplier()));
         if (mob.getAttribute(Attributes.MAX_HEALTH) != null) {
             mob.getAttribute(Attributes.MAX_HEALTH).setBaseValue(health);
         }
@@ -258,10 +251,11 @@ public final class BossEvent {
             mob.getAttribute(Attributes.KNOCKBACK_RESISTANCE).setBaseValue(1.0);
         }
         mob.setHealth((float) health);
-        equip(mob);
+        equip(mob, tier);
+        applyTierEffects(mob, tier);
         world.addFreshEntity(mob);
 
-        adopt(mob);
+        adopt(mob, tier);
 
         // Show a client-rendered pin at the newest boss (5 minutes or until death).
         pinLife = PIN_LIFETIME_TICKS;
@@ -269,8 +263,9 @@ public final class BossEvent {
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             sendBossPin(p, x, y, z, pinLife);
         }
-        GuildService.broadcast(server, "緊急ボス【" + mobName + "】が出現！座標: (" + x + ", " + y + ", " + z
-                + ")  与えたダメージの割合で報酬 " + Math.max(0, config.bossEventReward)
+        long reward = Math.max(0, Math.round(config.bossEventReward * tier.rewardMultiplier()));
+        GuildService.broadcast(server, "緊急ボス【" + tier.label() + " " + mobName + "】が出現！座標: ("
+                + x + ", " + y + ", " + z + ")  与えたダメージの割合で報酬 " + reward
                 + " コインを分配します。", ChatFormatting.RED);
         return true;
     }
@@ -384,47 +379,101 @@ public final class BossEvent {
         clearBossPin(server);
     }
 
-    /** Equips the boss with a unified, always-full enchanted diamond set. */
-    private static void equip(Mob mob) {
+    /** Equips the boss with gear matching its tier (iron/chain up to netherite). */
+    private static void equip(Mob mob, BossTier tier) {
+        Item[] weapons;
+        Item[] armorItems;
+        int sharpness;
+        int fireAspect;
+        int knockback;
+        int sweeping;
+        int protection;
+        int thorns;
+        int unbreaking;
+        int quickCharge;
+        boolean multishot;
+
+        switch (tier) {
+            case WEAK -> {
+                weapons = new Item[]{Items.IRON_SWORD, Items.IRON_AXE};
+                armorItems = new Item[]{Items.CHAINMAIL_HELMET, Items.CHAINMAIL_CHESTPLATE,
+                        Items.CHAINMAIL_LEGGINGS, Items.CHAINMAIL_BOOTS};
+                sharpness = 2; fireAspect = 0; knockback = 0; sweeping = 0;
+                protection = 2; thorns = 0; unbreaking = 3; quickCharge = 1; multishot = false;
+            }
+            case STRONG -> {
+                weapons = new Item[]{Items.DIAMOND_SWORD, Items.DIAMOND_AXE};
+                armorItems = new Item[]{Items.DIAMOND_HELMET, Items.DIAMOND_CHESTPLATE,
+                        Items.DIAMOND_LEGGINGS, Items.DIAMOND_BOOTS};
+                sharpness = 7; fireAspect = 2; knockback = 3; sweeping = 3;
+                protection = 6; thorns = 4; unbreaking = 5; quickCharge = 4; multishot = true;
+            }
+            case ELITE -> {
+                weapons = new Item[]{Items.NETHERITE_SWORD, Items.NETHERITE_AXE};
+                armorItems = new Item[]{Items.NETHERITE_HELMET, Items.NETHERITE_CHESTPLATE,
+                        Items.NETHERITE_LEGGINGS, Items.NETHERITE_BOOTS};
+                sharpness = 10; fireAspect = 3; knockback = 3; sweeping = 4;
+                protection = 8; thorns = 6; unbreaking = 5; quickCharge = 5; multishot = true;
+            }
+            default -> {
+                weapons = new Item[]{Items.DIAMOND_SWORD, Items.DIAMOND_AXE};
+                armorItems = new Item[]{Items.DIAMOND_HELMET, Items.DIAMOND_CHESTPLATE,
+                        Items.DIAMOND_LEGGINGS, Items.DIAMOND_BOOTS};
+                sharpness = 5; fireAspect = 2; knockback = 2; sweeping = 2;
+                protection = 4; thorns = 3; unbreaking = 3; quickCharge = 3; multishot = true;
+            }
+        }
+
         if (mob.getType() == EntityType.PILLAGER) {
             // Pillagers only have a crossbow AI goal; giving them a melee weapon
             // makes them unable to attack (they stand around "non-hostile").
             ItemStack crossbow = new ItemStack(Items.CROSSBOW);
-            crossbow.enchant(Enchantments.QUICK_CHARGE, 3);
-            crossbow.enchant(Enchantments.MULTISHOT, 1);
-            crossbow.enchant(Enchantments.UNBREAKING, 3);
+            crossbow.enchant(Enchantments.QUICK_CHARGE, quickCharge);
+            if (multishot) crossbow.enchant(Enchantments.MULTISHOT, 1);
+            crossbow.enchant(Enchantments.UNBREAKING, unbreaking);
             mob.setItemSlot(EquipmentSlot.MAINHAND, crossbow);
             mob.setDropChance(EquipmentSlot.MAINHAND, 0f);
         } else {
-            Item weaponItem = WEAPONS[RANDOM.nextInt(WEAPONS.length)];
+            Item weaponItem = weapons[RANDOM.nextInt(weapons.length)];
             ItemStack weapon = new ItemStack(weaponItem);
-            weapon.enchant(Enchantments.SHARPNESS, 5);
-            weapon.enchant(Enchantments.FIRE_ASPECT, 2);
-            weapon.enchant(Enchantments.UNBREAKING, 3);
+            weapon.enchant(Enchantments.SHARPNESS, sharpness);
+            if (fireAspect > 0) weapon.enchant(Enchantments.FIRE_ASPECT, fireAspect);
             if (weaponItem instanceof SwordItem) {
-                weapon.enchant(Enchantments.KNOCKBACK, 2);
-                weapon.enchant(Enchantments.SWEEPING_EDGE, 2);
+                if (knockback > 0) weapon.enchant(Enchantments.KNOCKBACK, knockback);
+                if (sweeping > 0) weapon.enchant(Enchantments.SWEEPING_EDGE, sweeping);
             }
+            weapon.enchant(Enchantments.UNBREAKING, unbreaking);
             mob.setItemSlot(EquipmentSlot.MAINHAND, weapon);
             mob.setDropChance(EquipmentSlot.MAINHAND, 0f);
         }
 
-        for (int i = 0; i < ARMOR_SET.length; i++) {
-            ItemStack armor = new ItemStack(ARMOR_SET[i]);
-            armor.enchant(Enchantments.ALL_DAMAGE_PROTECTION, 4);
-            armor.enchant(Enchantments.THORNS, 3);
-            armor.enchant(Enchantments.UNBREAKING, 3);
+        for (int i = 0; i < armorItems.length; i++) {
+            ItemStack armor = new ItemStack(armorItems[i]);
+            armor.enchant(Enchantments.ALL_DAMAGE_PROTECTION, protection);
+            if (thorns > 0) armor.enchant(Enchantments.THORNS, thorns);
+            armor.enchant(Enchantments.UNBREAKING, unbreaking);
             mob.setItemSlot(ARMOR_SLOTS[i], armor);
             mob.setDropChance(ARMOR_SLOTS[i], 0f);
         }
     }
 
-    private static void onDamage(LivingEntity entity, DamageSource source, float amount) {
+    /** Tier buffs: strong and elite bosses get permanent potion effects. */
+    private static void applyTierEffects(Mob mob, BossTier tier) {
+        addTierEffect(mob, MobEffects.DAMAGE_BOOST, tier.strengthAmplifier());
+        addTierEffect(mob, MobEffects.MOVEMENT_SPEED, tier.speedAmplifier());
+        addTierEffect(mob, MobEffects.DAMAGE_RESISTANCE, tier.resistanceAmplifier());
+    }
+
+    private static void addTierEffect(Mob mob, net.minecraft.world.effect.MobEffect effect, int amplifier) {
+        if (amplifier < 0) return;
+        mob.addEffect(new MobEffectInstance(effect, Integer.MAX_VALUE, amplifier, false, false, false));
+    }
+
+    /** Called from the {@code actuallyHurt} mixin with the HP the boss actually lost. */
+    public static void recordActualDamage(LivingEntity entity, DamageSource source, float amount) {
         if (!entity.getTags().contains(BOSS_TAG)) return;
-        if (!(source.getEntity() instanceof ServerPlayer attacker)) return;
-        // Skip hits vanilla will reject: hurt cooldown (spam-click) or already dead.
-        if (entity.invulnerableTime > 10 && !source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_COOLDOWN)) return;
-        if (entity.isDeadOrDying()) return;
+        if (!(BossProtection.attacker(source) instanceof ServerPlayer attacker)) return;
+        if (!(amount > 0) || !Float.isFinite(amount)) return;
         BossInstance instance = bosses.get(entity.getUUID());
         if (instance == null) instance = adopt(entity);
         instance.damage.merge(attacker.getUUID(), (double) amount, Double::sum);
@@ -452,16 +501,19 @@ public final class BossEvent {
         payout(server, name, instance);
     }
 
-    /** Removes the "【緊急ボス】" prefix so chat messages do not nest it twice. */
+    /** Removes the "【緊急ボス…】" prefix so chat messages do not nest it twice. */
     private static String stripBossPrefix(String name) {
-        return name.startsWith(BOSS_NAME_PREFIX) ? name.substring(BOSS_NAME_PREFIX.length()) : name;
+        if (!name.startsWith("【緊急ボス")) return name;
+        int end = name.indexOf('】');
+        return end >= 0 && end + 1 < name.length() ? name.substring(end + 1) : name;
     }
 
     private static void payout(MinecraftServer server, String name, BossInstance instance) {
         Map<UUID, Double> hits = instance == null ? new HashMap<>() : new HashMap<>(instance.damage);
         double total = 0;
         for (double value : hits.values()) total += value;
-        long reward = Math.max(0, ConfigManager.config().bossEventReward);
+        double multiplier = instance == null ? 1.0 : instance.tier.rewardMultiplier();
+        long reward = Math.max(0, Math.round(ConfigManager.config().bossEventReward * multiplier));
 
         if (hits.isEmpty() || total <= 0 || reward == 0) {
             GuildService.broadcast(server, "緊急ボス【" + name
@@ -506,13 +558,21 @@ public final class BossEvent {
     }
 
     private static BossInstance adopt(LivingEntity entity) {
+        String display = entity.getCustomName() != null
+                ? entity.getCustomName().getString()
+                : entity.getDisplayName().getString();
+        return adopt(entity, BossTier.fromDisplayName(display));
+    }
+
+    private static BossInstance adopt(LivingEntity entity, BossTier tier) {
         BossInstance existing = bosses.get(entity.getUUID());
         if (existing != null) return existing;
 
         String name = entity.getCustomName() != null
                 ? entity.getCustomName().getString()
                 : entity.getDisplayName().getString();
-        BossInstance instance = new BossInstance(entity, name, stripBossPrefix(name));
+        BossInstance instance = new BossInstance(entity, name, tier,
+                tier.label() + " " + stripBossPrefix(name));
         bosses.put(entity.getUUID(), instance);
 
         // Ensure adopted bosses also resist knockback (anti-cheese).
@@ -649,12 +709,13 @@ public final class BossEvent {
         instance.resetStuckTracking();
     }
 
-    /** Per-boss state: bar, damage ledger and rescue tracking. */
+    /** Per-boss state: tier, bar, damage ledger and rescue tracking. */
     private static final class BossInstance {
         final LivingEntity entity;
+        final BossTier tier;
         /** Full custom name shown on the boss bar (includes the prefix). */
         final String name;
-        /** Mob name without the prefix, used in chat messages. */
+        /** Tier label and mob name, used in chat messages. */
         final String shortName;
         final ServerBossEvent bar;
         final Map<UUID, Double> damage = new HashMap<>();
@@ -665,12 +726,13 @@ public final class BossEvent {
         double lastStuckZ;
         int stuckTicks;
 
-        BossInstance(LivingEntity entity, String name, String shortName) {
+        BossInstance(LivingEntity entity, String name, BossTier tier, String shortName) {
             this.entity = entity;
+            this.tier = tier;
             this.name = name;
             this.shortName = shortName;
             this.bar = new ServerBossEvent(Component.literal(name).withStyle(ChatFormatting.RED),
-                    BossBarColor.RED, BossBarOverlay.PROGRESS);
+                    tier.barColor(), BossBarOverlay.PROGRESS);
             resetStuckTracking();
         }
 

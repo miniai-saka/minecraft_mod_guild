@@ -195,7 +195,7 @@ public final class FxMinecraftScreen extends Screen {
     private void drawModal(GuiGraphics g) {
         text(g, (modal.equals("TRANSFER") ? "入出金 / 債務の返済" : "送信内容の確認") + (data.config.marginCallEnabled ? " / 追証あり" : " / 追証なし"), x + 16, y + 59, 0x333333);
         if (modal.equals("TRANSFER")) {
-            text(g, "出金可能 " + number(Math.floor(Math.max(0, Math.min(data.account.balance, data.freeMargin)))) + " GC", x + 16, y + 83, 0x404040);
+            text(g, "出金可能 " + number(Math.floor(data.withdrawable)) + " GC", x + 16, y + 83, 0x404040);
             text(g, "債務残高 " + data.guildDebt + " GC", x + 16, y + 97, data.delinquent ? 0x9B2828 : 0x444444);
             text(g, "金額 (GC)", x + 16, y + 119, 0x333333);
             if (h > 285) text(g, riskLabel(), x + 16, y + 236, data.config.marginCallEnabled ? 0x9B2828 : 0x3B5636);

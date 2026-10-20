@@ -82,7 +82,11 @@ public class FxEngineTest {
     @Test public void withdrawalCannotRemoveMarginOrUnrealizedProfit() {
         e.submit(a, order(OrderType.MARKET, Side.BUY, 900, 10, 0));
         reject(() -> e.withdraw(a, 1001)); assertEquals(10000, a.balance, 0);
-        e.setPrice("AUR", 101); e.withdraw(a, 1900); assertEquals(8100, a.balance, 0); assertEquals(0, e.free(a), 1e-6);
+        e.setPrice("AUR", 101);
+        // The 900 unrealised gain raises free margin, but it is not withdrawable cash.
+        reject(() -> e.withdraw(a, 1001));
+        assertEquals(1000, e.withdrawable(a), 1e-8);
+        e.withdraw(a, 1000); assertEquals(9000, a.balance, 1e-8); assertEquals(900, e.free(a), 1e-6);
     }
     @Test public void unrealizedLossRestrictsWithdrawal() {
         e.submit(a, order(OrderType.MARKET, Side.BUY, 100, 10, 0)); e.setPrice("AUR", 95);
@@ -178,6 +182,13 @@ public class FxEngineTest {
         e.submit(a, order(OrderType.MARKET, Side.BUY, 1, 1, 0)); c.symbols.remove(0); e.configure(c);
         reject(() -> e.submit(a, order(OrderType.MARKET, Side.BUY, 1, 1, 0)));
         e.setPrice("AUR", 110); e.closeAll(a); assertEquals(10010, a.balance, 0);
+    }
+    @Test public void disabledExchangeCancelsPendingOrdersInsteadOfFilling() {
+        e.submit(a, order(OrderType.LIMIT, Side.BUY, 1, 1, 95));
+        c.enabled = false; e.configure(c);
+        e.setPrice("AUR", 90);
+        assertTrue(a.positions.isEmpty());
+        assertTrue(a.orders.isEmpty());
     }
     private static void reject(Runnable r) { try { r.run(); fail("Expected rejection"); } catch (IllegalArgumentException expected) { } }
 }
