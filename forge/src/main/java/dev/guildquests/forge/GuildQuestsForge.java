@@ -2,6 +2,7 @@ package dev.guildquests.forge;
 
 import dev.guildquests.GuildQuestsMod;
 import dev.guildquests.block.ModBlocks;
+import dev.guildquests.effect.ModEffects;
 import dev.guildquests.item.ModItems;
 import dev.guildquests.platform.ContentRegistrar;
 import dev.guildquests.platform.Platform;
@@ -9,6 +10,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
@@ -56,6 +58,8 @@ public final class GuildQuestsForge {
             ModBlocks.registerBlockItems(registrar);
         } else if (Registries.BLOCK_ENTITY_TYPE.equals(key)) {
             ModBlocks.registerBlockEntityTypes(registrar);
+        } else if (Registries.MOB_EFFECT.equals(key)) {
+            ModEffects.registerEffects(registrar);
         } else if (Registries.CREATIVE_MODE_TAB.equals(key)) {
             ModItems.registerCreativeTab(registrar);
         }
@@ -76,6 +80,11 @@ public final class GuildQuestsForge {
         @Override
         public void registerBlockEntityType(ResourceLocation id, BlockEntityType<?> type) {
             event.register(Registries.BLOCK_ENTITY_TYPE, id, () -> type);
+        }
+
+        @Override
+        public void registerMobEffect(ResourceLocation id, MobEffect effect) {
+            event.register(Registries.MOB_EFFECT, id, () -> effect);
         }
 
         @Override

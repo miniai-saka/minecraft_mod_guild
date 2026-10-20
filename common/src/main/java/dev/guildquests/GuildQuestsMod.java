@@ -6,6 +6,7 @@ import dev.guildquests.block.ModBlocks;
 import dev.guildquests.config.ConfigManager;
 import dev.guildquests.data.GuildPersistentState;
 import dev.guildquests.data.PlayerGuildData;
+import dev.guildquests.effect.ModEffects;
 import dev.guildquests.gui.BankScreenHandler;
 import dev.guildquests.gui.GuildScreenHandler;
 import dev.guildquests.item.ModItems;
@@ -22,9 +23,11 @@ import net.minecraft.ChatFormatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 public final class GuildQuestsMod {
     public static final String MOD_ID = "guildquests";
-    public static final String VERSION = "26.13.0";
+    public static final String VERSION = "26.14.0";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static int exploreTicker = 0;
     private static int riboTicker = 0;
@@ -46,6 +49,7 @@ public final class GuildQuestsMod {
         ModBlocks.registerBlockEntityTypes(registrar);
         ModItems.registerItems(registrar);
         ModItems.registerCreativeTab(registrar);
+        ModEffects.registerEffects(registrar);
     }
 
     public static void init() {
@@ -152,6 +156,13 @@ public final class GuildQuestsMod {
                     }));
 
             guildAdmin.then(Commands.literal("boss")
+                    .then(Commands.literal("info").executes(context -> {
+                        List<String> lines = BossEvent.describeBosses();
+                        context.getSource().sendSuccess(() -> Component.literal(lines.isEmpty()
+                                ? "緊急ボスはいません。"
+                                : "緊急ボス " + lines.size() + "体: " + String.join(" / ", lines)), false);
+                        return lines.size();
+                    }))
                     .executes(context -> spawnBosses(context.getSource(), 1))
                     .then(Commands.argument("count", IntegerArgumentType.integer(1, BossEvent.MAX_ACTIVE))
                             .executes(context -> spawnBosses(context.getSource(),

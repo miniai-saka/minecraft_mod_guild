@@ -85,6 +85,8 @@ public final class ConfigManager {
         c.bossEventChancePercent = Math.max(0, Math.min(100, c.bossEventChancePercent));
         c.bossEventReward = Math.max(0, c.bossEventReward);
         c.bossEventHealth = Math.max(1, Math.min(100000, c.bossEventHealth));
+        c.bossProtectionSeconds = Math.max(0, Math.min(3600, c.bossProtectionSeconds));
+        c.bossProtectionReleaseRange = Math.max(8, Math.min(128, c.bossProtectionReleaseRange));
         c.bankFeePercent = Math.max(0, Math.min(100, c.bankFeePercent));
         c.riboInstallment = Math.max(1, c.riboInstallment);
         c.riboInterestPercent = Math.max(0, Math.min(100, c.riboInterestPercent));

@@ -4,6 +4,7 @@ import dev.guildquests.platform.ContentRegistrar;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
@@ -29,6 +30,11 @@ final class FabricContentRegistrar implements ContentRegistrar {
     @Override
     public void registerBlockEntityType(ResourceLocation id, BlockEntityType<?> type) {
         Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id, type);
+    }
+
+    @Override
+    public void registerMobEffect(ResourceLocation id, MobEffect effect) {
+        Registry.register(BuiltInRegistries.MOB_EFFECT, id, effect);
     }
 
     @Override

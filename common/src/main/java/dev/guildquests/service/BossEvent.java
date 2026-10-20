@@ -97,15 +97,34 @@ public final class BossEvent {
     public static void init() {
         Platform.onServerTick(BossEvent::tick);
         Platform.onServerStarted(BossEvent::adoptPersisted);
+        Platform.onServerStopped(server -> BossProtection.reset());
         Platform.onAllowDamage((entity, source, amount) -> {
-            // Environmental kill cheese (lava, void, fall, etc.) is ignored for the boss.
-            if (entity.getTags().contains(BOSS_TAG) && isEnvironmental(source)) {
+            // A protected player (the guildquests:boss_protection effect) is untouchable for bosses.
+            if (entity instanceof ServerPlayer player && BossProtection.isProtected(player)
+                    && BossProtection.isBossDamage(source)) {
                 return false;
             }
-            onDamage(entity, source, amount);
+            if (entity.getTags().contains(BOSS_TAG)) {
+                // Attacking a boss is consent: drop the protection before the hit lands.
+                if (BossProtection.attacker(source) instanceof ServerPlayer player) {
+                    BossProtection.revoke(player);
+                }
+                // Environmental kill cheese (lava, void, fall, etc.) is ignored for the boss.
+                if (isEnvironmental(source)) {
+                    return false;
+                }
+                onDamage(entity, source, amount);
+                return true;
+            }
+            if (entity instanceof ServerPlayer player && BossProtection.isBossDamage(source)) {
+                BossProtection.noteBossHit(player);
+            }
             return true;
         });
-        Platform.onEntityDeath(BossEvent::onDeath);
+        Platform.onEntityDeath((entity, source) -> {
+            BossProtection.onPlayerDeath(entity, source);
+            onDeath(entity, source);
+        });
     }
 
     private static boolean isEnvironmental(DamageSource source) {
@@ -130,6 +149,7 @@ public final class BossEvent {
     }
 
     private static void tick(MinecraftServer server) {
+        BossProtection.tick(server);
         ModConfig config = ConfigManager.config();
         if (!config.bossEventEnabled) {
             ticker = 0;
@@ -149,6 +169,7 @@ public final class BossEvent {
 
         // Rescue bosses that end up in lava, the void, walled in, or stuck.
         for (BossInstance instance : new ArrayList<>(bosses.values())) {
+            releaseProtectedTarget(instance);
             rescue(instance);
         }
 
@@ -277,6 +298,7 @@ public final class BossEvent {
         double bestDist = Double.MAX_VALUE;
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (p.isRemoved() || !p.isAlive()) continue;
+            if (BossProtection.isProtected(p)) continue;
             if (p.level() != from.level()) continue;
             double d = p.distanceToSqr(from);
             if (d < bestDist) {
@@ -285,6 +307,45 @@ public final class BossEvent {
             }
         }
         return best;
+    }
+
+    /** Clears an existing target when the player becomes protected. */
+    private static void releaseProtectedTarget(BossInstance instance) {
+        if (instance.entity instanceof Mob mob
+                && mob.getTarget() instanceof ServerPlayer player
+                && BossProtection.isProtected(player)) {
+            mob.setTarget(null);
+            mob.getNavigation().stop();
+        }
+    }
+
+    /** True for an emergency-boss entity. */
+    public static boolean isBoss(Entity entity) {
+        return entity != null && entity.getTags().contains(BOSS_TAG);
+    }
+
+    /** True when a living, tracked boss is within {@code range} blocks of the player. */
+    static boolean hasBossWithin(ServerPlayer player, double range) {
+        double limit = range * range;
+        for (BossInstance instance : bosses.values()) {
+            LivingEntity boss = instance.entity;
+            if (boss.isRemoved() || boss.level() != player.level()) continue;
+            if (boss.distanceToSqr(player) <= limit) return true;
+        }
+        return false;
+    }
+
+    /** One line per living boss: name, health and current AI target. */
+    public static List<String> describeBosses() {
+        List<String> lines = new ArrayList<>();
+        for (BossInstance instance : bosses.values()) {
+            LivingEntity boss = instance.entity;
+            String target = boss instanceof Mob mob && mob.getTarget() != null
+                    ? mob.getTarget().getName().getString() : "none";
+            lines.add(instance.shortName + " " + Math.round(boss.getHealth()) + "/"
+                    + Math.round(boss.getMaxHealth()) + " target=" + target);
+        }
+        return lines;
     }
 
     /** Sends the boss pin packet to one player. lifetimeTicks 0 clears the pin. */
@@ -573,8 +634,10 @@ public final class BossEvent {
         int tx;
         int tz;
         if (target != null) {
-            tx = Mth.floor(target.getX());
-            tz = Mth.floor(target.getZ());
+            // Never drop the boss on top of the player: land ~12 blocks away on a random side.
+            double angle = RANDOM.nextDouble() * Math.PI * 2.0;
+            tx = Mth.floor(target.getX() + Math.cos(angle) * 12);
+            tz = Mth.floor(target.getZ() + Math.sin(angle) * 12);
         } else {
             tx = Mth.floor(boss.getX());
             tz = Mth.floor(boss.getZ());

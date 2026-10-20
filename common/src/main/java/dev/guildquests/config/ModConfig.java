@@ -34,6 +34,12 @@ public final class ModConfig {
     /** Max health of the emergency boss. */
     public double bossEventHealth = 300;
 
+    /** Seconds of boss protection granted after dying during a boss fight (0 disables). */
+    public int bossProtectionSeconds = 300;
+
+    /** Blocks; the protection effect is removed after leaving every boss by this distance. */
+    public int bossProtectionReleaseRange = 48;
+
     /** Allow paying Create shops (table cloth price tags set to guild coins) from the virtual balance. */
     public boolean createIntegrationEnabled = true;
 

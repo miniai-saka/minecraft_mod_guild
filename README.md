@@ -2,7 +2,7 @@
 
 Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨、銀行、ギャンブルを単体で実装した Mod です。FTB Quests や Q Shop などへの依存はありません。
 
-現在のバージョン: **26.12.1**
+現在のバージョン: **26.14.0**
 
 ## 主な機能
 
@@ -63,6 +63,10 @@ Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨�
 - 環境ダメージによる撃破は無効
 - クライアント側にボス位置ピンを表示する
 - 管理コマンド `/guildadmin boss [count]` で同時に複数体（最大32体）を出現できる。各ボスは個別のボスバー・ダメージ集計・報酬分配を持つ
+- ボスに倒されると、復活後に **`guildquests:boss_protection`（緊急ボス保護）** が付与される
+  - 効果中はボスがそのプレイヤーをターゲットせず、ダメージも通らない
+  - ボスを攻撃するか、全ボスから `bossProtectionReleaseRange` ブロック以上離れると解除
+  - 効果時間は `bossProtectionSeconds`（既定5分）
 
 ### 管理者向け
 
@@ -95,14 +99,14 @@ Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨�
 生成物:
 
 ```text
-fabric/build/libs/guildquests_fabric-1.20.1_26.12.1.jar
-forge/build/libs/guildquests_forge-1.20.1_26.12.1.jar
+fabric/build/libs/guildquests_fabric-1.20.1_26.14.0.jar
+forge/build/libs/guildquests_forge-1.20.1_26.14.0.jar
 ```
 
 ## 導入
 
 1. Fabric または Forge で Minecraft 1.20.1 を用意します。
-2. ローダーに合う 26.12.1 の JAR を `mods/` へ配置します。Fabric では Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
+2. ローダーに合う 26.14.0 の JAR を `mods/` へ配置します。Fabric では Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定を変更したら、サーバーを再起動するか `/guildadmin reload` を実行します。
 
@@ -120,6 +124,7 @@ forge/build/libs/guildquests_forge-1.20.1_26.12.1.jar
 | `/guildadmin` | 借入・滞納などの管理チェスト UI を開く（OP Lv2） |
 | `/guildadmin reload` | JSON 設定を再読込する（OP Lv2） |
 | `/guildadmin boss [count]` | 緊急ボスを即時に出現させる（count省略時は1体、最大32体、OP Lv2） |
+| `/guildadmin boss info` | 生存中の緊急ボスの体力と現在のターゲットを表示する（OP Lv2） |
 | `/guildadmin coins set\|add <player> <amount>` | コインを設定・加算する（OP Lv2） |
 | `/guildadmin loan add\|set <player> <amount>` | 借入を加算・指定額に設定する（OP Lv2） |
 | `/guildadmin loan clear <player>` | 借入を帳消しにする（OP Lv2） |
@@ -166,6 +171,8 @@ config/guildquests/server-update.json  # Fabric / Forge 専用サーバー
 - `bossEventChancePercent`: ボス出現の確率（%）
 - `bossEventReward`: ボス撃破の報酬（コイン）
 - `bossEventHealth`: ボスの体力
+- `bossProtectionSeconds`: 死亡時に付与する緊急ボス保護の秒数（既定300、0で無効）
+- `bossProtectionReleaseRange`: ボスからこの距離以上離れると保護を解除（既定48ブロック）
 - `bankFeePercent`: 銀行の手数料（%）
 - `riboInstallment`: リボの1回あたりの徴収額
 - `riboInterestPercent`: リボの周期利息（%）
