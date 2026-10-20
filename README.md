@@ -2,7 +2,7 @@
 
 Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨、銀行、ギャンブルを単体で実装した Mod です。FTB Quests や Q Shop などへの依存はありません。
 
-現在のバージョン: **26.15.0**
+現在のバージョン: **26.15.1**
 
 ## 主な機能
 
@@ -106,14 +106,14 @@ Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨�
 生成物:
 
 ```text
-fabric/build/libs/guildquests_fabric-1.20.1_26.15.0.jar
-forge/build/libs/guildquests_forge-1.20.1_26.15.0.jar
+fabric/build/libs/guildquests_fabric-1.20.1_26.15.1.jar
+forge/build/libs/guildquests_forge-1.20.1_26.15.1.jar
 ```
 
 ## 導入
 
 1. Fabric または Forge で Minecraft 1.20.1 を用意します。
-2. ローダーに合う 26.15.0 の JAR を `mods/` へ配置します。Fabric では Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
+2. ローダーに合う 26.15.1 の JAR を `mods/` へ配置します。Fabric では Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定を変更したら、サーバーを再起動するか `/guildadmin reload` を実行します。
 

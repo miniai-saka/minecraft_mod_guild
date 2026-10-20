@@ -4,7 +4,6 @@
   "version": "${version}",
   "name": "Guild Quests & Economy",
   "description": "Standalone guild quests, electronic coins, rank progression and guild shop for Fabric 1.20.1.",
-  "authors": ["OpenAI"],
   "license": "MIT",
   "environment": "*",
   "entrypoints": {
