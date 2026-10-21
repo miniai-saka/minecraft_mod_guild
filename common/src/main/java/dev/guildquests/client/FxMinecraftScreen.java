@@ -46,7 +46,7 @@ public final class FxMinecraftScreen extends Screen {
         String quantity = units == null ? "1" : units.getValue(), multiple = leverage == null ? "10" : leverage.getValue();
         String entryPrice = price == null ? defaultPrice() : price.getValue(), transfer = amount == null ? "100" : amount.getValue();
         clearWidgets();
-        w = Math.min(432, width - 12); h = Math.min(314, height - 12); x = (width - w) / 2; y = (height - h) / 2;
+        w = Math.min(432, width - 12); h = Math.min(314, Math.max(236, height - 12)); x = (width - w) / 2; y = Math.max(0, (height - h) / 2);
         if (!modal.isEmpty()) { initModal(transfer); return; }
         String[] tabs = {"取引", "建玉", "注文", "履歴"};
         int tabWidth = (w - 100) / 4;
@@ -173,23 +173,24 @@ public final class FxMinecraftScreen extends Screen {
     private void drawRows(GuiGraphics g) {
         int count = count();
         if (count == 0) text(g, "まだデータがありません。", x + 12, y + 100, 0x555555);
+        int textRight = x + w - (tab == 1 || tab == 2 ? 67 : 8);
         for (int row = 0; row < rows() && page * rows() + row < count; row++) {
             int index = page * rows() + row, rowY = y + 77 + row * 31;
             g.fill(x + 7, rowY - 2, x + w - 7, rowY + 27, 0xFFB5B5B5);
             if (tab == 1) {
                 Position p = data.account.positions.get(index);
-                text(g, p.symbol + " " + (p.side == Side.BUY ? "買い" : "売り") + "  " + number(p.units) + " / " + p.leverage + "倍", x + 11, rowY + 1, 0x333333);
+                text(g, p.symbol + " " + (p.side == Side.BUY ? "買い" : "売り") + "  " + number(p.units) + " / " + p.leverage + "倍", x + 11, rowY + 1, textRight, 0x333333);
                 Quote q = data.quotes.stream().filter(item -> item.symbol.equals(p.symbol)).findFirst().orElse(quote());
                 double pnl = ((p.side == Side.BUY ? q.bid : q.ask) - p.entryPrice) * p.units * p.side.sign();
-                text(g, "約定 " + number(p.entryPrice) + " / 損益 " + number(pnl) + " GC", x + 11, rowY + 14, pnl < 0 ? 0x9B2828 : 0x24552E);
+                text(g, "約定 " + number(p.entryPrice) + " / 損益 " + number(pnl) + " GC", x + 11, rowY + 14, textRight, pnl < 0 ? 0x9B2828 : 0x24552E);
             } else if (tab == 2) {
                 Order o = data.account.orders.get(index);
-                text(g, "#" + o.id + " " + o.symbol + " " + label(o.type) + " " + o.side, x + 11, rowY + 1, 0x333333);
-                text(g, number(o.units) + " / " + o.leverage + "倍 @ " + number(o.price), x + 11, rowY + 14, 0x444444);
+                text(g, "#" + o.id + " " + o.symbol + " " + label(o.type) + " " + o.side, x + 11, rowY + 1, textRight, 0x333333);
+                text(g, number(o.units) + " / " + o.leverage + "倍 @ " + number(o.price), x + 11, rowY + 14, textRight, 0x444444);
             } else {
                 History event = data.account.history.get(count - 1 - index);
-                text(g, event.symbol + "  " + event.action + "  #" + event.id, x + 11, rowY + 1, 0x333333);
-                text(g, font.plainSubstrByWidth(event.detail + "  " + number(event.pnl) + " GC", w - 28), x + 11, rowY + 14, 0x444444);
+                text(g, event.symbol + "  " + event.action + "  #" + event.id, x + 11, rowY + 1, textRight, 0x333333);
+                text(g, event.detail + "  " + number(event.pnl) + " GC", x + 11, rowY + 14, textRight, 0x444444);
             }
         }
     }
@@ -208,7 +209,14 @@ public final class FxMinecraftScreen extends Screen {
             text(g, riskLabel(), x + 16, y + 161, data.config.marginCallEnabled ? 0x9B2828 : 0x3B5636);
         }
     }
-    private void text(GuiGraphics g, String text, int px, int py, int color) { g.drawString(font, font.plainSubstrByWidth(text, Math.max(0, x + w - 8 - px)), px, py, color, false); }
+    private void text(GuiGraphics g, String text, int px, int py, int color) { text(g, text, px, py, x + w - 8, color); }
+    /** Draws one line inside the panel, cut at {@code right} with a visible ellipsis when it does not fit. */
+    private void text(GuiGraphics g, String text, int px, int py, int right, int color) {
+        int width = Math.max(0, right - px);
+        String shown = font.plainSubstrByWidth(text, width);
+        if (!shown.equals(text)) shown = font.plainSubstrByWidth(text, Math.max(0, width - font.width("…"))) + "…";
+        g.drawString(font, shown, px, py, color, false);
+    }
     private Request request(String op) { Request r = new Request(); r.op = op; r.symbol = data.selected; return r; }
     private void send(Request r) {
         if (System.currentTimeMillis() - receivedAt > Math.max(5000, data.config.snapshotIntervalTicks * 150L)) { localError("相場更新を待ってください。"); return; }

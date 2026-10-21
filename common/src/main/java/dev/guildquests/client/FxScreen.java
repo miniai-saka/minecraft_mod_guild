@@ -130,15 +130,16 @@ public final class FxScreen extends Screen {
     private void header(GuiGraphics d) {
         box(d, 18, 16, 34, 34, BLUE);
         text(d, "G", 30, 28, WHITE);
-        large(d, "GUILD", 62, 18, 1.6f, INK); large(d, "FX", 130, 18, 1.6f, BLUE);
+        large(d, "GUILD", 62, 18, 1.6f, INK);
+        large(d, "FX", 62 + Math.round(measure("GUILD") * 1.6f) + 7, 18, 1.6f, BLUE);
         text(d, "ギルドコインで、架空通貨の市場へ。", 62, 41, MUTED);
-        box(d, 316, 23, 114, 21, 0xFFE4F6F0); text(d, "VIRTUAL MARKET", 324, 30, GREEN);
+        box(d, 316, 18, 80, 21, 0xFFE4F6F0); text(d, "仮想市場", 324, 25, GREEN);
         button(d, 450, 20, 92, 30, "UI設定", false, BLUE, FxClient::settings, "Minecraft簡易UIと白背景の詳細UIを切り替えます。");
         text(d, data.delinquent ? "債務滞納中 / 新規取引停止" : data.config.marginCallEnabled ? "追証あり" : "追証なし", 560, 30, data.delinquent || data.config.marginCallEnabled ? RED : GREEN);
         dot(d, 770, 31, stale() ? RED : GREEN);
         text(d, stale() ? "接続を確認中" : "LIVE  " + clock(data.time), 782, 27, stale() ? RED : MUTED);
         button(d, 906, 20, 112, 30, "入金 / 出金", false, BLUE, () -> showTransfer(), "ギルドコインの移動・債務の返済。追証の有無はサーバー設定に従います。");
-        button(d, 1030, 20, 48, 30, "閉じる", false, MUTED, this::onClose, "Escでも閉じられます。注文と建玉はサーバーで継続します。");
+        button(d, 1024, 20, 54, 30, "閉じる", false, MUTED, this::onClose, "Escでも閉じられます。注文と建玉はサーバーで継続します。");
     }
 
     private void metrics(GuiGraphics d) {
@@ -148,12 +149,12 @@ public final class FxScreen extends Screen {
         metric(d, 446, "余剰証拠金", money(Math.max(0, data.freeMargin)), "GC", INK);
         metric(d, 655, "評価損益", signed(data.unrealized), "GC", tone(data.unrealized));
         text(d, "証拠金維持率", 864, 82, MUTED);
-        large(d, data.usedMargin == 0 ? "—" : money(data.equity / data.usedMargin * 100) + "%", 864, 98, 1.5f,
+        large(d, data.usedMargin == 0 ? "—" : fit(money(data.equity / data.usedMargin * 100) + "%", 140), 864, 98, 1.5f,
                 data.usedMargin > 0 && data.equity / data.usedMargin < 1 ? RED : INK);
         for (int x : new int[]{219, 427, 635, 844}) d.fill(x, 81, x + 1, 124, LINE);
     }
     private void metric(GuiGraphics d, int x, String label, String value, String unit, int color) {
-        text(d, label, x, 82, MUTED); large(d, fit(value, 116), x, 99, 1.55f, color);
+        text(d, label, x, 82, MUTED); large(d, fit(value, 96), x, 99, 1.55f, color);
         text(d, unit, x + 158, 111, MUTED);
     }
 
@@ -170,8 +171,9 @@ public final class FxScreen extends Screen {
             dot(d, 37, y + 7, 0xFF000000 | q.color);
             text(d, q.symbol + "/GC", 48, y + 2, active ? BLUE : INK);
             text(d, fit(q.name + " / " + (q.style == null ? "バランス" : q.style), 112), 35, y + 19, MUTED);
-            text(d, number(q.price), 35, y + 35, INK);
-            right(d, String.format(Locale.ROOT, "%+.2f%%", q.change), 159, y + 35, tone(q.change));
+            String change = String.format(Locale.ROOT, "%+.2f%%", q.change);
+            right(d, change, 159, y + 35, tone(q.change));
+            text(d, fit(number(q.price), Math.max(40, 158 - measure(change) - 35)), 35, y + 35, INK);
             hits.add(new Hit(26, y - 4, 142, 59, () -> select(q.symbol), "騰落率は保存チャートの先頭価格との比較です。"));
         }
         text(d, "独自生成相場", 29, 416, MUTED);
@@ -195,7 +197,7 @@ public final class FxScreen extends Screen {
         Quote q = quote();
         text(d, q.symbol + " / GC", 204, 165, INK);
         large(d, number(q.price), 204, 183, 1.65f, INK);
-        text(d, "高値 " + number(q.high) + "   安値 " + number(q.low), 335, 188, MUTED);
+        text(d, "高値 " + number(q.high) + "   安値 " + number(q.low), 335, 201, MUTED);
         String[] frames = {data.config.candleSeconds + "秒", "30秒", "1分", "5分"};
         for (int i = 0; i < 4; i++) {
             final int selected = i;
@@ -212,7 +214,7 @@ public final class FxScreen extends Screen {
         double range = hi - lo;
         for (int i = 0; i <= 4; i++) {
             int gy = y + i * ch / 4; d.fill(x, gy, x + cw, gy + 1, LINE);
-            text(d, number(hi - range * i / 4), x + cw + 8, gy - 3, MUTED);
+            text(d, fit(number(hi - range * i / 4), 60), x + cw + 8, gy - 3, MUTED);
         }
         int slots = Math.max(visible.size(), Math.min(candleCount, 40));
         double step = cw / (double) slots;
@@ -230,7 +232,7 @@ public final class FxScreen extends Screen {
         }
         int currentY = py(q.price, hi, range, y, ch);
         dashed(d, x, currentY, cw, BLUE);
-        box(d, 717, currentY - 6, 63, 13, BLUE); text(d, number(q.price), 720, currentY - 3, WHITE);
+        box(d, 717, currentY - 6, 63, 13, BLUE); text(d, fit(number(q.price), 55), 720, currentY - 3, WHITE);
         for (Position p : data.account.positions) if (p.symbol.equals(data.selected)) {
             if (p.entryPrice >= lo && p.entryPrice <= hi) {
                 int gy = py(p.entryPrice, hi, range, y, ch); dashed(d, x, gy, cw, tone(p.side.sign()));
@@ -244,8 +246,10 @@ public final class FxScreen extends Screen {
             Candle c = visible.get(index); int cx = x + (int) ((index + offset + .5) * step);
             dashedVertical(d, cx, y, 180, 0xFFBCC2D1);
             int hy = Math.max(y, Math.min(y + ch, (int) my)); dashed(d, x, hy, cw, 0xFFBCC2D1);
-            box(d, x + 2, y + 2, 368, 16, 0xF2FFFFFF);
-            text(d, clock(c.time) + "  O " + number(c.open) + "  H " + number(c.high) + "  L " + number(c.low) + "  C " + number(c.close), x + 7, y + 6, INK);
+            String info = clock(c.time) + "  O " + number(c.open) + "  H " + number(c.high) + "  L " + number(c.low) + "  C " + number(c.close);
+            int infoWidth = Math.min(cw - 4, measure(info) + 10);
+            box(d, x + 2, y + 2, infoWidth, 16, 0xF2FFFFFF);
+            text(d, fit(info, infoWidth - 10), x + 7, y + 6, INK);
         }
         if (visible.isEmpty()) text(d, "最初の価格を生成しています…", 348, 288, MUTED);
         else {
@@ -267,8 +271,9 @@ public final class FxScreen extends Screen {
 
     private void orderPanel(GuiGraphics d, float delta) {
         panel(d, 800, 150, 278, 496);
-        text(d, editingId == 0 ? "新規注文" : "決済OCOの編集  #" + editingId, 818, 165, INK);
-        right(d, "最大 " + maxLeverage() + "x", 1060, 165, BLUE);
+        String maxText = "最大 " + maxLeverage() + "x";
+        text(d, fit(editingId == 0 ? "新規注文" : "決済OCOの編集  #" + editingId, 1060 - measure(maxText) - 8 - 818), 818, 165, INK);
+        right(d, maxText, 1060, 165, BLUE);
         button(d, 818, 190, 120, 30, "買い / BUY", side == Side.BUY, GREEN, () -> changeSide(Side.BUY), "ASKで買い、BIDで決済します。");
         button(d, 946, 190, 116, 30, "売り / SELL", side == Side.SELL, RED, () -> changeSide(Side.SELL), "BIDで売り、ASKで決済します。");
         for (int i = 0; i < MODES.length; i++) {
@@ -282,7 +287,7 @@ public final class FxScreen extends Screen {
                 button(d, 859 + i * 67, 285, 61, 21, new String[]{"成行", "指値", "逆指値"}[i], entry.ordinal() == i, BLUE,
                         () -> { entry = Entry.values()[which]; defaults(); }, "新規注文の約定方法");
             }
-        } else text(d, mode == OrderType.OCO ? "指値 + 逆指値 / 片方の約定で他方取消" : "価格は 1 " + data.selected + " あたりの GC", 820, 291, MUTED);
+        } else small(d, mode == OrderType.OCO ? "指値 + 逆指値 / 片方の約定で他方取消" : "価格は 1 " + data.selected + " あたりの GC", 820, 291, 244, MUTED);
         input(d, units, "数量 (" + data.selected + ")", editingId == 0, delta);
         input(d, leverage, "レバレッジ (1〜" + maxLeverage() + ")", editingId == 0, delta);
         boolean pendingEntry = editingId == 0 && mode != OrderType.MARKET && !((mode == OrderType.IFD || mode == OrderType.IFO) && entry == Entry.MARKET);
@@ -297,22 +302,28 @@ public final class FxScreen extends Screen {
         if (mode == OrderType.OCO) ref = Math.max(ref, numberOrZero(second));
         double notional = size * ref;
         d.fill(818, 489, 1062, 490, LINE);
-        text(d, "必要証拠金（概算）", 820, 501, MUTED); right(d, money(lev > 0 ? notional / lev : 0) + " GC", 1062, 501, INK);
-        text(d, "新規手数料（概算）", 820, 518, MUTED); right(d, number(notional * (quote().commissionBps > 0 ? quote().commissionBps : data.config.commissionBps) / 10000) + " GC", 1062, 518, INK);
-        text(d, "ASK " + number(quote().ask), 820, 536, GREEN); right(d, "BID " + number(quote().bid), 1062, 536, RED);
+        String marginValue = money(lev > 0 ? notional / lev : 0) + " GC";
+        right(d, marginValue, 1062, 501, INK);
+        text(d, fit("必要証拠金（概算）", 1062 - measure(marginValue) - 8 - 820), 820, 501, MUTED);
+        String feeValue = number(notional * (quote().commissionBps > 0 ? quote().commissionBps : data.config.commissionBps) / 10000) + " GC";
+        right(d, feeValue, 1062, 518, INK);
+        text(d, fit("新規手数料（概算）", 1062 - measure(feeValue) - 8 - 820), 820, 518, MUTED);
+        String bidValue = "BID " + number(quote().bid);
+        right(d, bidValue, 1062, 536, RED);
+        text(d, fit("ASK " + number(quote().ask), 1062 - measure(bidValue) - 8 - 820), 820, 536, GREEN);
         button(d, 818, 558, 244, 31, editingId == 0 ? "注文内容を確認する" : "決済OCOを更新する", true,
                 stale() ? MUTED : editingId == 0 ? BLUE : GREEN, this::reviewOrder, "送信前に注文内容を表示します。サーバーが最終的に価格・証拠金を検証します。");
         button(d, 818, 598, 118, 23, "TP/SL ±1%", false, BLUE, this::protectionPreset, "基準価格の±1%を設定。1000倍ではロスカットが先に起きる場合があります。");
         button(d, 944, 598, 118, 23, editingId == 0 ? "決済条件を消す" : "新規注文に戻る", false, MUTED, () -> {
             if (editingId != 0) editingId = 0; else { tp.setValue(""); sl.setValue(""); trailing.setValue(""); }
         }, "利確・損切が未指定なら、手動決済またはロスカットまで建玉を維持します。");
-        text(d, data.config.marginCallEnabled ? "追証あり / 未払いは既存の滞納処理へ" : "ゼロカット / 追証なし / 共通証拠金", 818, 632, data.config.marginCallEnabled ? RED : MUTED);
+        small(d, data.config.marginCallEnabled ? "追証あり / 未払いは既存の滞納処理へ" : "ゼロカット / 追証なし / 共通証拠金", 818, 632, 244, data.config.marginCallEnabled ? RED : MUTED);
     }
 
     private void input(GuiGraphics d, EditBox f, String label, boolean enabled, float delta) {
         f.setEditable(enabled); f.setVisible(enabled);
         int x = f.getX(), y = f.getY();
-        text(d, label, x, y - 12, MUTED);
+        small(d, label, x, y - 12, (x < 940 ? 944 : 1074) - x, MUTED);
         box(d, x - 2, y - 2, f.getWidth() + 4, 25, enabled ? BG : 0xFFF9FAFC);
         if (enabled) {
             d.fill(x - 2, y + 22, x + f.getWidth() + 2, y + 23, f.isFocused() ? BLUE : LINE);
@@ -328,15 +339,16 @@ public final class FxScreen extends Screen {
             final int which = i;
             button(d, 30 + i * 113, 457, 106, 25, tabs[i], tab == i, BLUE, () -> { tab = which; scroll = 0; }, "");
         }
-        if (tab == 0) button(d, 688, 458, 83, 23, "全建玉決済", false, RED, () -> confirmAction("CLOSE_ALL"), "保有する全通貨の建玉を成行で決済します。");
-        if (tab == 1) button(d, 688, 458, 83, 23, "全注文取消", false, RED, () -> confirmAction("CANCEL_ALL"), "全ての未約定注文を取り消し、拘束証拠金を解放します。");
+        if (tab == 0) button(d, 684, 458, 88, 23, "全建玉決済", false, RED, () -> confirmAction("CLOSE_ALL"), "保有する全通貨の建玉を成行で決済します。");
+        if (tab == 1) button(d, 684, 458, 88, 23, "全注文取消", false, RED, () -> confirmAction("CANCEL_ALL"), "全ての未約定注文を取り消し、拘束証拠金を解放します。");
         d.fill(30, 488, 776, 489, LINE);
         if (tab == 3) { guide(d); return; }
+        int lastColumn = tab == 2 ? 776 : 682;
         text(d, tab == 2 ? "市場時刻 / 操作" : "通貨 / 売買", 34, 500, MUTED);
         text(d, tab == 2 ? "注文ID / 詳細" : "数量 / 倍率", 184, 500, MUTED);
         text(d, tab == 1 ? "指値 / 逆指値" : "約定価格", 314, 500, MUTED);
         text(d, tab == 0 ? "利確 / 損切" : tab == 1 ? "拘束証拠金 / 期限" : "数量 / 手数料", 440, 500, MUTED);
-        text(d, tab == 0 ? "評価損益 (GC)" : tab == 1 ? "種別" : "損益・入出金 (GC)", 588, 500, MUTED);
+        small(d, tab == 0 ? "評価損益 (GC)" : tab == 1 ? "種別" : "損益・入出金 (GC)", 588, 500, lastColumn - 588 - 6, MUTED);
         int count = tab == 0 ? data.account.positions.size() : tab == 1 ? data.account.orders.size() : data.account.history.size();
         int page = 4;
         scroll = Math.max(0, Math.min(scroll, Math.max(0, count - page)));
@@ -348,29 +360,29 @@ public final class FxScreen extends Screen {
             if (i % 2 == 0) box(d, 30, y - 3, 745, 26, 0xFFF8F9FC);
             if (tab == 0) {
                 Position p = data.account.positions.get(index);
-                text(d, p.symbol + "/GC  " + p.side, 35, y, p.side == Side.BUY ? GREEN : RED);
-                text(d, "#" + p.id, 35, y + 11, MUTED);
-                text(d, number(p.units) + " / " + p.leverage + "x", 184, y + 3, INK);
-                text(d, number(p.entryPrice), 314, y + 3, INK);
-                text(d, "TP " + optional(p.takeProfit), 440, y, GREEN); text(d, "SL " + optional(p.stopLoss), 440, y + 11, RED);
-                double pnl = positionPnl(p); text(d, signed(pnl), 588, y + 3, tone(pnl));
+                text(d, fit(p.symbol + "/GC  " + p.side, 145), 35, y, p.side == Side.BUY ? GREEN : RED);
+                text(d, fit("#" + p.id, 145), 35, y + 11, MUTED);
+                text(d, fit(number(p.units) + " / " + p.leverage + "x", 124), 184, y + 3, INK);
+                text(d, fit(number(p.entryPrice), 120), 314, y + 3, INK);
+                text(d, fit("TP " + optional(p.takeProfit), 142), 440, y, GREEN); text(d, fit("SL " + optional(p.stopLoss), 142), 440, y + 11, RED);
+                double pnl = positionPnl(p); text(d, fit(signed(pnl), 88), 588, y + 3, tone(pnl));
                 button(d, 682, y - 1, 42, 21, "OCO", false, BLUE, () -> edit(p), "建玉の利確・損切・トレーリング条件を変更します。");
                 button(d, 730, y - 1, 42, 21, "決済", false, RED, () -> showClose(p), "全数量または一部数量を成行決済します。");
             } else if (tab == 1) {
                 Order o = data.account.orders.get(index);
-                text(d, o.symbol + "/GC  " + o.side, 35, y, o.side == Side.BUY ? GREEN : RED); text(d, "#" + o.id, 35, y + 11, MUTED);
-                text(d, number(o.units) + " / " + o.leverage + "x", 184, y + 3, INK);
-                text(d, number(o.price), 314, y, INK); if (o.type == OrderType.OCO) text(d, number(o.secondPrice), 314, y + 11, MUTED);
-                text(d, money(o.reserved) + " GC", 440, y, INK); text(d, o.expiresAt == 0 ? "無期限" : clock(o.expiresAt), 440, y + 11, MUTED);
-                text(d, o.type.toString(), 588, y + 3, BLUE);
+                text(d, fit(o.symbol + "/GC  " + o.side, 145), 35, y, o.side == Side.BUY ? GREEN : RED); text(d, fit("#" + o.id, 145), 35, y + 11, MUTED);
+                text(d, fit(number(o.units) + " / " + o.leverage + "x", 124), 184, y + 3, INK);
+                text(d, fit(number(o.price), 120), 314, y, INK); if (o.type == OrderType.OCO) text(d, fit(number(o.secondPrice), 120), 314, y + 11, MUTED);
+                text(d, fit(money(o.reserved) + " GC", 142), 440, y, INK); text(d, o.expiresAt == 0 ? "無期限" : clock(o.expiresAt), 440, y + 11, MUTED);
+                text(d, fit(o.type.toString(), 88), 588, y + 3, BLUE);
                 button(d, 724, y - 1, 48, 21, "取消", false, RED, () -> { Request r = request("CANCEL"); r.id = o.id; send(r); }, "OCOでは、両方の新規条件をまとめて取り消します。");
             } else {
                 History h = data.account.history.get(count - 1 - index);
-                text(d, clock(h.time) + "  " + h.action, 35, y, INK); text(d, h.symbol, 35, y + 11, MUTED);
-                text(d, fit("#" + h.id + " " + h.detail, 119), 184, y + 3, MUTED);
-                text(d, h.price == 0 ? "—" : number(h.price), 314, y + 3, INK);
-                text(d, number(h.units), 440, y, INK); text(d, "手数料 " + number(h.fee), 440, y + 11, MUTED);
-                text(d, signed(h.pnl), 588, y + 3, tone(h.pnl));
+                text(d, fit(h.action, 145), 35, y, INK); text(d, fit(clock(h.time) + "  " + h.symbol, 145), 35, y + 11, MUTED);
+                text(d, fit("#" + h.id + " " + h.detail, 124), 184, y + 3, MUTED);
+                text(d, fit(h.price == 0 ? "—" : number(h.price), 120), 314, y + 3, INK);
+                text(d, fit(number(h.units), 142), 440, y, INK); text(d, fit("手数料 " + number(h.fee), 142), 440, y + 11, MUTED);
+                text(d, fit(signed(h.pnl), 88), 588, y + 3, tone(h.pnl));
                 hits.add(new Hit(30, y - 3, 745, 26, () -> { }, h.action + " / " + h.detail));
             }
         }
@@ -399,8 +411,9 @@ public final class FxScreen extends Screen {
         Quote q = quote();
         dot(d, 25, 662, q.event.equals("通常相場") ? GREEN : RED);
         text(d, q.event.equals("通常相場") ? "市場は稼働中" : q.event, 36, 658, q.event.equals("通常相場") ? MUTED : RED);
-        text(d, "所持金 " + data.wallet + " GC    債務 " + data.guildDebt + " GC    損益 " + signed(data.account.realized), 280, 658, data.delinquent ? RED : MUTED);
-        right(d, "GUILD FX  /  ギャンブルメニューから取引", 1078, 658, MUTED);
+        String note = "GUILD FX  /  ギャンブルメニューから取引";
+        right(d, note, 1078, 658, MUTED);
+        text(d, fit("所持金 " + data.wallet + " GC    債務 " + data.guildDebt + " GC    損益 " + signed(data.account.realized), 1078 - measure(note) - 8 - 280), 280, 658, data.delinquent ? RED : MUTED);
     }
 
     private void changeSide(Side value) { side = value; editingId = 0; tp.setValue(""); sl.setValue(""); defaults(); }
@@ -457,11 +470,11 @@ public final class FxScreen extends Screen {
             text(d, "金額 (GC) / 1以上の整数", 345, 282, MUTED);
             modalField(d, delta);
             text(d, data.config.marginCallEnabled ? "追証あり: ロスカット後の不足を所持金から自動精算。" : "追証なし: 損失はFX口座の資金内でゼロカット。", 345, 345, data.config.marginCallEnabled ? RED : MUTED);
-            text(d, data.config.marginCallEnabled ? "未払いは債務・滞納へ。既存の返済・利息設定に従います。" : "モード変更前に発生した債務・未精算の追証は残ります。", 345, 363, MUTED);
+            small(d, data.config.marginCallEnabled ? "未払いは債務・滞納へ。既存の返済・利息設定に従います。" : "モード変更前に発生した債務・未精算の追証は残ります。", 345, 363, 408, MUTED);
             button(d, 344, 401, 196, 32, "FX口座へ入金", true, BLUE, () -> transfer("DEPOSIT"), "所持ギルドコインから入金します。");
             button(d, 552, 401, 202, 32, "所持金へ出金", true, GREEN, () -> transfer("WITHDRAW"), "整数GCを出金します。端数はFX口座に残ります。");
             if (data.guildDebt > 0) button(d, 344, 440, 410, 23, "所持金から債務を返済（残り " + data.guildDebt + " GC）", false, RED, () -> transfer("REPAY_DEBT"), "入力額を上限として、既存のリボ債務を含む債務に返済します。完済で滞納を解除します。");
-            text(d, "手数料なし。出金は建玉・注文の証拠金を確保した範囲で行えます。", 344, 467, MUTED);
+            small(d, "手数料なし。出金は建玉・注文の証拠金を確保した範囲で行えます。", 344, 467, 408, MUTED);
         } else if (modal.equals("CLOSE")) {
             text(d, closing.symbol + "/GC   " + closing.side + "   " + closing.leverage + "x", 345, 230, INK);
             text(d, "評価損益 " + signed(positionPnl(closing)) + " GC", 345, 251, tone(positionPnl(closing)));
@@ -486,7 +499,7 @@ public final class FxScreen extends Screen {
                 text(d, "利確 " + optional(pending.takeProfit) + "    損切 " + optional(pending.stopLoss), 345, 326, INK);
                 text(d, "トレール " + optional(pending.trailingDistance) + "    期限 " + (pending.expiryMinutes == 0 ? "無期限" : pending.expiryMinutes + "分"), 345, 350, MUTED);
                 text(d, "スプレッド・手数料・スリッページが適用されます。", 345, 389, MUTED);
-                text(d, data.config.marginCallEnabled ? "追証あり: 不足は所持金から精算、未払いは滞納になります。" : "追証なし: ゼロカット。既存の債務は免除されません。", 345, 407, data.config.marginCallEnabled ? RED : MUTED);
+                small(d, data.config.marginCallEnabled ? "追証あり: 不足は所持金から精算、未払いは滞納になります。" : "追証なし: ゼロカット。既存の債務は免除されません。", 345, 407, 408, data.config.marginCallEnabled ? RED : MUTED);
             } else {
                 large(d, pending.op.equals("CLOSE_ALL") ? "全ての建玉を成行決済します。" : "全ての未約定注文を取り消します。", 345, 252, 1.1f, INK);
                 text(d, "対象はこのFX口座の全銘柄です。", 345, 289, MUTED);
@@ -571,8 +584,15 @@ public final class FxScreen extends Screen {
     private void button(GuiGraphics d, int x, int y, int w, int h, String label, boolean active, int color, Runnable action, String tip) {
         boolean over = hover(x, y, w, h) && modal.isEmpty();
         box(d, x, y, w, h, active ? color : over ? 0xFFE9EDF9 : 0xFFF3F5FA);
-        int tx = x + (w - measure(label)) / 2;
-        text(d, label, tx, y + (h - 8) / 2, active ? WHITE : color);
+        int width = measure(label), limit = Math.max(1, w - 4);
+        if (width > limit) {
+            float size = limit / (float) width;
+            d.pose().pushPose();
+            d.pose().translate(x + (w - width * size) / 2f, y + (h - 8 * size) / 2f, 0);
+            d.pose().scale(size, size, 1);
+            text(d, label, 0, 0, active ? WHITE : color);
+            d.pose().popPose();
+        } else text(d, label, x + (w - width) / 2, y + (h - 8) / 2, active ? WHITE : color);
         hits.add(new Hit(x, y, w, h, action, tip));
     }
     private boolean hover(int x, int y, int w, int h) { return mx >= x && mx < x + w && my >= y && my < y + h; }
@@ -592,6 +612,14 @@ public final class FxScreen extends Screen {
         int end = value.length();
         while (end > 0 && measure(value.substring(0, end) + "…") > width) end--;
         return value.substring(0, end) + "…";
+    }
+    /** Draws a caption inside {@code maxWidth}, shrinking it only when it would otherwise spill out. */
+    private void small(GuiGraphics d, String value, int x, int y, int maxWidth, int color) {
+        int width = measure(value);
+        if (width <= maxWidth) { text(d, value, x, y, color); return; }
+        float size = maxWidth / (float) width;
+        d.pose().pushPose(); d.pose().translate(x, y, 0); d.pose().scale(size, size, 1);
+        text(d, value, 0, 0, color); d.pose().popPose();
     }
     private static void panel(GuiGraphics d, int x, int y, int w, int h) { box(d, x, y + 2, w, h, 0x080D2145); box(d, x, y, w, h, WHITE); }
     private static void box(GuiGraphics d, int x, int y, int w, int h, int color) {
