@@ -216,7 +216,7 @@ public final class ConfigManager {
         undead.amount = 15;
         undead.amountMin = 10;
         undead.amountMax = 20;
-        undead.reward = 4;
+        undead.reward = 45;
 
         QuestDefinition monsters = new QuestDefinition();
         monsters.id = "kill_monsters";
@@ -231,7 +231,7 @@ public final class ConfigManager {
         monsters.amount = 12;
         monsters.amountMin = 8;
         monsters.amountMax = 16;
-        monsters.reward = 5;
+        monsters.reward = 54;
 
         QuestDefinition nether = new QuestDefinition();
         nether.id = "kill_nether";
@@ -246,7 +246,7 @@ public final class ConfigManager {
         nether.amount = 10;
         nether.amountMin = 6;
         nether.amountMax = 14;
-        nether.reward = 6;
+        nether.reward = 80;
 
         QuestDefinition illager = new QuestDefinition();
         illager.id = "kill_illagers";
@@ -260,7 +260,7 @@ public final class ConfigManager {
         illager.amount = 7;
         illager.amountMin = 5;
         illager.amountMax = 10;
-        illager.reward = 6;
+        illager.reward = 70;
 
         QuestDefinition ender = new QuestDefinition();
         ender.id = "kill_ender";
@@ -274,7 +274,7 @@ public final class ConfigManager {
         ender.amount = 8;
         ender.amountMin = 6;
         ender.amountMax = 12;
-        ender.reward = 6;
+        ender.reward = 80;
 
         QuestDefinition explore = new QuestDefinition();
         explore.id = "explore_target_area";
@@ -291,7 +291,7 @@ public final class ConfigManager {
         explore.randomCoordinates = true;
         explore.coordRange = 0;
         explore.amount = 1;
-        explore.reward = 8;
+        explore.reward = 30;
 
         QuestDefinition biome = new QuestDefinition();
         biome.id = "explore_biome_jungle";
@@ -311,7 +311,7 @@ public final class ConfigManager {
         biome.y = 64;
         biome.radius = 32;
         biome.amount = 1;
-        biome.reward = 6;
+        biome.reward = 25;
 
         QuestDefinition structure = new QuestDefinition();
         structure.id = "explore_nether_fortress";
@@ -324,7 +324,7 @@ public final class ConfigManager {
         structure.y = 64;
         structure.radius = 32;
         structure.amount = 1;
-        structure.reward = 10;
+        structure.reward = 50;
 
         QuestDefinition boss = new QuestDefinition();
         boss.id = "boss_wither";
@@ -333,7 +333,7 @@ public final class ConfigManager {
         boss.type = QuestType.KILL;
         boss.target = "minecraft:wither";
         boss.amount = 1;
-        boss.reward = 9;
+        boss.reward = 250;
         boss.requiredCompleted = 10;
 
         QuestDefinition dragon = new QuestDefinition();
@@ -343,7 +343,7 @@ public final class ConfigManager {
         dragon.type = QuestType.KILL;
         dragon.target = "minecraft:ender_dragon";
         dragon.amount = 1;
-        dragon.reward = 25;
+        dragon.reward = 600;
         dragon.requiredCompleted = 30;
 
         QuestDefinition collect = new QuestDefinition();
@@ -355,7 +355,7 @@ public final class ConfigManager {
         collect.amount = 32;
         collect.amountMin = 16;
         collect.amountMax = 48;
-        collect.reward = 8;
+        collect.reward = 96;
         collect.repeatable = true;
         collect.cooldownDays = 2;
 
