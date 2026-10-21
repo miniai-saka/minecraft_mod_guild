@@ -2,11 +2,13 @@ package dev.guildquests.fx;
 
 import dev.guildquests.fx.FxModels.*;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 
 /** Server-owned exchange. Contains no Minecraft classes, wall clock prices, or external services. */
 public final class FxEngine {
+    private static final SecureRandom SALT_RANDOM = new SecureRandom();
     public final State state;
     private FxConfig config;
 
@@ -35,15 +37,31 @@ public final class FxEngine {
     public FxConfig config() { return config; }
 
     /**
-     * Starts a new in-game day's price stream. The first step for a day reseeds the PRNG from the
-     * supplied daily seed; restarts during the same day keep the persisted PRNG position.
+     * Selects the in-game day's seed. The seed is a pure function of the persisted market salt and
+     * the day number, so a restart on the same day resumes the same day seed instead of rerolling it.
+     * The first step for a new day reseeds the PRNG; restarts during the same day keep the persisted
+     * PRNG position.
      */
-    public void beginDay(long day, long seed) {
-        if (state.seedDay == day && state.dailySeed != 0) return;
-        long normalized = seed == 0 ? 0x1234abcd5678ef90L : seed;
+    public void beginDay(long day) {
+        if (state.seedSalt == 0) {
+            long salt;
+            do { salt = SALT_RANDOM.nextLong(); } while (salt == 0);
+            state.seedSalt = salt;
+        }
+        long seed = dailySeed(day);
+        if (state.seedDay == day && state.dailySeed == seed) return;
         state.seedDay = day;
-        state.dailySeed = normalized;
-        state.randomState = normalized;
+        state.dailySeed = seed;
+        state.randomState = seed;
+    }
+
+    long dailySeed(long day) { return mix(state.seedSalt ^ mix(day)); }
+
+    static long mix(long value) {
+        value += 0x9E3779B97F4A7C15L;
+        value = (value ^ (value >>> 30)) * 0xBF58476D1CE4E5B9L;
+        value = (value ^ (value >>> 27)) * 0x94D049BB133111EBL;
+        return value ^ (value >>> 31);
     }
 
     private void seedMarket(Market m, FxConfig.Symbol s) {
@@ -190,10 +208,12 @@ public final class FxEngine {
             FxConfig.Style style = style(s);
             double roll = random();
             double shock = 0;
+            double dayShock = dailyShock(m.symbol);
             double shockChance = Math.min(1, (config.crashProbability + config.rallyProbability)
-                    * style.shockChanceFactor());
+                    * style.shockChanceFactor() * dayShock);
             if (roll < shockChance) {
-                boolean crash = roll < Math.min(1, config.crashProbability * style.shockChanceFactor());
+                boolean crash = roll < Math.min(1, config.crashProbability * style.shockChanceFactor()
+                        * dayShock);
                 shock = (config.shockMin + random() * (config.shockMax - config.shockMin))
                         * style.shockAmplitudeFactor() * (crash ? -1 : 1);
                 m.shockLeft = config.shockDurationSteps;
@@ -201,11 +221,13 @@ public final class FxEngine {
                 m.eventTime = state.time;
             }
             double noise = (random() + random() + random() + random() + random() + random() - 3) * Math.sqrt(2);
-            double vol = config.volatility * s.volatilityMultiplier * style.volatilityFactor();
+            double vol = config.volatility * s.volatilityMultiplier * style.volatilityFactor()
+                    * dailyVolatility(m.symbol);
             m.trend = m.trend * Math.min(.9999, config.trendPersistence * style.trendFactor())
                     + (random() - .5) * vol * .08;
             double move = noise * vol * (m.shockLeft > 0 ? config.shockVolatilityMultiplier : 1)
-                    + m.trend + Math.log(s.initialPrice / m.price) * config.meanReversion * style.meanReversionFactor();
+                    + m.trend + dailyBias(m.symbol)
+                    + Math.log(s.initialPrice / m.price) * config.meanReversion * style.meanReversionFactor();
             m.previous = m.price;
             updatePrice(m, m.price * Math.exp(Math.max(-1, Math.min(1, move))) * (1 + shock));
             if (m.shockLeft > 0) m.shockLeft--;
@@ -405,6 +427,24 @@ public final class FxEngine {
     }
     private static FxConfig.Style style(FxConfig.Symbol symbol) {
         return symbol.style == null ? FxConfig.Style.BALANCED : symbol.style;
+    }
+    private long symbolSeed(String symbol) {
+        return mix(state.dailySeed ^ mix(symbol.hashCode()));
+    }
+    double dailyBias(String symbol) {
+        double unit = unit(symbolSeed(symbol));
+        return (unit * 2 - 1) * config.dailyBias * style(settings(symbol)).volatilityFactor();
+    }
+    private double dailyVolatility(String symbol) {
+        double unit = unit(mix(symbolSeed(symbol) + 0x9E3779B97F4A7C15L));
+        return config.dailyVolatilityMin + unit * (config.dailyVolatilityMax - config.dailyVolatilityMin);
+    }
+    private double dailyShock(String symbol) {
+        double unit = unit(mix(symbolSeed(symbol) + 0xBF58476D1CE4E5B9L));
+        return config.dailyShockMin + unit * (config.dailyShockMax - config.dailyShockMin);
+    }
+    private static double unit(long hash) {
+        return (hash >>> 11) * 0x1.0p-53;
     }
     private double random() {
         long x = state.randomState == 0 ? 0x1234abcd5678ef90L : state.randomState;

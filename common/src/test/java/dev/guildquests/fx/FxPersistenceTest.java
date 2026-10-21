@@ -13,7 +13,8 @@ public class FxPersistenceTest {
         FxPersistentState store = new FxPersistentState();
         FxEngine engine = store.engine(); Account account = engine.account("persistent-player");
         engine.deposit(account, 123456);
-        engine.beginDay(42, 0x5eedL);
+        engine.state.seedSalt = 0x5eedL;
+        engine.beginDay(42);
         Request r = new Request(); r.symbol = "AUR"; r.type = OrderType.IFO;
         r.units = 2; r.leverage = 1000; r.price = engine.state.markets.get("AUR").price * .9;
         r.takeProfit = r.price * 1.1; r.stopLoss = r.price * .9; engine.submit(account, r);
@@ -24,7 +25,8 @@ public class FxPersistenceTest {
         assertEquals(123456, loaded.balance, 0); assertEquals(1, loaded.orders.size());
         assertEquals(1000, loaded.orders.get(0).leverage); assertEquals(engine.state.randomState, restored.state.randomState);
         assertEquals(engine.state.time, restored.state.time);
-        assertEquals(42, restored.state.seedDay); assertEquals(0x5eedL, restored.state.dailySeed);
+        assertEquals(42, restored.state.seedDay); assertEquals(0x5eedL, restored.state.seedSalt);
+        assertEquals(engine.state.dailySeed, restored.state.dailySeed);
     }
     @Test(expected = IllegalStateException.class) public void corruptSaveFailsClosedInsteadOfResettingMoney() {
         CompoundTag broken = new CompoundTag(); broken.putByteArray("Exchange", new byte[]{1, 2, 3});

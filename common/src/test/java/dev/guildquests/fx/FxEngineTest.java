@@ -141,17 +141,31 @@ public class FxEngineTest {
         e.step(1000); other.step(1000); assertEquals(e.state.randomState, other.state.randomState);
     }
     @Test public void dailySeedReseedsOnlyWhenTheInGameDayChanges() {
-        e.beginDay(10, 777);
-        assertEquals(10, e.state.seedDay); assertEquals(777, e.state.dailySeed);
-        assertEquals(777, e.state.randomState);
+        e.state.seedSalt = 12345;
+        e.beginDay(10);
+        long dayTenSeed = e.state.dailySeed;
+        assertEquals(10, e.state.seedDay);
+        assertEquals(dayTenSeed, e.state.randomState);
         e.step(1000);
         long midDayState = e.state.randomState;
-        e.beginDay(10, 999);
+        e.beginDay(10);
         assertEquals("same day must not reroll the market", midDayState, e.state.randomState);
-        assertEquals(777, e.state.dailySeed);
-        e.beginDay(11, 888);
-        assertEquals(11, e.state.seedDay); assertEquals(888, e.state.dailySeed);
-        assertEquals(888, e.state.randomState);
+        assertEquals(dayTenSeed, e.state.dailySeed);
+        e.beginDay(11);
+        assertEquals(11, e.state.seedDay);
+        assertNotEquals(dayTenSeed, e.state.dailySeed);
+        assertEquals(e.state.dailySeed, e.state.randomState);
+    }
+    @Test public void dailySeedAndBiasAreDeterministicForTheSameSaltAndDay() {
+        State first = new State(); first.time = 0; first.randomState = 1; first.seedSalt = 424242;
+        State second = new State(); second.time = 0; second.randomState = 999; second.seedSalt = 424242;
+        FxEngine a = new FxEngine(new FxConfig(), first);
+        FxEngine b = new FxEngine(new FxConfig(), second);
+        a.beginDay(7); b.beginDay(7);
+        assertEquals(a.state.dailySeed, b.state.dailySeed);
+        assertEquals(a.dailyBias("AUR"), b.dailyBias("AUR"), 0);
+        b.beginDay(8);
+        assertNotEquals(a.state.dailySeed, b.state.dailySeed);
     }
     @Test public void stableSymbolsCapLeverageAndTightenSpread() {
         c.spreadBps = 20; c.commissionBps = 10; e.configure(c);

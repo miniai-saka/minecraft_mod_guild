@@ -30,6 +30,11 @@ public final class FxConfig {
     public double volatility = 0.0009;
     public double trendPersistence = 0.90;
     public double meanReversion = 0.00003;
+    public double dailyBias = 0.00003;
+    public double dailyVolatilityMin = 0.7;
+    public double dailyVolatilityMax = 1.6;
+    public double dailyShockMin = 0.6;
+    public double dailyShockMax = 1.6;
     public double crashProbability = 0.0005;
     public double rallyProbability = 0.00035;
     public double shockMin = 0.04;
@@ -126,6 +131,11 @@ public final class FxConfig {
         volatility = bounded(volatility, 0, .1, .0009);
         trendPersistence = bounded(trendPersistence, 0, .9999, .90);
         meanReversion = bounded(meanReversion, 0, .1, .00003);
+        dailyBias = bounded(dailyBias, 0, .002, .00003);
+        dailyVolatilityMin = bounded(dailyVolatilityMin, .1, 3, .7);
+        dailyVolatilityMax = bounded(dailyVolatilityMax, dailyVolatilityMin, 5, 1.6);
+        dailyShockMin = bounded(dailyShockMin, .1, 3, .6);
+        dailyShockMax = bounded(dailyShockMax, dailyShockMin, 5, 1.6);
         crashProbability = bounded(crashProbability, 0, 1, .0005);
         rallyProbability = bounded(rallyProbability, 0, 1 - crashProbability, .00035);
         shockMin = bounded(shockMin, .001, .9, .04);

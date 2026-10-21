@@ -103,8 +103,10 @@ public final class FxModels {
         public long randomState = 0x1234abcd5678ef90L ^ System.nanoTime();
         /** In-game day number that owns dailySeed. Missing in older saves. */
         public long seedDay = Long.MIN_VALUE;
-        /** PRNG seed generated for seedDay. Not exposed to clients. */
+        /** PRNG seed derived from seedSalt and seedDay. Not exposed to clients. */
         public long dailySeed;
+        /** Secret per-save salt used to derive dailySeed from the in-game day. */
+        public long seedSalt;
         public Map<String, Market> markets = new LinkedHashMap<>();
         public Map<String, Account> accounts = new LinkedHashMap<>();
     }

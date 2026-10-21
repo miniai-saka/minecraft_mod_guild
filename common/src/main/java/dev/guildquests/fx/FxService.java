@@ -24,7 +24,6 @@ import java.util.WeakHashMap;
 public final class FxService {
     public static final ResourceLocation REQUEST = new ResourceLocation("guildquests", "fx_request");
     public static final ResourceLocation SNAPSHOT = new ResourceLocation("guildquests", "fx_snapshot");
-    private static final java.security.SecureRandom DAILY_SEEDS = new java.security.SecureRandom();
     private static final Map<MinecraftServer, Session> SESSIONS = new WeakHashMap<>();
     private static final class Session {
         int marketTicks, snapshotTicks;
@@ -147,14 +146,6 @@ public final class FxService {
         send(player, false, message, error);
     }
 
-    /** One unpredictable seed per in-game day. Persisted so a restart cannot reroll the day. */
-    private static long dailySeed(FxEngine engine, long day) {
-        if (engine.state.seedDay == day && engine.state.dailySeed != 0) return engine.state.dailySeed;
-        long seed;
-        do { seed = DAILY_SEEDS.nextLong(); } while (seed == 0);
-        return seed;
-    }
-
     private static void tick(MinecraftServer server) {
         Session session = SESSIONS.computeIfAbsent(server, ignored -> new Session());
         FxConfig config = FxSettings.get();
@@ -163,7 +154,7 @@ public final class FxService {
             if (state.healthy()) {
                 FxEngine engine = state.engine();
                 long day = server.overworld().getDayTime() / 24000L;
-                engine.beginDay(day, dailySeed(engine, day));
+                engine.beginDay(day);
                 for (var entry : engine.state.accounts.entrySet()) settle(server, engine, entry.getKey(), entry.getValue());
                 engine.step(session.marketTicks * 50L);
                 for (var entry : engine.state.accounts.entrySet()) settle(server, engine, entry.getKey(), entry.getValue());
