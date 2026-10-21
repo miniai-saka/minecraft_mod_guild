@@ -125,6 +125,8 @@ public final class FxModels {
     public static final class Snapshot {
         public boolean open;
         public boolean enabled;
+        /** True when debt can only be repaid by mining, so the FX repayment action is hidden. */
+        public boolean miningDebtRepaymentOnly;
         public String selected;
         public String message = "";
         public boolean error;

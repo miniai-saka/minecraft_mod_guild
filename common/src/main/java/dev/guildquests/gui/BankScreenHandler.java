@@ -258,10 +258,15 @@ public final class BankScreenHandler extends AbstractContainerMenu {
             case GuildService.MODE_RIBO -> new String[]{
                     "クリックでリボ払いに切替",
                     "残高がなくても購入でき、価格は債務化",
-                    "利息 " + ConfigManager.config().riboInterestPercent + "% / "
+                    ConfigManager.config().miningDebtRepaymentOnly
+                            ? "返済は採掘のみ。利息 " + ConfigManager.config().riboInterestPercent + "% / "
+                            + ConfigManager.config().riboIntervalMinutes + "分ごと"
+                            : "利息 " + ConfigManager.config().riboInterestPercent + "% / "
                             + ConfigManager.config().riboIntervalMinutes + "分ごとに "
                             + ConfigManager.config().riboInstallment + " コインを自動徴収",
-                    "返済不能で延滞ロック → クエストで返済"
+                    ConfigManager.config().miningDebtRepaymentOnly
+                            ? "延滞ロック → 採掘で解除"
+                            : "返済不能で延滞ロック → クエストで返済"
             };
             case GuildService.MODE_DISABLED -> new String[]{
                     "クリックで無効に切替",
@@ -289,27 +294,27 @@ public final class BankScreenHandler extends AbstractContainerMenu {
         if (delinquent) {
             set(startSlot, item(Items.REDSTONE_BLOCK, "債務: " + data.debt,
                     "⚠ 延滞中：ギルド機能ロック中",
-                    "クエスト報酬は全額自動で返済に充当",
+                    cfg.miningDebtRepaymentOnly ? "採掘で返済" : "クエスト報酬は全額自動で返済に充当",
                     "完済するまで銀行・残高支払い不可"));
         } else if (hasDebt) {
             set(startSlot, item(Items.REDSTONE, "債務: " + data.debt,
-                    "次回の自動徴収まで約 " + minutesLeft + " 分",
-                    "残高から " + cfg.riboInstallment + " コインを定期徴収"));
+                    "次回の返済期限まで約 " + minutesLeft + " 分",
+                    cfg.miningDebtRepaymentOnly ? "返済は採掘のみ" : "残高から " + cfg.riboInstallment + " コインを定期徴収"));
         } else {
             set(startSlot, item(Items.GOLD_NUGGET, "債務: なし",
                     "支払い方法をリボにすると",
                     "後払い購入（債務）が使える"));
         }
 
-        set(startSlot + 1, item(Items.CLOCK, "次回徴収まで: " + minutesLeft + " 分",
+        set(startSlot + 1, item(Items.CLOCK, "次回期限まで: " + minutesLeft + " 分",
                 "周期: " + cfg.riboIntervalMinutes + " 分ごと",
-                hasDebt ? "自動で残高から徴収" : "現在債務なし"));
-        set(startSlot + 2, item(Items.COPPER_INGOT, "自動徴収額: " + cfg.riboInstallment,
-                "周期ごとに徴収される金額",
+                hasDebt ? (cfg.miningDebtRepaymentOnly ? "採掘で返済" : "自動で残高から徴収") : "現在債務なし"));
+        set(startSlot + 2, item(Items.COPPER_INGOT, cfg.miningDebtRepaymentOnly ? "返済方法: 採掘" : "自動徴収額: " + cfg.riboInstallment,
+                cfg.miningDebtRepaymentOnly ? "設定したブロックを掘って返済" : "周期ごとに徴収される金額",
                 "利息 " + cfg.riboInterestPercent + "% が周期ごとに加算"));
         set(startSlot + 3, item(Items.AMETHYST_SHARD, "利息: " + cfg.riboInterestPercent + "%",
                 "周期ごとに債務へ加算",
-                "延滞でロック → クエストで返済"));
+                cfg.miningDebtRepaymentOnly ? "延滞でロック → 採掘で返済" : "延滞でロック → クエストで返済"));
     }
 
     private String feeLine(long fee) {

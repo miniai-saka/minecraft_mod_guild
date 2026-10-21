@@ -115,8 +115,8 @@ public final class LoanScreenHandler extends AbstractContainerMenu {
                 "利息: " + cfg.consumerLoanInterestPercent + "% / " + cfg.consumerLoanIntervalMinutes + " 分"));
         set(5, item(Items.WRITABLE_BOOK, "消費者金融",
                 "借入: 残高に加算され、債務になります",
-                "返済: 残高から手動で返済",
-                "返済は自動ではありません"));
+                cfg.miningDebtRepaymentOnly ? "返済: 設定したブロックの採掘で自動返済" : "返済: 残高から手動で返済",
+                cfg.miningDebtRepaymentOnly ? "採掘返済のみ" : "返済は自動ではありません"));
 
         // Row 1: borrow (9-12) / repay all (13) / repay (14-17).
         if (borrowable > 0) {
@@ -129,7 +129,11 @@ public final class LoanScreenHandler extends AbstractContainerMenu {
         }
 
         if (data.loan > 0) {
-            if (data.coins > 0) {
+            if (cfg.miningDebtRepaymentOnly) {
+                set(13, item(Items.GRAY_CONCRETE, "返済は採掘のみ",
+                        "設定したブロックを掘って返済します",
+                        "残債: " + data.loan));
+            } else if (data.coins > 0) {
                 setAction(13, item(Items.LIME_CONCRETE, "全額返済",
                                 "残高の範囲で最大まで返済",
                                 "債務 " + data.loan + " / 残高 " + data.coins),

@@ -114,6 +114,8 @@ public final class FxService {
                 case "CANCEL_ALL" -> { engine.cancelAll(account); message = "全注文を取り消しました。"; }
                 case "AMEND" -> { engine.amend(account, request.id, request.takeProfit, request.stopLoss, request.trailingDistance); message = "決済OCOを更新しました。"; }
                 case "REPAY_DEBT" -> {
+                    if (ConfigManager.config().miningDebtRepaymentOnly)
+                        throw new IllegalArgumentException("返済は採掘のみです。設定したブロックを掘って返済してください。");
                     if (request.amount <= 0) throw new IllegalArgumentException("返済額は1以上の整数です。");
                     var guild = GuildPersistentState.get(server);
                     long paid = GuildDebtPolicy.repay(guild.get(player.getUUID()), request.amount);
@@ -182,7 +184,9 @@ public final class FxService {
             ServerPlayer online = server.getPlayerList().getPlayer(UUID.fromString(owner));
             if (online != null) online.sendSystemMessage(Component.literal("[Guild FX] 追証精算: 所持金 " + result.paid()
                     + " GC / 未払い " + result.debtAdded() + " GC"
-                    + (result.debtAdded() > 0 ? "。既存の滞納処理でギルド機能をロックしました。クエスト報酬・定期返済で解消できます。" : "。支払い完了。")));
+                    + (result.debtAdded() > 0 ? "。既存の滞納処理でギルド機能をロックしました。"
+                    + (ConfigManager.config().miningDebtRepaymentOnly
+                    ? "採掘で返済してください。" : "クエスト報酬・定期返済で解消できます。") : "。支払い完了。")));
         }
     }
 
@@ -194,6 +198,7 @@ public final class FxService {
         Snapshot snapshot = FxPersistentState.get(server).engine().snapshot(player.getStringUUID(),
                 session.viewers.get(player.getUUID()), GuildPersistentState.get(server).get(player.getUUID()).coins);
         snapshot.open = open; snapshot.message = message; snapshot.error = error;
+        snapshot.miningDebtRepaymentOnly = ConfigManager.config().miningDebtRepaymentOnly;
         var wallet = GuildPersistentState.get(server).get(player.getUUID());
         snapshot.guildDebt = wallet.debt; snapshot.delinquent = wallet.delinquent;
         FxNetwork.server.send(player, snapshot);

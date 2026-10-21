@@ -470,10 +470,10 @@ public final class FxScreen extends Screen {
             text(d, "金額 (GC) / 1以上の整数", 345, 282, MUTED);
             modalField(d, delta);
             text(d, data.config.marginCallEnabled ? "追証あり: ロスカット後の不足を所持金から自動精算。" : "追証なし: 損失はFX口座の資金内でゼロカット。", 345, 345, data.config.marginCallEnabled ? RED : MUTED);
-            small(d, data.config.marginCallEnabled ? "未払いは債務・滞納へ。既存の返済・利息設定に従います。" : "モード変更前に発生した債務・未精算の追証は残ります。", 345, 363, 408, MUTED);
+            small(d, data.miningDebtRepaymentOnly ? "未払いは債務・滞納へ。返済は採掘で行います。" : data.config.marginCallEnabled ? "未払いは債務・滞納へ。既存の返済・利息設定に従います。" : "モード変更前に発生した債務・未精算の追証は残ります。", 345, 363, 408, MUTED);
             button(d, 344, 401, 196, 32, "FX口座へ入金", true, BLUE, () -> transfer("DEPOSIT"), "所持ギルドコインから入金します。");
             button(d, 552, 401, 202, 32, "所持金へ出金", true, GREEN, () -> transfer("WITHDRAW"), "整数GCを出金します。端数はFX口座に残ります。");
-            if (data.guildDebt > 0) button(d, 344, 440, 410, 23, "所持金から債務を返済（残り " + data.guildDebt + " GC）", false, RED, () -> transfer("REPAY_DEBT"), "入力額を上限として、既存のリボ債務を含む債務に返済します。完済で滞納を解除します。");
+            if (data.guildDebt > 0 && !data.miningDebtRepaymentOnly) button(d, 344, 440, 410, 23, "所持金から債務を返済（残り " + data.guildDebt + " GC）", false, RED, () -> transfer("REPAY_DEBT"), "入力額を上限として、既存のリボ債務を含む債務に返済します。完済で滞納を解除します。");
             small(d, "手数料なし。出金は建玉・注文の証拠金を確保した範囲で行えます。", 344, 467, 408, MUTED);
         } else if (modal.equals("CLOSE")) {
             text(d, closing.symbol + "/GC   " + closing.side + "   " + closing.leverage + "x", 345, 230, INK);

@@ -265,13 +265,14 @@ public final class GuildService {
     public static boolean claimQuest(ServerPlayer player, String questId) {
         GuildPersistentState state = GuildPersistentState.get(player.getServer());
         PlayerGuildData data = state.get(player.getUUID());
+        ModConfig config = ConfigManager.config();
         ActiveQuest active = data.findActive(questId);
         QuestDefinition quest = resolveQuest(player.getServer(), questId);
         if (active == null || quest == null || active.progress < effectiveAmount(active, quest)) return false;
 
         long reward = quest.reward;
         long tribute = 0;
-        if (data.delinquent && data.debt > 0 && reward > 0) {
+        if (!config.miningDebtRepaymentOnly && data.delinquent && data.debt > 0 && reward > 0) {
             tribute = Math.min(reward, data.debt);
             data.debt -= tribute;
             reward -= tribute;
@@ -465,6 +466,10 @@ public final class GuildService {
     public static boolean repayLoan(ServerPlayer player, long amount) {
         GuildPersistentState state = GuildPersistentState.get(player.getServer());
         PlayerGuildData data = state.get(player.getUUID());
+        if (ConfigManager.config().miningDebtRepaymentOnly) {
+            message(player, "返済は採掘のみです。設定したブロックを掘って返済してください。", ChatFormatting.YELLOW);
+            return false;
+        }
         if (data.loan <= 0) {
             message(player, "返済する債務がありません。", ChatFormatting.YELLOW);
             return false;
@@ -565,10 +570,10 @@ public final class GuildService {
     }
 
     /**
-     * Scheduled ribo collection. Runs periodically for every player with outstanding debt:
-     * applies interest, then collects the fixed installment from the balance. A failed
-     * collection marks the player delinquent, which locks their guild features until the
-     * full debt is repaid (quest rewards are tributed automatically while locked).
+     * Scheduled debt cycle. Runs periodically for every player with outstanding debt: applies
+     * interest, then either collects the fixed installment from the balance or, in mining-only
+     * mode, marks the debt overdue without taking coins. A missed payment marks the player
+     * delinquent, which locks guild features until the full debt is repaid.
      */
     public static void runRiboCycles(MinecraftServer server) {
         ModConfig config = ConfigManager.config();
@@ -604,7 +609,12 @@ public final class GuildService {
 
             long due = Math.min(config.riboInstallment, data.debt);
             boolean newlyDelinquent = false;
-            if (data.coins >= due) {
+            if (config.miningDebtRepaymentOnly) {
+                if (!data.delinquent) {
+                    data.delinquent = true;
+                    newlyDelinquent = true;
+                }
+            } else if (data.coins >= due) {
                 data.coins -= due;
                 data.debt -= due;
             } else if (!data.delinquent) {
@@ -623,8 +633,13 @@ public final class GuildService {
 
             ServerPlayer online = server.getPlayerList().getPlayer(entry.getKey());
             if (online != null && newlyDelinquent) {
-                message(online, "債務の定期返済が残高不足で失敗しました（債務 " + data.debt + "）。"
-                        + "完済するまでギルド機能がロックされています。クエスト報酬は自動で返済に充てられます。", ChatFormatting.RED);
+                if (config.miningDebtRepaymentOnly) {
+                    message(online, "返済期限を過ぎました（債務 " + data.debt + "）。"
+                            + "返済は採掘のみです。設定したブロックを掘って返済してください。", ChatFormatting.RED);
+                } else {
+                    message(online, "債務の定期返済が残高不足で失敗しました（債務 " + data.debt + "）。"
+                            + "完済するまでギルド機能がロックされています。クエスト報酬は自動で返済に充てられます。", ChatFormatting.RED);
+                }
             }
             if (online != null && unlocked) {
                 message(online, "債務を完済しました。ギルド機能のロックを解除しました。", ChatFormatting.GREEN);
@@ -638,7 +653,8 @@ public final class GuildService {
             return;
         }
         message(player, "債務の滞納中です。債務 " + data.debt
-                + " を完済するまでギルド機能がロックされています（クエスト報酬で返済できます）。", ChatFormatting.RED);
+                + " を完済するまでギルド機能がロックされています（"
+                + (ConfigManager.config().miningDebtRepaymentOnly ? "採掘で返済できます" : "クエスト報酬で返済できます") + "）。", ChatFormatting.RED);
     }
 
     public static long countHeldCoins(ServerPlayer player) {

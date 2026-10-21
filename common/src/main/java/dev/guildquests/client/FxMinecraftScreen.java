@@ -118,7 +118,7 @@ public final class FxMinecraftScreen extends Screen {
             amount = field(bx + 80, y + 113, w - 116, "金額", initial);
             button(bx, y + 153, (w - 38) / 2, "FX口座へ入金", () -> transfer("DEPOSIT"));
             button(x + w / 2 + 3, y + 153, (w - 38) / 2, "所持金へ出金", () -> transfer("WITHDRAW"));
-            if (data.guildDebt > 0) button(bx, y + 181, w - 32, "所持金から債務を返済", () -> transfer("REPAY_DEBT"));
+            if (data.guildDebt > 0 && !data.miningDebtRepaymentOnly) button(bx, y + 181, w - 32, "所持金から債務を返済", () -> transfer("REPAY_DEBT"));
         } else {
             int actionY = y + Math.max(178, h - 66);
             button(bx, actionY, (w - 38) / 2, "戻る", () -> { modal = ""; init(); });
@@ -195,7 +195,7 @@ public final class FxMinecraftScreen extends Screen {
         }
     }
     private void drawModal(GuiGraphics g) {
-        text(g, (modal.equals("TRANSFER") ? "入出金 / 債務の返済" : "送信内容の確認") + (data.config.marginCallEnabled ? " / 追証あり" : " / 追証なし"), x + 16, y + 59, 0x333333);
+        text(g, (modal.equals("TRANSFER") ? "入出金" + (data.miningDebtRepaymentOnly ? "" : " / 債務の返済") : "送信内容の確認") + (data.config.marginCallEnabled ? " / 追証あり" : " / 追証なし"), x + 16, y + 59, 0x333333);
         if (modal.equals("TRANSFER")) {
             text(g, "出金可能 " + number(Math.floor(data.withdrawable)) + " GC", x + 16, y + 83, 0x404040);
             text(g, "債務残高 " + data.guildDebt + " GC", x + 16, y + 97, data.delinquent ? 0x9B2828 : 0x444444);
