@@ -23,13 +23,13 @@ public final class FxConfig {
     public int candleHistory = 720;
     public int initialHistoryCandles = 120;
     public int maxExpiryMinutes = 1440;
-    public double spreadBps = 1.5;
-    public double commissionBps = 0.1;
-    public double marketSlippageBps = 0.15;
+    public double spreadBps = 2.0;
+    public double commissionBps = 0.5;
+    public double marketSlippageBps = 0.4;
     public double stopOutRatio = 0.5;
     public double volatility = 0.0009;
-    public double trendPersistence = 0.97;
-    public double meanReversion = 0.00001;
+    public double trendPersistence = 0.90;
+    public double meanReversion = 0.00003;
     public double crashProbability = 0.0005;
     public double rallyProbability = 0.00035;
     public double shockMin = 0.04;
@@ -39,9 +39,49 @@ public final class FxConfig {
     public double minimumPrice = 0.01;
     public double maximumPrice = 1_000_000;
     public List<Symbol> symbols = new ArrayList<>(List.of(
-            new Symbol("AUR", "オーロラ", 100, 1.0, 0x5966EE),
-            new Symbol("EMB", "エンバー", 50, 1.65, 0xEB9059),
-            new Symbol("TID", "タイド", 25, 0.75, 0x24A99B)));
+            new Symbol("AUR", "オーロラ", 100, 1.0, 0x5966EE, Style.BALANCED),
+            new Symbol("EMB", "エンバー", 50, 1.65, 0xEB9059, Style.STABLE),
+            new Symbol("TID", "タイド", 25, 0.75, 0x24A99B, Style.VOLATILE)));
+
+    /** Per-symbol balance profile. Factors are applied to the global market settings. */
+    public enum Style {
+        STABLE("安定", 0.40, 0.80, 30.0, 0.30, 0.60, 0.80, 0.80, 0.25),
+        BALANCED("バランス", 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
+        VOLATILE("変動", 1.80, 1.05, 0.10, 1.80, 1.40, 1.40, 1.50, 1.0);
+
+        private final String label;
+        private final double volatility;
+        private final double trend;
+        private final double meanReversion;
+        private final double shockChance;
+        private final double shockAmplitude;
+        private final double spread;
+        private final double commission;
+        private final double leverage;
+
+        Style(String label, double volatility, double trend, double meanReversion, double shockChance,
+              double shockAmplitude, double spread, double commission, double leverage) {
+            this.label = label;
+            this.volatility = volatility;
+            this.trend = trend;
+            this.meanReversion = meanReversion;
+            this.shockChance = shockChance;
+            this.shockAmplitude = shockAmplitude;
+            this.spread = spread;
+            this.commission = commission;
+            this.leverage = leverage;
+        }
+
+        public String label() { return label; }
+        public double volatilityFactor() { return volatility; }
+        public double trendFactor() { return trend; }
+        public double meanReversionFactor() { return meanReversion; }
+        public double shockChanceFactor() { return shockChance; }
+        public double shockAmplitudeFactor() { return shockAmplitude; }
+        public double spreadFactor() { return spread; }
+        public double commissionFactor() { return commission; }
+        public double leverageFactor() { return leverage; }
+    }
 
     public static final class Symbol {
         public String id;
@@ -49,10 +89,16 @@ public final class FxConfig {
         public double initialPrice;
         public double volatilityMultiplier;
         public int color;
+        /** Balance profile. Missing in old configs; sanitize fills it from the symbol id. */
+        public Style style;
 
         public Symbol(String id, String name, double price, double volatility, int color) {
+            this(id, name, price, volatility, color, Style.BALANCED);
+        }
+
+        public Symbol(String id, String name, double price, double volatility, int color, Style style) {
             this.id = id; this.name = name; this.initialPrice = price;
-            this.volatilityMultiplier = volatility; this.color = color;
+            this.volatilityMultiplier = volatility; this.color = color; this.style = style;
         }
     }
 
@@ -73,13 +119,13 @@ public final class FxConfig {
         candleHistory = Math.max(60, Math.min(1440, candleHistory));
         initialHistoryCandles = Math.max(0, Math.min(candleHistory, initialHistoryCandles));
         maxExpiryMinutes = Math.max(1, Math.min(10080, maxExpiryMinutes));
-        spreadBps = bounded(spreadBps, 0, 100, 1.5);
-        commissionBps = bounded(commissionBps, 0, 100, .1);
-        marketSlippageBps = bounded(marketSlippageBps, 0, 100, .15);
+        spreadBps = bounded(spreadBps, 0, 100, 2.0);
+        commissionBps = bounded(commissionBps, 0, 100, .5);
+        marketSlippageBps = bounded(marketSlippageBps, 0, 100, .4);
         stopOutRatio = bounded(stopOutRatio, .01, 1, .5);
         volatility = bounded(volatility, 0, .1, .0009);
-        trendPersistence = bounded(trendPersistence, 0, .9999, .97);
-        meanReversion = bounded(meanReversion, 0, .1, .00001);
+        trendPersistence = bounded(trendPersistence, 0, .9999, .90);
+        meanReversion = bounded(meanReversion, 0, .1, .00003);
         crashProbability = bounded(crashProbability, 0, 1, .0005);
         rallyProbability = bounded(rallyProbability, 0, 1 - crashProbability, .00035);
         shockMin = bounded(shockMin, .001, .9, .04);
@@ -96,6 +142,7 @@ public final class FxConfig {
             s.name = s.name == null || s.name.isBlank() ? s.id : s.name.substring(0, Math.min(24, s.name.length()));
             s.initialPrice = bounded(s.initialPrice, minimumPrice, maximumPrice, 100);
             s.volatilityMultiplier = bounded(s.volatilityMultiplier, 0, 10, 1);
+            if (s.style == null) s.style = defaultStyle(s.id);
             clean.add(s);
             if (clean.size() >= 8) break;
         }
@@ -105,5 +152,12 @@ public final class FxConfig {
 
     static double bounded(double n, double low, double high, double fallback) {
         return Double.isFinite(n) ? Math.max(low, Math.min(high, n)) : fallback;
+    }
+
+    /** Profiles for the bundled symbols; any other symbol defaults to BALANCED. */
+    private static Style defaultStyle(String id) {
+        if ("EMB".equals(id)) return Style.STABLE;
+        if ("TID".equals(id)) return Style.VOLATILE;
+        return Style.BALANCED;
     }
 }

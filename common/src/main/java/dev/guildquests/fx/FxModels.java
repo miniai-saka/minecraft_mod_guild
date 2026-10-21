@@ -101,13 +101,21 @@ public final class FxModels {
         public long nextId = 1;
         public long time = System.currentTimeMillis();
         public long randomState = 0x1234abcd5678ef90L ^ System.nanoTime();
+        /** In-game day number that owns dailySeed. Missing in older saves. */
+        public long seedDay = Long.MIN_VALUE;
+        /** PRNG seed generated for seedDay. Not exposed to clients. */
+        public long dailySeed;
         public Map<String, Market> markets = new LinkedHashMap<>();
         public Map<String, Account> accounts = new LinkedHashMap<>();
     }
 
     public static final class Quote {
         public String symbol, name, event;
+        /** Japanese balance profile label; null for snapshots from older servers. */
+        public String style;
         public int color;
+        public int maxLeverage;
+        public double commissionBps;
         public double price, bid, ask, change, high, low;
         public long eventTime;
     }

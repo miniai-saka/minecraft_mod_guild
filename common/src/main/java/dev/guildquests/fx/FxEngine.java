@@ -34,12 +34,25 @@ public final class FxEngine {
 
     public FxConfig config() { return config; }
 
+    /**
+     * Starts a new in-game day's price stream. The first step for a day reseeds the PRNG from the
+     * supplied daily seed; restarts during the same day keep the persisted PRNG position.
+     */
+    public void beginDay(long day, long seed) {
+        if (state.seedDay == day && state.dailySeed != 0) return;
+        long normalized = seed == 0 ? 0x1234abcd5678ef90L : seed;
+        state.seedDay = day;
+        state.dailySeed = normalized;
+        state.randomState = normalized;
+    }
+
     private void seedMarket(Market m, FxConfig.Symbol s) {
         long now = state.time;
         for (int i = config.initialHistoryCandles; i > 0; i--) {
             state.time = now - i * config.candleSeconds * 1000L;
             m.previous = m.price;
-            double movement = (random() + random() + random() - 1.5) * config.volatility * s.volatilityMultiplier * Math.sqrt(config.candleSeconds);
+            double movement = (random() + random() + random() - 1.5) * config.volatility
+                    * s.volatilityMultiplier * style(s).volatilityFactor() * Math.sqrt(config.candleSeconds);
             updatePrice(m, m.price * Math.exp(movement));
         }
         state.time = now;
@@ -47,8 +60,8 @@ public final class FxEngine {
         trim(m.candles, config.candleHistory);
     }
     public Account account(String owner) { return state.accounts.computeIfAbsent(owner, key -> new Account()); }
-    public double bid(Market m) { return m.price * (1 - config.spreadBps / 20000); }
-    public double ask(Market m) { return m.price * (1 + config.spreadBps / 20000); }
+    public double bid(Market m) { return m.price * (1 - spreadBps(m.symbol) / 20000); }
+    public double ask(Market m) { return m.price * (1 + spreadBps(m.symbol) / 20000); }
     public double pnl(Position p) {
         Market m = market(p.symbol);
         return (exitQuote(m, p.side) - p.entryPrice) * p.units * p.side.sign();
@@ -92,7 +105,8 @@ public final class FxEngine {
         require(finite(r.units) && r.units >= config.minUnits && r.units <= config.maxUnits, "数量が取引範囲外です。");
         double steps = r.units / config.unitStep;
         require(Math.abs(steps - Math.rint(steps)) < 1e-6, "数量は " + config.unitStep + " 単位で指定してください。");
-        require(r.leverage >= 1 && r.leverage <= config.maxLeverage, "レバレッジは1〜" + config.maxLeverage + "倍です。");
+        int maxLeverage = maxLeverage(r.symbol);
+        require(r.leverage >= 1 && r.leverage <= maxLeverage, "レバレッジは1〜" + maxLeverage + "倍です。");
         require(a.positions.size() + a.orders.size() < config.maxPositions + config.maxOrders, "注文・建玉数の上限です。");
         Entry entry = switch (r.type) {
             case MARKET -> Entry.MARKET;
@@ -114,7 +128,7 @@ public final class FxEngine {
         double notional = r.units * reservePrice;
         require(finite(notional) && notional <= config.maxNotional, "取引金額が上限を超えています。");
         require(r.expiryMinutes >= 0 && r.expiryMinutes <= config.maxExpiryMinutes, "有効期限が範囲外です。");
-        double reservation = notional / r.leverage + fee(notional);
+        double reservation = notional / r.leverage + fee(notional, r.symbol);
         require(reservation <= free(a), "余剰証拠金が不足しています（必要 " + format(reservation) + " GC）。");
         Order o = new Order();
         o.id = state.nextId++; o.symbol = r.symbol; o.side = r.side; o.type = r.type; o.entry = entry;
@@ -173,20 +187,25 @@ public final class FxEngine {
         state.time += Math.max(1, elapsedMillis);
         for (Market m : state.markets.values()) {
             FxConfig.Symbol s = settings(m.symbol);
+            FxConfig.Style style = style(s);
             double roll = random();
             double shock = 0;
-            if (roll < config.crashProbability + config.rallyProbability) {
-                boolean crash = roll < config.crashProbability;
-                shock = (config.shockMin + random() * (config.shockMax - config.shockMin)) * (crash ? -1 : 1);
+            double shockChance = Math.min(1, (config.crashProbability + config.rallyProbability)
+                    * style.shockChanceFactor());
+            if (roll < shockChance) {
+                boolean crash = roll < Math.min(1, config.crashProbability * style.shockChanceFactor());
+                shock = (config.shockMin + random() * (config.shockMax - config.shockMin))
+                        * style.shockAmplitudeFactor() * (crash ? -1 : 1);
                 m.shockLeft = config.shockDurationSteps;
                 m.event = crash ? "暴落・流動性ショック" : "急騰・買い集中";
                 m.eventTime = state.time;
             }
             double noise = (random() + random() + random() + random() + random() + random() - 3) * Math.sqrt(2);
-            double vol = config.volatility * s.volatilityMultiplier;
-            m.trend = m.trend * config.trendPersistence + (random() - .5) * vol * .08;
+            double vol = config.volatility * s.volatilityMultiplier * style.volatilityFactor();
+            m.trend = m.trend * Math.min(.9999, config.trendPersistence * style.trendFactor())
+                    + (random() - .5) * vol * .08;
             double move = noise * vol * (m.shockLeft > 0 ? config.shockVolatilityMultiplier : 1)
-                    + m.trend + Math.log(s.initialPrice / m.price) * config.meanReversion;
+                    + m.trend + Math.log(s.initialPrice / m.price) * config.meanReversion * style.meanReversionFactor();
             m.previous = m.price;
             updatePrice(m, m.price * Math.exp(Math.max(-1, Math.min(1, move))) * (1 + shock));
             if (m.shockLeft > 0) m.shockLeft--;
@@ -204,7 +223,8 @@ public final class FxEngine {
 
     public void shock(String symbol, boolean crash) {
         Market m = market(symbol);
-        double move = config.shockMin + random() * (config.shockMax - config.shockMin);
+        double move = (config.shockMin + random() * (config.shockMax - config.shockMin))
+                * style(settings(symbol)).shockAmplitudeFactor();
         m.event = crash ? "暴落・流動性ショック" : "急騰・買い集中";
         m.eventTime = state.time; m.shockLeft = config.shockDurationSteps;
         setPrice(symbol, Math.max(config.minimumPrice, Math.min(config.maximumPrice, m.price * (1 + (crash ? -move : move)))));
@@ -255,7 +275,7 @@ public final class FxEngine {
 
     private void fill(Account a, Order o, double price, boolean pending) {
         double notional = price * o.units;
-        double cost = fee(notional);
+        double cost = fee(notional, o.symbol);
         double margin = notional / o.leverage;
         // Include the spread loss so opening a position never consumes reserved funds of another order.
         double spreadLoss = (price - exitQuote(market(o.symbol), o.side)) * o.side.sign() * o.units;
@@ -272,7 +292,7 @@ public final class FxEngine {
 
     private void closeAt(Account a, Position p, double units, double price, String reason) {
         double gross = (price - p.entryPrice) * units * p.side.sign();
-        double cost = fee(price * units);
+        double cost = fee(price * units, p.symbol);
         double previousBalance = a.balance;
         a.balance = Math.min(Math.max(config.maxAccountBalance, previousBalance), previousBalance + gross - cost);
         double settled = a.balance - previousBalance;
@@ -325,6 +345,8 @@ public final class FxEngine {
         for (Market m : state.markets.values()) {
             FxConfig.Symbol setting = settings(m.symbol);
             Quote q = new Quote(); q.symbol = m.symbol; q.name = setting.name; q.color = setting.color;
+            q.style = style(setting).label(); q.maxLeverage = maxLeverage(m.symbol);
+            q.commissionBps = config.commissionBps * style(setting).commissionFactor();
             q.price = m.price; q.bid = bid(m); q.ask = ask(m); q.event = m.event; q.eventTime = m.eventTime;
             double first = m.candles.isEmpty() ? m.price : m.candles.get(0).open;
             q.change = (m.price / first - 1) * 100;
@@ -372,7 +394,18 @@ public final class FxEngine {
     private double exitQuote(Market m, Side side) { return side == Side.BUY ? bid(m) : ask(m); }
     private double executionEntry(Market m, Side side) { return entryQuote(m, side) * (1 + side.sign() * config.marketSlippageBps / 10000); }
     private double executionExit(Market m, Side side) { return exitQuote(m, side) * (1 - side.sign() * config.marketSlippageBps / 10000); }
-    private double fee(double notional) { return notional * config.commissionBps / 10000; }
+    private double fee(double notional, String symbol) {
+        return notional * config.commissionBps * style(settings(symbol)).commissionFactor() / 10000;
+    }
+    private double spreadBps(String symbol) {
+        return config.spreadBps * style(settings(symbol)).spreadFactor();
+    }
+    private int maxLeverage(String symbol) {
+        return Math.max(1, (int) Math.floor(config.maxLeverage * style(settings(symbol)).leverageFactor()));
+    }
+    private static FxConfig.Style style(FxConfig.Symbol symbol) {
+        return symbol.style == null ? FxConfig.Style.BALANCED : symbol.style;
+    }
     private double random() {
         long x = state.randomState == 0 ? 0x1234abcd5678ef90L : state.randomState;
         x ^= x << 13; x ^= x >>> 7; x ^= x << 17; state.randomState = x;

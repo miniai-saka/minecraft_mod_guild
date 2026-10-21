@@ -140,6 +140,35 @@ public class FxEngineTest {
         assertEquals(a.positions.get(0).id, b.positions.get(0).id); assertEquals(e.state.nextId, other.state.nextId);
         e.step(1000); other.step(1000); assertEquals(e.state.randomState, other.state.randomState);
     }
+    @Test public void dailySeedReseedsOnlyWhenTheInGameDayChanges() {
+        e.beginDay(10, 777);
+        assertEquals(10, e.state.seedDay); assertEquals(777, e.state.dailySeed);
+        assertEquals(777, e.state.randomState);
+        e.step(1000);
+        long midDayState = e.state.randomState;
+        e.beginDay(10, 999);
+        assertEquals("same day must not reroll the market", midDayState, e.state.randomState);
+        assertEquals(777, e.state.dailySeed);
+        e.beginDay(11, 888);
+        assertEquals(11, e.state.seedDay); assertEquals(888, e.state.dailySeed);
+        assertEquals(888, e.state.randomState);
+    }
+    @Test public void stableSymbolsCapLeverageAndTightenSpread() {
+        c.spreadBps = 20; c.commissionBps = 10; e.configure(c);
+        reject(() -> {
+            Request r = order(OrderType.MARKET, Side.BUY, 1, 251, 0); r.symbol = "EMB";
+            e.submit(a, r);
+        });
+        Snapshot s = e.snapshot("alice", "AUR", 0);
+        Quote aur = s.quotes.stream().filter(q -> q.symbol.equals("AUR")).findFirst().orElseThrow();
+        Quote emb = s.quotes.stream().filter(q -> q.symbol.equals("EMB")).findFirst().orElseThrow();
+        assertEquals(250, emb.maxLeverage);
+        assertEquals("安定", emb.style);
+        assertEquals(8, emb.commissionBps, 1e-9);
+        assertEquals(10, aur.commissionBps, 1e-9);
+        assertEquals(.0020, (aur.ask - aur.bid) / aur.price, 1e-9);
+        assertEquals(.0016, (emb.ask - emb.bid) / emb.price, 1e-9);
+    }
     @Test public void disabledExchangeStillHonorsExitsAndWithdrawals() {
         e.submit(a, order(OrderType.MARKET, Side.BUY, 1, 1, 0)); c.enabled = false; e.configure(c);
         reject(() -> e.submit(a, order(OrderType.MARKET, Side.BUY, 1, 1, 0)));

@@ -17,13 +17,13 @@
   "candleHistory": 720,
   "initialHistoryCandles": 120,
   "maxExpiryMinutes": 1440,
-  "spreadBps": 1.5,
-  "commissionBps": 0.1,
-  "marketSlippageBps": 0.15,
+  "spreadBps": 2.0,
+  "commissionBps": 0.5,
+  "marketSlippageBps": 0.4,
   "stopOutRatio": 0.5,
   "volatility": 0.0009,
-  "trendPersistence": 0.97,
-  "meanReversion": 0.00001,
+  "trendPersistence": 0.90,
+  "meanReversion": 0.00003,
   "crashProbability": 0.0005,
   "rallyProbability": 0.00035,
   "shockMin": 0.04,
@@ -33,8 +33,8 @@
   "minimumPrice": 0.01,
   "maximumPrice": 1000000,
   "symbols": [
-    { "id": "AUR", "name": "オーロラ", "initialPrice": 100, "volatilityMultiplier": 1, "color": 5859054 },
-    { "id": "EMB", "name": "エンバー", "initialPrice": 50, "volatilityMultiplier": 1.65, "color": 15437913 },
-    { "id": "TID", "name": "タイド", "initialPrice": 25, "volatilityMultiplier": 0.75, "color": 2402715 }
+    { "id": "AUR", "name": "オーロラ", "initialPrice": 100, "volatilityMultiplier": 1, "color": 5859054, "style": "BALANCED" },
+    { "id": "EMB", "name": "エンバー", "initialPrice": 50, "volatilityMultiplier": 1.65, "color": 15437913, "style": "STABLE" },
+    { "id": "TID", "name": "タイド", "initialPrice": 25, "volatilityMultiplier": 0.75, "color": 2402715, "style": "VOLATILE" }
   ]
 }

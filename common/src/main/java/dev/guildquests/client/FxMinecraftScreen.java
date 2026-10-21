@@ -130,7 +130,8 @@ public final class FxMinecraftScreen extends Screen {
         try {
             Request r = request("ORDER"); r.side = side; r.type = type; r.units = parse(units);
             double lev = parse(leverage);
-            if (lev != Math.floor(lev) || lev < 1 || lev > data.config.maxLeverage) throw new IllegalArgumentException("倍率は1〜" + data.config.maxLeverage + "の整数です。");
+            int maxLeverage = quote().maxLeverage > 0 ? quote().maxLeverage : data.config.maxLeverage;
+            if (lev != Math.floor(lev) || lev < 1 || lev > maxLeverage) throw new IllegalArgumentException("倍率は1〜" + maxLeverage + "の整数です。");
             if (r.units <= 0) throw new IllegalArgumentException("数量を入力してください。");
             r.leverage = (int) lev; r.price = type == OrderType.MARKET ? 0 : parse(price);
             pending = r; modal = "REVIEW"; init();
@@ -162,7 +163,7 @@ public final class FxMinecraftScreen extends Screen {
             if (h > 285) {
                 text(g, "有効証拠金 " + number(data.equity) + "  余剰 " + number(data.freeMargin) + " GC", x + 10, y + 224, 0x404040);
                 text(g, data.delinquent ? "債務滞納中: " + data.guildDebt + " GC / 新規取引停止" : riskLabel(), x + 10, y + 240, data.delinquent || data.config.marginCallEnabled ? 0x9B2828 : 0x3B5636);
-                text(g, quote().event + " / 最大 " + data.config.maxLeverage + "倍", x + 10, y + 256, 0x555555);
+                text(g, quote().event + " / " + (quote().style == null ? "バランス" : quote().style) + " / 最大 " + (quote().maxLeverage > 0 ? quote().maxLeverage : data.config.maxLeverage) + "倍", x + 10, y + 256, 0x555555);
             }
         } else drawRows(g);
         super.render(g, mx, my, delta);

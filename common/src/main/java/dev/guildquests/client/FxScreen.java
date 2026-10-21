@@ -104,6 +104,7 @@ public final class FxScreen extends Screen {
     }
 
     private Quote quote() { return data.quotes.stream().filter(q -> q.symbol.equals(data.selected)).findFirst().orElse(data.quotes.get(0)); }
+    private int maxLeverage() { return quote().maxLeverage > 0 ? quote().maxLeverage : data.config.maxLeverage; }
     private void updateTransform() {
         scale = Math.min(width / (float) W, height / (float) H);
         originX = (width - W * scale) / 2; originY = (height - H * scale) / 2;
@@ -168,7 +169,7 @@ public final class FxScreen extends Screen {
             if (active) box(d, 26, y - 4, 142, 59, PALE);
             dot(d, 37, y + 7, 0xFF000000 | q.color);
             text(d, q.symbol + "/GC", 48, y + 2, active ? BLUE : INK);
-            text(d, fit(q.name, 112), 35, y + 19, MUTED);
+            text(d, fit(q.name + " / " + (q.style == null ? "バランス" : q.style), 112), 35, y + 19, MUTED);
             text(d, number(q.price), 35, y + 35, INK);
             right(d, String.format(Locale.ROOT, "%+.2f%%", q.change), 159, y + 35, tone(q.change));
             hits.add(new Hit(26, y - 4, 142, 59, () -> select(q.symbol), "騰落率は保存チャートの先頭価格との比較です。"));
@@ -267,7 +268,7 @@ public final class FxScreen extends Screen {
     private void orderPanel(GuiGraphics d, float delta) {
         panel(d, 800, 150, 278, 496);
         text(d, editingId == 0 ? "新規注文" : "決済OCOの編集  #" + editingId, 818, 165, INK);
-        right(d, "最大 " + data.config.maxLeverage + "x", 1060, 165, BLUE);
+        right(d, "最大 " + maxLeverage() + "x", 1060, 165, BLUE);
         button(d, 818, 190, 120, 30, "買い / BUY", side == Side.BUY, GREEN, () -> changeSide(Side.BUY), "ASKで買い、BIDで決済します。");
         button(d, 946, 190, 116, 30, "売り / SELL", side == Side.SELL, RED, () -> changeSide(Side.SELL), "BIDで売り、ASKで決済します。");
         for (int i = 0; i < MODES.length; i++) {
@@ -283,7 +284,7 @@ public final class FxScreen extends Screen {
             }
         } else text(d, mode == OrderType.OCO ? "指値 + 逆指値 / 片方の約定で他方取消" : "価格は 1 " + data.selected + " あたりの GC", 820, 291, MUTED);
         input(d, units, "数量 (" + data.selected + ")", editingId == 0, delta);
-        input(d, leverage, "レバレッジ (1〜" + data.config.maxLeverage + ")", editingId == 0, delta);
+        input(d, leverage, "レバレッジ (1〜" + maxLeverage() + ")", editingId == 0, delta);
         boolean pendingEntry = editingId == 0 && mode != OrderType.MARKET && !((mode == OrderType.IFD || mode == OrderType.IFO) && entry == Entry.MARKET);
         input(d, price, mode == OrderType.OCO ? "指値価格" : "新規価格 (GC)", pendingEntry, delta);
         input(d, second, "OCO 逆指値価格", editingId == 0 && mode == OrderType.OCO, delta);
@@ -297,7 +298,7 @@ public final class FxScreen extends Screen {
         double notional = size * ref;
         d.fill(818, 489, 1062, 490, LINE);
         text(d, "必要証拠金（概算）", 820, 501, MUTED); right(d, money(lev > 0 ? notional / lev : 0) + " GC", 1062, 501, INK);
-        text(d, "新規手数料（概算）", 820, 518, MUTED); right(d, number(notional * data.config.commissionBps / 10000) + " GC", 1062, 518, INK);
+        text(d, "新規手数料（概算）", 820, 518, MUTED); right(d, number(notional * (quote().commissionBps > 0 ? quote().commissionBps : data.config.commissionBps) / 10000) + " GC", 1062, 518, INK);
         text(d, "ASK " + number(quote().ask), 820, 536, GREEN); right(d, "BID " + number(quote().bid), 1062, 536, RED);
         button(d, 818, 558, 244, 31, editingId == 0 ? "注文内容を確認する" : "決済OCOを更新する", true,
                 stale() ? MUTED : editingId == 0 ? BLUE : GREEN, this::reviewOrder, "送信前に注文内容を表示します。サーバーが最終的に価格・証拠金を検証します。");
@@ -434,7 +435,7 @@ public final class FxScreen extends Screen {
             r.units = parse(units); r.leverage = integer(leverage); r.price = parse(price); r.secondPrice = parse(second);
             r.takeProfit = parse(tp); r.stopLoss = mode == OrderType.IFD ? 0 : parse(sl); r.trailingDistance = parse(trailing);
             r.expiryMinutes = integer(expiry);
-            if (editingId == 0 && (r.units <= 0 || r.leverage < 1 || r.leverage > data.config.maxLeverage))
+            if (editingId == 0 && (r.units <= 0 || r.leverage < 1 || r.leverage > maxLeverage()))
                 throw new IllegalArgumentException("数量とレバレッジを確認してください。");
             pending = r; modal = "REVIEW"; clearFocus();
         } catch (IllegalArgumentException ex) { localError(ex.getMessage()); }
