@@ -238,7 +238,7 @@ config/guildquests/server-update.json  # Fabric / Forge 専用サーバー
   "amount": 32,
   "amountMin": 16,
   "amountMax": 48,
-  "reward": 96,
+  "reward": 8,
   "repeatable": true,
   "cooldownDays": 2
 }
