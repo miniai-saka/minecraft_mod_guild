@@ -519,17 +519,18 @@ public final class GuildService {
     }
 
     /**
-     * Mining-based loan repayment. While the player still owes a loan, breaking a block whose id
-     * is listed in {@code loanMiningValues} repays the loan directly (never the balance). The
-     * credit is accumulated in thousandths of a coin so fractional rates stay exact.
+     * Mining-based debt repayment. While the player owes a consumer loan or FX/ribo debt, breaking
+     * a block whose id is listed in {@code loanMiningValues} repays the loan first and then the
+     * shared debt directly (never the balance). The credit is accumulated in thousandths of a coin
+     * so fractional rates stay exact.
      */
     public static void onBlockBreak(ServerPlayer player, BlockState state) {
         ModConfig config = ConfigManager.config();
-        if (!config.consumerLoanEnabled || config.loanMiningValues.isEmpty()) return;
+        if (config.loanMiningValues.isEmpty()) return;
         if (player.isCreative()) return; // no creative mining credit
         GuildPersistentState guildState = GuildPersistentState.get(player.getServer());
         PlayerGuildData data = guildState.get(player.getUUID());
-        if (data.loan <= 0) return; // only while a loan is owed
+        if (data.loan <= 0 && data.debt <= 0) return; // only while debt remains
 
         ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         Double value = config.loanMiningValues.get(blockId.toString());
@@ -539,17 +540,26 @@ public final class GuildService {
         if (add <= 0) return;
         data.loanCreditMillis += add;
 
-        long pay = data.loanCreditMillis / 1000;
-        if (pay > 0) {
-            long applied = Math.min(pay, data.loan);
-            data.loan -= applied;
-            data.loanCreditMillis -= applied * 1000;
+        long available = data.loanCreditMillis / 1000;
+        if (available > 0) {
+            long loanPaid = Math.min(available, data.loan);
+            data.loan -= loanPaid;
+            available -= loanPaid;
+            long debtPaid = Math.min(available, data.debt);
+            data.debt -= debtPaid;
+            data.loanCreditMillis -= (loanPaid + debtPaid) * 1000;
             if (data.loan <= 0) {
                 data.loan = 0;
-                data.loanCreditMillis = 0;
                 data.nextLoanInterestAt = 0;
-                message(player, "採掘による返済で消費者金融の債務を完済しました。", ChatFormatting.GREEN);
+                if (loanPaid > 0) message(player, "採掘による返済で消費者金融の債務を完済しました。", ChatFormatting.GREEN);
             }
+            if (data.debt <= 0) {
+                data.debt = 0;
+                data.delinquent = data.adminDelinquent;
+                data.nextRiboDueAt = 0;
+                if (debtPaid > 0) message(player, "採掘による返済でFX・リボ債務を完済しました。", ChatFormatting.GREEN);
+            }
+            if (data.loan <= 0 && data.debt <= 0) data.loanCreditMillis = 0;
         }
         guildState.setDirty();
     }

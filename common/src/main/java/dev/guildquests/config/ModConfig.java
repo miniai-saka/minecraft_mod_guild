@@ -83,8 +83,8 @@ public final class ModConfig {
     public Map<String, Long> consumerLoanLimits = new LinkedHashMap<>();
 
     /**
-     * Mining-based loan repayment: block id -> coin value credited per block mined.
-     * Only applies while the player still owes a loan, and only repays the loan (never the balance).
+     * Mining-based debt repayment: block id -> coin value credited per block mined.
+     * Applies while a consumer loan or FX/ribo debt remains; the loan is repaid first, then debt.
      */
     public Map<String, Double> loanMiningValues = new LinkedHashMap<>();
 
@@ -106,15 +106,15 @@ public final class ModConfig {
         consumerLoanLimits.put("A", 50_000L);
         consumerLoanLimits.put("S", 100_000L);
 
-        loanMiningValues.put("minecraft:stone", 0.001);
-        loanMiningValues.put("minecraft:cobblestone", 0.001);
-        loanMiningValues.put("minecraft:coal_ore", 0.02);
-        loanMiningValues.put("minecraft:deepslate_coal_ore", 0.02);
-        loanMiningValues.put("minecraft:iron_ore", 0.03);
-        loanMiningValues.put("minecraft:deepslate_iron_ore", 0.03);
-        loanMiningValues.put("minecraft:gold_ore", 0.08);
-        loanMiningValues.put("minecraft:deepslate_gold_ore", 0.08);
-        loanMiningValues.put("minecraft:diamond_ore", 0.2);
-        loanMiningValues.put("minecraft:deepslate_diamond_ore", 0.2);
+        loanMiningValues.put("minecraft:stone", 0.01);
+        loanMiningValues.put("minecraft:cobblestone", 0.01);
+        loanMiningValues.put("minecraft:coal_ore", 0.2);
+        loanMiningValues.put("minecraft:deepslate_coal_ore", 0.2);
+        loanMiningValues.put("minecraft:iron_ore", 0.3);
+        loanMiningValues.put("minecraft:deepslate_iron_ore", 0.3);
+        loanMiningValues.put("minecraft:gold_ore", 0.8);
+        loanMiningValues.put("minecraft:deepslate_gold_ore", 0.8);
+        loanMiningValues.put("minecraft:diamond_ore", 2.0);
+        loanMiningValues.put("minecraft:deepslate_diamond_ore", 2.0);
     }
 }

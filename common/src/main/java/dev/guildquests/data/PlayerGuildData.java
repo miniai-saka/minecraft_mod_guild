@@ -29,7 +29,7 @@ public final class PlayerGuildData {
     public long loan = 0;
     /** Epoch millis of the next loan interest charge. 0 when no loan. */
     public long nextLoanInterestAt = 0;
-    /** Mining-based loan repayment credit, in thousandths of a coin (0.001 coin = 1). */
+    /** Mining-based debt repayment credit, in thousandths of a coin (0.001 coin = 1). */
     public long loanCreditMillis = 0;
     public final List<ActiveQuest> activeQuests = new ArrayList<>();
     public final Set<String> completedQuestIds = new HashSet<>();
@@ -148,7 +148,7 @@ public final class PlayerGuildData {
             data.nextLoanInterestAt = 0;
         }
         data.loanCreditMillis = Math.max(0L, nbt.getLong("LoanCreditMillis"));
-        if (data.loan <= 0) {
+        if (data.loan <= 0 && data.debt <= 0) {
             data.loanCreditMillis = 0;
         }
 
