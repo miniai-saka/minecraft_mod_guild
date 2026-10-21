@@ -53,7 +53,17 @@ public class ServerReleaseClientTest {
 
     private String release(String extra, String name) {
         return "{\"tag_name\":\"v26.7.2\"," + extra + "\"assets\":[{\"name\":\"" + name
-                + "\",\"size\":123,\"browser_download_url\":\"https://example.com/mod.jar\"}]}";
+                + "\",\"size\":123,\"digest\":\"sha256:" + "a".repeat(64)
+                + "\",\"browser_download_url\":\"https://example.com/mod.jar\"}]}";
+    }
+
+    private static String sha256(byte[] body) {
+        try {
+            return java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(body));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Test public void findsOnlyExactFabricAssetAndIgnoresBodyText() {
@@ -77,7 +87,9 @@ public class ServerReleaseClientTest {
         byte[] body = jar("guildquests", "26.7.2", "*", "~1.20.1");
         String url = serve(body, 200);
         Path dir = temporary.newFolder("update").toPath();
-        Path staged = ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length, null), dir, "fabric", 2, 2, true, VALIDATOR);
+        Path staged = ServerReleaseClient.downloadToStage(
+                new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length, sha256(body)),
+                dir, "fabric", 2, 2, true, VALIDATOR);
         assertTrue(staged.toString().endsWith(".jar.download"));
         assertArrayEquals(body, Files.readAllBytes(staged));
         try (var files = Files.list(dir)) { assertEquals(1, files.count()); }
@@ -86,7 +98,9 @@ public class ServerReleaseClientTest {
     @Test public void httpFailureLeavesNoJarOrPartialFile() throws Exception {
         String url = serve("not found".getBytes(StandardCharsets.UTF_8), 404);
         Path dir = temporary.newFolder("update").toPath();
-        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url), dir, "fabric", 2, 2, true, VALIDATOR));
+        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(
+                new ServerReleaseClient.UpdateInfo("26.7.2", url, 9, "a".repeat(64)),
+                dir, "fabric", 2, 2, true, VALIDATOR));
         try (var files = Files.list(dir)) { assertEquals(0, files.count()); }
     }
 
@@ -94,9 +108,24 @@ public class ServerReleaseClientTest {
         byte[] body = jar("guildquests", "26.7.2", "*", "~1.20.1");
         String url = serve(body, 200);
         Path dir = temporary.newFolder("update").toPath();
-        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length + 1, null), dir, "fabric", 2, 2, true, VALIDATOR));
-        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length, "0".repeat(64)), dir, "fabric", 2, 2, true, VALIDATOR));
+        String hash = sha256(body);
+        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(
+                new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length + 1, hash),
+                dir, "fabric", 2, 2, true, VALIDATOR));
+        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(
+                new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length, "0".repeat(64)),
+                dir, "fabric", 2, 2, true, VALIDATOR));
+        assertThrows(IOException.class, () -> ServerReleaseClient.downloadToStage(
+                new ServerReleaseClient.UpdateInfo("26.7.2", url, body.length, null),
+                dir, "fabric", 2, 2, true, VALIDATOR));
         try (var files = Files.list(dir)) { assertEquals(0, files.count()); }
+    }
+
+    @Test public void rejectsReleaseAssetWithoutDigest() {
+        String json = "{\"tag_name\":\"v26.7.2\",\"assets\":[{\"name\":\"guildquests_fabric-1.20.1_26.7.2.jar\","
+                + "\"size\":123,\"browser_download_url\":\"https://example.com/mod.jar\"}]}";
+        assertThrows(IllegalArgumentException.class,
+                () -> ServerReleaseClient.parseRelease(json, "26.7.1", "fabric"));
     }
 
     @Test public void rejectsInvalidIncompatibleAndClientOnlyJars() throws Exception {

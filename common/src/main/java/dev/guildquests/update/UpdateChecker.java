@@ -1,14 +1,18 @@
 package dev.guildquests.update;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /** Checks GitHub Releases for a newer version and auto-downloads it. */
 public final class UpdateChecker {
@@ -21,7 +25,10 @@ public final class UpdateChecker {
     }
 
     /** Result of a successful update check. */
-    public record UpdateInfo(String latestVersion, String downloadUrl) {
+    public record UpdateInfo(String latestVersion, String downloadUrl, long size, String sha256) {
+        public UpdateInfo(String latestVersion, String downloadUrl) {
+            this(latestVersion, downloadUrl, -1, null);
+        }
     }
 
     /**
@@ -71,33 +78,59 @@ public final class UpdateChecker {
             }
 
             String body = response.body();
-            String tagName = extractString(body, "tag_name");
-            LOGGER.info("[Update] tag_name extracted: {}", tagName);
-            if (tagName == null) {
-                return null;
+            UpdateInfo info = parseRelease(body, currentVersion, loader);
+            if (info != null) {
+                LOGGER.info("[Update] Found v{} ({} bytes, sha256={})",
+                        info.latestVersion(), info.size(), info.sha256());
+            } else {
+                LOGGER.info("[Update] No usable update asset (release body length={})", body.length());
             }
-
-            String latest = tagName.startsWith("v") ? tagName.substring(1) : tagName;
-            int cmp = compareVersions(currentVersion, latest);
-            LOGGER.info("[Update] Version compare: current={} latest={} cmp={}", currentVersion, latest, cmp);
-            if (cmp >= 0) {
-                return null;
-            }
-
-            String jarName = "guildquests_" + loader + "-1.20.1_" + latest + ".jar";
-            LOGGER.info("[Update] Looking for JAR: {}", jarName);
-            String url = extractAssetUrl(body, jarName);
-            LOGGER.info("[Update] JAR URL result: {}", url == null ? "NULL" : url);
-            if (url == null) {
-                LOGGER.warn("[Update] Could not find JAR asset in release body. Body length={}", body.length());
-                return null;
-            }
-
-            return new UpdateInfo(latest, url);
+            return info;
         } catch (Exception e) {
             LOGGER.warn("[Update] Exception during check", e);
             return null;
         }
+    }
+
+    /**
+     * Parses a GitHub release body. The matching JAR must carry a {@code sha256} digest; an update
+     * without one is ignored instead of being downloaded unverified.
+     */
+    static UpdateInfo parseRelease(String json, String currentVersion, String loader) {
+        JsonObject release = JsonParser.parseString(json).getAsJsonObject();
+        if (isTrue(release, "draft") || isTrue(release, "prerelease")) return null;
+        if (!release.has("tag_name")) return null;
+
+        String tagName = release.get("tag_name").getAsString();
+        String latest = tagName.startsWith("v") || tagName.startsWith("V") ? tagName.substring(1) : tagName;
+        if (compareVersions(currentVersion, latest) >= 0) return null;
+
+        String jarName = "guildquests_" + loader + "-1.20.1_" + latest + ".jar";
+        if (!release.has("assets") || !release.get("assets").isJsonArray()) return null;
+        for (JsonElement element : release.getAsJsonArray("assets")) {
+            JsonObject asset = element.getAsJsonObject();
+            if (!asset.has("name") || !jarName.equals(asset.get("name").getAsString())) continue;
+            if (!asset.has("browser_download_url")) return null;
+            String url = ServerReleaseClient.requireHttpUri(asset.get("browser_download_url").getAsString()).toString();
+            long size = asset.has("size") && !asset.get("size").isJsonNull() ? asset.get("size").getAsLong() : -1;
+            if (size <= 0 || size > ServerReleaseClient.MAX_JAR_BYTES) {
+                throw new IllegalArgumentException("Invalid update asset size");
+            }
+            if (!asset.has("digest") || asset.get("digest").isJsonNull()) {
+                LOGGER.warn("[Update] Release asset {} has no SHA-256 digest; refusing the update", jarName);
+                return null;
+            }
+            String digest = asset.get("digest").getAsString();
+            if (!digest.matches("sha256:[0-9a-fA-F]{64}")) {
+                throw new IllegalArgumentException("Invalid SHA-256 digest");
+            }
+            return new UpdateInfo(latest, url, size, digest.substring(7).toLowerCase(Locale.ROOT));
+        }
+        return null;
+    }
+
+    private static boolean isTrue(JsonObject object, String key) {
+        return object.has(key) && !object.get(key).isJsonNull() && object.get(key).getAsBoolean();
     }
 
     /** Outcome of {@link #download}. */
@@ -127,8 +160,12 @@ public final class UpdateChecker {
      */
     public static DownloadResult download(UpdateInfo info, Path modsDir, String loader) {
         try {
+            if (info.sha256() == null || !info.sha256().matches("[0-9a-f]{64}")) {
+                LOGGER.warn("[Update] Refusing to download {} without a SHA-256 digest", info.latestVersion());
+                return DownloadResult.FAILED;
+            }
             String fileName = "guildquests_" + loader + "-1.20.1_" + info.latestVersion() + ".jar";
-            LOGGER.info("[Update] Download URL: {}", info.downloadUrl());
+            LOGGER.info("[Update] Download URL: {} (sha256={})", info.downloadUrl(), info.sha256());
 
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(30))
@@ -146,14 +183,36 @@ public final class UpdateChecker {
             Path target = modsDir.resolve(fileName);
             LOGGER.info("[Update] Download start: loader={} mods={} staging={}", loader, modsDir, stagingDir);
             java.nio.file.Files.deleteIfExists(staged); // clear any partial prior attempt
+            java.nio.file.Files.deleteIfExists(checksumFile(staged));
             LOGGER.info("[Update] Downloading to staging: {}", staged);
 
             HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFile(staged));
-            LOGGER.info("[Update] Download response: {} ({} bytes)", response.statusCode(),
-                    java.nio.file.Files.exists(staged) ? java.nio.file.Files.size(staged) : -1);
+            long downloaded = java.nio.file.Files.exists(staged) ? java.nio.file.Files.size(staged) : -1;
+            LOGGER.info("[Update] Download response: {} ({} bytes)", response.statusCode(), downloaded);
             if (response.statusCode() != 200) {
-                java.nio.file.Files.deleteIfExists(staged); // never leave a broken JAR to be auto-installed
+                deleteStaged(staged);
                 LOGGER.warn("[Update] Download failed with status {}; staged file removed", response.statusCode());
+                return DownloadResult.FAILED;
+            }
+            if (downloaded <= 0 || downloaded > ServerReleaseClient.MAX_JAR_BYTES
+                    || (info.size() > 0 && downloaded != info.size())) {
+                deleteStaged(staged);
+                LOGGER.warn("[Update] Downloaded JAR size does not match the release asset; staged file removed");
+                return DownloadResult.FAILED;
+            }
+            String actual = UpdateInstaller.sha256(staged);
+            if (!info.sha256().equalsIgnoreCase(actual)) {
+                deleteStaged(staged);
+                LOGGER.warn("[Update] SHA-256 mismatch (expected {}, got {}); staged file removed",
+                        info.sha256(), actual);
+                return DownloadResult.FAILED;
+            }
+            writeChecksum(staged, actual);
+
+            // Verify again immediately before touching the mods folder.
+            if (!verify(staged, info.sha256())) {
+                deleteStaged(staged);
+                LOGGER.warn("[Update] Staged JAR changed after verification; update aborted");
                 return DownloadResult.FAILED;
             }
 
@@ -162,14 +221,15 @@ public final class UpdateChecker {
                 try {
                     java.nio.file.Files.move(staged, target,
                             java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                    LOGGER.info("[Update] Installed {} into mods (immediate)", fileName);
+                    java.nio.file.Files.deleteIfExists(checksumFile(staged));
+                    LOGGER.info("[Update] Installed {} into mods (immediate, SHA-256 verified)", fileName);
                     return DownloadResult.OK;
                 } catch (Exception e) {
                     LOGGER.warn("[Update] Could not install staged JAR", e);
                 }
             }
             // Otherwise swap automatically once the game has exited.
-            if (scheduleSwap(modsDir, staged, target)) {
+            if (scheduleSwap(modsDir, staged, target, info.sha256())) {
                 LOGGER.info("[Update] Update SCHEDULED: {} will replace the old JAR on exit", fileName);
                 return DownloadResult.SCHEDULED;
             }
@@ -187,21 +247,36 @@ public final class UpdateChecker {
      * JAR from the mods folder and moves the staged JAR into place.
      */
     public static boolean scheduleSwap(Path modsDir, Path staged, Path target) {
+        String expected = readChecksum(staged);
+        if (!verify(staged, expected)) {
+            LOGGER.warn("[Update] Staged JAR has no valid SHA-256 record; refusing to schedule it");
+            return false;
+        }
+        return scheduleSwap(modsDir, staged, target, expected);
+    }
+
+    public static boolean scheduleSwap(Path modsDir, Path staged, Path target, String expectedSha256) {
+        if (!verify(staged, expectedSha256)) {
+            LOGGER.warn("[Update] Staged JAR does not match the expected SHA-256; refusing to schedule it");
+            return false;
+        }
         String key = target.toString();
         if (!SCHEDULED_SWAPS.add(key)) {
             return true; // already scheduled this session
         }
         try {
             // Preferred: a small Java helper launched in its own JVM after the game exits
-            // (cross-platform, no shell scripts).
+            // (cross-platform, no shell scripts). It re-verifies the hash before moving the file.
             Path selfJar = resolveSelfJar(modsDir);
             if (selfJar != null) {
                 Runtime.getRuntime().addShutdownHook(new Thread(
-                        () -> spawnJavaHelper(selfJar, modsDir, staged, target), "GuildQuests-UpdateSwap"));
-                LOGGER.info("[Update] Scheduled post-exit Java swap helper (jar={})", selfJar);
+                        () -> spawnJavaHelper(selfJar, modsDir, staged, target, expectedSha256),
+                        "GuildQuests-UpdateSwap"));
+                LOGGER.info("[Update] Scheduled post-exit Java swap helper (jar={}, sha256={})",
+                        selfJar, expectedSha256);
                 return true;
             }
-            // Fallback: a shell script.
+            // Fallback: a shell script. The JAR was verified above; the helper JVM path is preferred.
             boolean windows = System.getProperty("os.name", "")
                     .toLowerCase(java.util.Locale.ROOT).contains("win");
             Path script = staged.resolveSibling(windows ? "guildquests-swap.bat" : "guildquests-swap.sh");
@@ -241,7 +316,7 @@ public final class UpdateChecker {
         return null;
     }
 
-    private static void spawnJavaHelper(Path jar, Path modsDir, Path staged, Path target) {
+    private static void spawnJavaHelper(Path jar, Path modsDir, Path staged, Path target, String expectedSha256) {
         try {
             // Copy the mod JAR OUT of the mods folder first. The helper JVM would otherwise hold
             // its own classpath JAR (the very one it must delete) open, and Windows would refuse
@@ -254,11 +329,11 @@ public final class UpdateChecker {
             boolean windows = System.getProperty("os.name", "")
                     .toLowerCase(java.util.Locale.ROOT).contains("win");
             Path javaExe = Path.of(javaHome, "bin", windows ? "javaw.exe" : "java");
-            LOGGER.info("[Update] Spawning swap helper: {} -cp {} dev.guildquests.update.UpdateApplier {} {} {}",
-                    javaExe, updaterJar, modsDir, staged, target);
+            LOGGER.info("[Update] Spawning swap helper: {} -cp {} dev.guildquests.update.UpdateApplier {} {} {} sha256={}",
+                    javaExe, updaterJar, modsDir, staged, target, expectedSha256);
             new ProcessBuilder(javaExe.toString(), "-cp", updaterJar.toString(),
                     "dev.guildquests.update.UpdateApplier",
-                    modsDir.toString(), staged.toString(), target.toString())
+                    modsDir.toString(), staged.toString(), target.toString(), expectedSha256)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
@@ -360,6 +435,12 @@ public final class UpdateChecker {
                     if (ver == null) {
                         continue;
                     }
+                    String checksum = readChecksum(p);
+                    if (!verify(p, checksum)) {
+                        deleteStaged(p);
+                        LOGGER.warn("[Update] Removed staged JAR without a valid SHA-256 record: {}", name);
+                        continue;
+                    }
                     if (compareVersions(currentVersion, ver) < 0) {
                         candidates.add(p);
                         if (newestVer == null || compareVersions(newestVer, ver) < 0) {
@@ -367,7 +448,7 @@ public final class UpdateChecker {
                             newestVer = ver;
                         }
                     } else {
-                        java.nio.file.Files.deleteIfExists(p);
+                        deleteStaged(p);
                         LOGGER.info("[Update] Removed stale staged JAR: {}", name);
                     }
                 }
@@ -376,11 +457,13 @@ public final class UpdateChecker {
                 // Keep only the newest staged JAR so a single swap runs at exit.
                 for (Path p : candidates) {
                     if (!p.getFileName().toString().equals(newest.getFileName().toString())) {
-                        java.nio.file.Files.deleteIfExists(p);
+                        deleteStaged(p);
                     }
                 }
-                scheduleSwap(modsDir, newest, modsDir.resolve(newest.getFileName().toString()));
-                LOGGER.info("[Update] Pending update {} will be applied on exit.", newest.getFileName());
+                scheduleSwap(modsDir, newest, modsDir.resolve(newest.getFileName().toString()),
+                        readChecksum(newest));
+                LOGGER.info("[Update] Pending update {} will be applied on exit (SHA-256 verified).",
+                        newest.getFileName());
             }
         } catch (Exception ignored) {
         }
@@ -466,6 +549,41 @@ public final class UpdateChecker {
         }
     }
 
+    /** Sidecar file holding the SHA-256 of a staged JAR. */
+    private static Path checksumFile(Path staged) {
+        return staged.resolveSibling(staged.getFileName() + ".sha256");
+    }
+
+    private static void writeChecksum(Path staged, String sha256) throws java.io.IOException {
+        java.nio.file.Files.writeString(checksumFile(staged), sha256 + "\n", StandardCharsets.UTF_8);
+    }
+
+    private static String readChecksum(Path staged) {
+        try {
+            String value = java.nio.file.Files.readString(checksumFile(staged), StandardCharsets.UTF_8).trim();
+            return value.matches("[0-9a-f]{64}") ? value : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static boolean verify(Path file, String expectedSha256) {
+        if (expectedSha256 == null || !expectedSha256.matches("[0-9a-f]{64}")) return false;
+        try {
+            return expectedSha256.equalsIgnoreCase(UpdateInstaller.sha256(file));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void deleteStaged(Path staged) {
+        try {
+            java.nio.file.Files.deleteIfExists(staged);
+            java.nio.file.Files.deleteIfExists(checksumFile(staged));
+        } catch (Exception ignored) {
+        }
+    }
+
     /** Compares dotted version strings numerically. Returns negative if a < b. */
     private static int compareVersions(String a, String b) {
         String[] pa = a.split("\\.");
@@ -478,17 +596,5 @@ public final class UpdateChecker {
             }
         }
         return 0;
-    }
-
-    private static String extractString(String json, String field) {
-        Matcher m = Pattern.compile("\"" + Pattern.quote(field) + "\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
-        return m.find() ? m.group(1) : null;
-    }
-
-    private static String extractAssetUrl(String json, String fileName) {
-        Matcher m = Pattern.compile(
-                "\"name\"\\s*:\\s*\"" + Pattern.quote(fileName) + "\"[\\s\\S]*?\"browser_download_url\"\\s*:\\s*\"([^\"]+)\""
-        ).matcher(json);
-        return m.find() ? m.group(1) : null;
     }
 }

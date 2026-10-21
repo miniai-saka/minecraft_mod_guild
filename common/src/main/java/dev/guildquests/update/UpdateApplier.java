@@ -18,29 +18,40 @@ import java.util.stream.Collectors;
  * Its stdout/stderr are discarded by the launcher, so progress is appended to
  * {@code <stagedDir>/swap.log} for diagnosis.
  * <p>
- * Args: {@code <modsDir> <stagedJar> <targetJar>}.
+ * Args: {@code <modsDir> <stagedJar> <targetJar> <sha256>}.
  */
 public final class UpdateApplier {
     private UpdateApplier() {
     }
 
     public static void main(String[] args) {
-        if (args.length < 3) {
+        if (args.length < 4) {
             return;
         }
         Path modsDir = Path.of(args[0]);
         Path staged = Path.of(args[1]);
         Path target = Path.of(args[2]);
+        String expectedSha256 = args[3];
         Path logFile = staged.getParent() != null ? staged.getParent().resolve("swap.log") : null;
 
         log(logFile, "=== swap start ===");
         log(logFile, "modsDir=" + modsDir);
         log(logFile, "staged=" + staged);
         log(logFile, "target=" + target);
+        log(logFile, "sha256=" + expectedSha256);
+
+        if (!expectedSha256.matches("[0-9a-f]{64}")) {
+            log(logFile, "missing or invalid SHA-256; aborting");
+            return;
+        }
 
         try {
             if (!Files.exists(staged)) {
                 log(logFile, "staged JAR missing; nothing to do");
+                return;
+            }
+            if (!matches(staged, expectedSha256)) {
+                log(logFile, "staged JAR SHA-256 mismatch; aborting");
                 return;
             }
 
@@ -79,8 +90,14 @@ public final class UpdateApplier {
                 Thread.sleep(1000);
             }
 
+            // The file must still match right before it is published.
+            if (!matches(staged, expectedSha256)) {
+                log(logFile, "staged JAR changed during the wait; aborting");
+                return;
+            }
             Files.move(staged, target, StandardCopyOption.REPLACE_EXISTING);
-            log(logFile, "moved staged -> target");
+            Files.deleteIfExists(staged.resolveSibling(staged.getFileName() + ".sha256"));
+            log(logFile, "moved staged -> target (SHA-256 verified)");
         } catch (Exception e) {
             log(logFile, "ERROR: " + e);
         } finally {
@@ -88,6 +105,14 @@ public final class UpdateApplier {
             log(logFile, "=== swap end ===");
         }
         System.exit(0);
+    }
+
+    private static boolean matches(Path file, String expectedSha256) {
+        try {
+            return expectedSha256.equalsIgnoreCase(UpdateInstaller.sha256(file));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static String listing(Path dir) {

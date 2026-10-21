@@ -89,10 +89,11 @@ FORGE_ARGS_FILE=libraries/net/minecraftforge/forge/1.20.1-47.2.0/unix_args.txt s
 - Fabric: `guildquests_fabric-1.20.1_<数値バージョン>.jar`
 - Forge: `guildquests_forge-1.20.1_<数値バージョン>.jar`
 
-サイズ・提供時のSHA-256・全エントリーのCRCを検証し、Fabricは `fabric.mod.json`、Forgeは `META-INF/mods.toml` からMod ID・バージョン・ローダーと依存条件を確認します。
+サイズ・GitHub Release AssetのSHA-256ダイジェスト（必須）・全エントリーのCRCを検証し、Fabricは `fabric.mod.json`、Forgeは `META-INF/mods.toml` からMod ID・バージョン・ローダーと依存条件を確認します。
 Forgeのバージョン範囲にはForgeと同じMaven形式を使用し、Javaの要件、必須Mod、導入済みの任意依存Modも検証します。
 他ローダーのJARや非対応のMinecraftバージョンは適用せず、サーバーを稼働させたまま再試行します。
 ドラフト・プレリリース・同じ版・古い版・該当JARのないReleaseも適用しません。
+SHA-256ダイジェストがないReleaseは適用しません。
 
 ダウンロードは `mods` 外の `config/guildquests/update/` で行います。
 検証後、Java 17だけで動く独立ヘルパーが元のJavaプロセスの終了を待ち、現在のJARを `update/backups/` へ保存して差し替えます。

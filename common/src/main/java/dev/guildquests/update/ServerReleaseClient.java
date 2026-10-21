@@ -73,6 +73,9 @@ public final class ServerReleaseClient {
                 if (!digest.matches("sha256:[0-9a-fA-F]{64}")) throw new IllegalArgumentException("Invalid SHA-256 digest");
                 digest = digest.substring(7).toLowerCase(java.util.Locale.ROOT);
             }
+            if (digest == null) {
+                throw new IllegalArgumentException("Release asset " + expected + " is missing a SHA-256 digest");
+            }
             return new UpdateInfo(latest, url, size, digest);
         }
         return null;
@@ -82,6 +85,9 @@ public final class ServerReleaseClient {
     public static Path downloadToStage(UpdateInfo info, Path updateDir, String loader,
                                        int connectTimeout, int requestTimeout, boolean dedicatedServer, MetadataValidator metadataValidator)
             throws IOException, InterruptedException {
+        if (info.sha256() == null || !info.sha256().matches("[0-9a-f]{64}")) {
+            throw new IOException("Update asset is missing a SHA-256 digest");
+        }
         Files.createDirectories(updateDir);
         Path part = Files.createTempFile(updateDir, "download-", ".part");
         Path staged = updateDir.resolve(jarName(loader, info.latestVersion()) + ".download");
@@ -94,7 +100,7 @@ public final class ServerReleaseClient {
             if (size == 0 || size > MAX_JAR_BYTES || (info.size() >= 0 && size != info.size())) {
                 throw new IOException("Downloaded JAR size does not match the release asset");
             }
-            if (info.sha256() != null && !info.sha256().equalsIgnoreCase(UpdateInstaller.sha256(part))) {
+            if (info.sha256() == null || !info.sha256().equalsIgnoreCase(UpdateInstaller.sha256(part))) {
                 throw new IOException("Downloaded JAR SHA-256 does not match the release asset");
             }
             validateJar(part, info.latestVersion(), dedicatedServer, metadataValidator);
