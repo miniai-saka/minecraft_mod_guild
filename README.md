@@ -2,7 +2,7 @@
 
 Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨、銀行、ギャンブルを単体で実装した Mod です。FTB Quests や Q Shop などへの依存はありません。
 
-現在のバージョン: **26.15.1**
+現在のバージョン: **26.15.2**
 
 ## 主な機能
 
@@ -83,7 +83,7 @@ Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨�
 ### その他
 
 - プレイヤー別の永続化（コイン・クエスト進捗・累計達成数・日次カウンタ・借入・債務）
-- 起動時に GitHub の最新リリースを確認し、新しいバージョンがあればタイトル画面で通知する（クライアント側の自動更新）
+- 起動時に GitHub の最新リリースを確認し、新しいバージョンがあればタイトル画面で通知する（クライアント側の自動更新）。ダウンロードした JAR はリリースの SHA-256 と照合し、一致しない場合は適用しない
 - G キーでクエスト GUI を開く
 - Create 連携（ストックティッカーの支払いをギルドコインで自動決済する）
 
@@ -106,14 +106,14 @@ Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨�
 生成物:
 
 ```text
-fabric/build/libs/guildquests_fabric-1.20.1_26.15.1.jar
-forge/build/libs/guildquests_forge-1.20.1_26.15.1.jar
+fabric/build/libs/guildquests_fabric-1.20.1_26.15.2.jar
+forge/build/libs/guildquests_forge-1.20.1_26.15.2.jar
 ```
 
 ## 導入
 
 1. Fabric または Forge で Minecraft 1.20.1 を用意します。
-2. ローダーに合う 26.15.1 の JAR を `mods/` へ配置します。Fabric では Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
+2. ローダーに合う 26.15.2 の JAR を `mods/` へ配置します。Fabric では Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定を変更したら、サーバーを再起動するか `/guildadmin reload` を実行します。
 
@@ -304,6 +304,7 @@ STRUCTURE は、プレイヤーの現在座標が対象構造物の内部に入�
 ## サーバーの自動更新（Fabric / Forge）
 
 専用サーバーで GitHub Releases を定期確認し、最初の検出から設定した時間を待って更新します。
+ダウンロードした JAR はリリースの SHA-256 と照合し、一致しない場合やダイジェストがない場合は適用しません。
 設定は `config/guildquests/server-update.json` に自動生成されます。初期値は 30 分ごとの確認と、検出後の 30 分待機です。
 `/guildadmin reload` または管理 GUI の設定再読込で変更を反映できます。
 
