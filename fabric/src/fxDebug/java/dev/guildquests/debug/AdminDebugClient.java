@@ -45,14 +45,14 @@ public final class AdminDebugClient implements ClientModInitializer {
                 switch (phase) {
                     case 0 -> { c.options.guiScale().set(2); c.resizeDisplay(); command(c,"fxdebug prepareadmin"); }
                     case 1 -> f8();
-                    case 2 -> { check(!(c.screen instanceof FxMinecraftScreen) && !FxUiPreferences.hotkeyEnabled(), "F8 does not open FX by default"); command(c,"guild"); }
+                    case 2 -> { check(!(c.screen instanceof FxScreen) && !FxUiPreferences.hotkeyEnabled(), "F8 does not open FX by default"); command(c,"guild"); }
                     case 3 -> slot(c,3);
                     case 4 -> { check(c.screen.getTitle().getString().equals("ギャンブル"), "Guild chest opens gambling menu"); shot(c,"gambling-fx-entry.png"); slot(c,16); }
-                    case 5 -> { check(c.screen instanceof FxMinecraftScreen, "Gambling FX entry works with F8 disabled"); shot(c,"fx-minecraft.png"); button(c,"UI設定"); }
+                    case 5 -> { check(c.screen instanceof FxScreen, "Gambling FX entry works with F8 disabled"); shot(c,"fx-minecraft.png"); button(c,"設定"); }
                     case 6 -> { shot(c,"fx-settings.png"); button(c,"F8でFXを開く: 無効（既定）"); }
                     case 7 -> { check(FxUiPreferences.hotkeyEnabled(), "Native settings enable F8"); button(c,"戻る"); c.screen.onClose(); }
                     case 8 -> f8();
-                    case 9 -> { check(c.screen instanceof FxMinecraftScreen, "F8 opens FX after enabling"); button(c,"UI設定"); }
+                    case 9 -> { check(c.screen instanceof FxScreen, "F8 opens FX after enabling"); button(c,"設定"); }
                     case 10 -> { button(c,"F8でFXを開く: 有効"); button(c,"戻る"); c.screen.onClose(); command(c,"guildadmin"); }
                     case 11 -> { check(c.screen instanceof AbstractContainerScreen, "Bare guildadmin opens vanilla chest UI"); shot(c,"admin-players.png"); player(c,"FxTester"); }
                     case 12 -> { shot(c,"admin-actions.png"); slot(c,10); }

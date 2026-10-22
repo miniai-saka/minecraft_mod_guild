@@ -28,7 +28,6 @@ public final class FxClient {
         var client = Minecraft.getInstance();
         if (client.screen instanceof FxUiSettingsScreen) return;
         if (client.screen instanceof FxScreen screen) screen.accept(snapshot);
-        else if (client.screen instanceof FxMinecraftScreen screen) screen.accept(snapshot);
         else if (snapshot.open) showUi();
     }
     public static void setScreen(Screen screen) {
@@ -38,8 +37,7 @@ public final class FxClient {
     }
     public static void showUi() {
         if (latest == null) return;
-        boolean white = "WHITE".equals(FxUiPreferences.resolved(latest.config.defaultUi));
-        setScreen(white ? new FxScreen(latest) : new FxMinecraftScreen(latest));
+        setScreen(new FxScreen(latest));
     }
     public static void settings() { setScreen(new FxUiSettingsScreen()); }
     public static void send(Request request) {

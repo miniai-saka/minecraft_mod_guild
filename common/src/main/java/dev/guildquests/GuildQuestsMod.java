@@ -143,6 +143,11 @@ public final class GuildQuestsMod {
                             .executes(context -> {
                                 dev.guildquests.gui.AuctionBrowseScreenHandler.open(context.getSource().getPlayerOrException());
                                 return 1;
+                            }))
+                    .then(Commands.literal("version")
+                            .executes(context -> {
+                                sendVersions(context.getSource());
+                                return 1;
                             })));
 
             var guildAdmin = Commands.literal("guildadmin")
@@ -299,5 +304,12 @@ public final class GuildQuestsMod {
         }
         source.sendSuccess(() -> Component.literal(message), false);
         return spawned;
+    }
+
+    /** `/version` and `/guild version`: the running server build. */
+    private static void sendVersions(CommandSourceStack source) {
+        source.sendSuccess(() -> Component.literal("[Guild] ").withStyle(ChatFormatting.GOLD)
+                .append(Component.literal("GuildQuests " + VERSION + " (" + Platform.getLoaderName() + ")")
+                        .withStyle(ChatFormatting.YELLOW)), false);
     }
 }

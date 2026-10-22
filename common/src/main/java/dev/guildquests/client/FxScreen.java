@@ -134,7 +134,7 @@ public final class FxScreen extends Screen {
         large(d, "FX", 62 + Math.round(measure("GUILD") * 1.6f) + 7, 18, 1.6f, BLUE);
         text(d, "ギルドコインで、架空通貨の市場へ。", 62, 41, MUTED);
         box(d, 316, 18, 80, 21, 0xFFE4F6F0); text(d, "仮想市場", 324, 25, GREEN);
-        button(d, 450, 20, 92, 30, "UI設定", false, BLUE, FxClient::settings, "Minecraft簡易UIと白背景の詳細UIを切り替えます。");
+        button(d, 450, 20, 92, 30, "設定", false, BLUE, FxClient::settings, "F8ホットキーの有効・無効を切り替えます。");
         text(d, data.delinquent ? "債務滞納中 / 新規取引停止" : data.config.marginCallEnabled ? "追証あり" : "追証なし", 560, 30, data.delinquent || data.config.marginCallEnabled ? RED : GREEN);
         dot(d, 770, 31, stale() ? RED : GREEN);
         text(d, stale() ? "接続を確認中" : "LIVE  " + clock(data.time), 782, 27, stale() ? RED : MUTED);

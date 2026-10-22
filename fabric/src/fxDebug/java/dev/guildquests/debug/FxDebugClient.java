@@ -57,7 +57,7 @@ public final class FxDebugClient implements ClientModInitializer {
                     case 1 -> {
                         if (s == null) return;
                         if (Boolean.getBoolean("guildquests.fxCapture")) { phase = 100; return; }
-                        check(client.screen instanceof FxMinecraftScreen && s.wallet == 50000, "Native Minecraft UI is the default, wallet synchronized");
+                        check(client.screen instanceof FxScreen && s.wallet == 50000, "Native Minecraft UI is the default, wallet synchronized");
                         Request r = req("DEPOSIT"); r.amount = 10000; FxClient.send(r); phase++;
                     }
                     case 2 -> {
@@ -92,7 +92,7 @@ public final class FxDebugClient implements ClientModInitializer {
                         check(s.account.orders.get(1).type == OrderType.STOP, "Native stop order stored on server");
                         click(client, "注文"); phase++;
                     }
-                    case 12 -> { screenshot(client, "native-orders.png"); click(client, "UI設定"); phase++; }
+                    case 12 -> { screenshot(client, "native-orders.png"); click(client, "設定"); phase++; }
                     case 13 -> { screenshot(client, "ui-settings.png"); click(client, "白背景・高機能ターミナル"); phase++; }
                     case 14 -> {
                         check(client.screen instanceof FxScreen && s.account.orders.size() == 2, "UI switch preserves live subscription and orders");
@@ -109,7 +109,7 @@ public final class FxDebugClient implements ClientModInitializer {
                     }
                     case 18 -> { click(client, "Minecraft風・簡易取引"); phase++; }
                     case 19 -> {
-                        check(client.screen instanceof FxMinecraftScreen, "Switch back to native UI without disconnecting");
+                        check(client.screen instanceof FxScreen, "Switch back to native UI without disconnecting");
                         FxClient.send(req("CANCEL_ALL")); phase++;
                     }
                     case 20 -> {
@@ -171,7 +171,7 @@ public final class FxDebugClient implements ClientModInitializer {
                     case 38 -> {
                         if (s.guildDebt != 21900) return;
                         command(client, "fxdebug legacycheck");
-                        click(client, "UI設定"); phase++;
+                        click(client, "設定"); phase++;
                     }
                     case 39 -> { click(client, "白背景・高機能ターミナル"); phase++; }
                     case 40 -> { screenshot(client, "white-margin-call.png"); whiteClick(client, 965, 35); phase++; }
@@ -181,7 +181,7 @@ public final class FxDebugClient implements ClientModInitializer {
                         click(client, "サーバー設定に従う（既定）"); phase++;
                     }
                     case 43 -> {
-                        check(client.screen instanceof FxMinecraftScreen && FxUiPreferences.style().equals("SERVER"), "Server UI preference restored and persisted locally");
+                        check(client.screen instanceof FxScreen && FxUiPreferences.style().equals("SERVER"), "Server UI preference restored and persisted locally");
                         client.getWindow().setWindowed(1100, 700); phase++; next += 1200;
                     }
                     case 44 -> { screenshot(client, "native-compact.png"); client.options.guiScale().set(3); client.resizeDisplay(); phase++; }
