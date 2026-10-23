@@ -49,10 +49,37 @@ public final class FxEngine {
             state.seedSalt = salt;
         }
         long seed = dailySeed(day);
-        if (state.seedDay == day && state.dailySeed == seed) return;
+        if (state.seedDay == day && state.dailySeed == seed) {
+            for (Market m : state.markets.values()) {
+                if (m.day != day || m.dayOpen <= 0 || m.dayTarget <= 0) anchorDay(m, day);
+            }
+            return;
+        }
         state.seedDay = day;
         state.dailySeed = seed;
         state.randomState = seed;
+        for (Market m : state.markets.values()) anchorDay(m, day);
+    }
+
+    /** Draws today's open and close from a normal daily return; the intraday path follows this line. */
+    private void anchorDay(Market m, long day) {
+        FxConfig.Symbol setting = settings(m.symbol);
+        FxConfig.Style style = style(setting);
+        m.day = day;
+        m.dayOpen = m.price > 0 ? m.price : setting.initialPrice;
+        m.dayStart = state.time;
+        double z = Math.max(-3, Math.min(3, normal(symbolSeed(m.symbol))));
+        double sigma = config.dailyReturnSigma * style.volatilityFactor()
+                * Math.max(.1, setting.volatilityMultiplier);
+        double move = Math.max(-config.dailyReturnMax, Math.min(config.dailyReturnMax, z * sigma));
+        m.dayTarget = m.dayOpen * Math.exp(move);
+    }
+
+    /** Deterministic standard normal from two mixed uniforms (Box-Muller). */
+    private static double normal(long seed) {
+        double u1 = Math.max(1e-9, unit(mix(seed + 0x9E3779B97F4A7C15L)));
+        double u2 = unit(mix(seed + 0xBF58476D1CE4E5B9L));
+        return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
     }
 
     long dailySeed(long day) { return mix(state.seedSalt ^ mix(day)); }
@@ -204,6 +231,12 @@ public final class FxEngine {
     public void step(long elapsedMillis) {
         state.time += Math.max(1, elapsedMillis);
         for (Market m : state.markets.values()) {
+            if (config.realMarketEnabled && m.symbol.equals(config.realMarketSymbol) && RealMarket.price() > 0) {
+                // Real-market symbol: follow the API price instead of the simulated walk.
+                m.previous = m.price;
+                updatePrice(m, RealMarket.price());
+                continue;
+            }
             FxConfig.Symbol s = settings(m.symbol);
             FxConfig.Style style = style(s);
             double roll = random();
@@ -221,12 +254,29 @@ public final class FxEngine {
                 m.eventTime = state.time;
             }
             double noise = (random() + random() + random() + random() + random() + random() - 3) * Math.sqrt(2);
-            double vol = config.volatility * s.volatilityMultiplier * style.volatilityFactor()
+            double targetVol = config.volatility * s.volatilityMultiplier * style.volatilityFactor()
                     * dailyVolatility(m.symbol);
+            double targetVar = Math.max(1e-12, targetVol * targetVol);
+            // GARCH(1,1): the last return feeds the next variance, so calm and stormy phases cluster.
+            if (!(m.variance > 0)) m.variance = targetVar;
+            double sigma = Math.sqrt(m.variance) * (m.shockLeft > 0 ? config.shockVolatilityMultiplier : 1);
+            double stepReturn = noise * sigma;
+            // Merton jump diffusion: rare fat-tailed moves on top of the diffusion.
+            if (random() < config.jumpProbability) {
+                stepReturn += config.jumpSigma * Math.max(-4, Math.min(4, normal(state.randomState)));
+            }
+            m.variance = targetVar * Math.max(.01, 1 - config.garchAlpha - config.garchBeta)
+                    + config.garchAlpha * stepReturn * stepReturn + config.garchBeta * m.variance;
+            m.slowTrend = m.slowTrend * config.slowTrendPersistence + (random() - .5) * targetVol * .05;
             m.trend = m.trend * Math.min(.9999, config.trendPersistence * style.trendFactor())
-                    + (random() - .5) * vol * .08;
-            double move = noise * vol * (m.shockLeft > 0 ? config.shockVolatilityMultiplier : 1)
-                    + m.trend + dailyBias(m.symbol)
+                    + (random() - .5) * targetVol * .08;
+            double dayLengthMs = 24000.0 * 50.0;
+            double dayFraction = m.dayTarget > 0
+                    ? Math.max(0, Math.min(1, (state.time - m.dayStart) / dayLengthMs)) : 1;
+            double dayPath = m.dayTarget > 0
+                    ? m.dayOpen * Math.exp(Math.log(m.dayTarget / m.dayOpen) * dayFraction) : m.price;
+            double dayPull = m.dayTarget > 0 ? Math.log(dayPath / m.price) * 0.02 : 0;
+            double move = stepReturn + m.trend + m.slowTrend + dailyBias(m.symbol) + dayPull
                     + Math.log(s.initialPrice / m.price) * config.meanReversion * style.meanReversionFactor();
             m.previous = m.price;
             updatePrice(m, m.price * Math.exp(Math.max(-1, Math.min(1, move))) * (1 + shock));

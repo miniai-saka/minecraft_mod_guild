@@ -35,6 +35,25 @@ public final class FxConfig {
     public double dailyVolatilityMax = 1.6;
     public double dailyShockMin = 0.6;
     public double dailyShockMax = 1.6;
+    /** Standard deviation of the once-per-day log return draw (0.03 is about 3%). */
+    public double dailyReturnSigma = 0.03;
+    /** Hard cap on a single day's log return, in either direction. */
+    public double dailyReturnMax = 0.15;
+    /** GARCH(1,1) volatility clustering; alpha + beta stays below 1. */
+    public double garchAlpha = 0.10;
+    public double garchBeta = 0.85;
+    /** Merton jump diffusion: per-step jump probability and log-jump size. */
+    public double jumpProbability = 0.0008;
+    public double jumpSigma = 0.035;
+    /** Long-memory trend persistence; near 1 keeps a direction for minutes, not seconds. */
+    public double slowTrendPersistence = 0.995;
+    /** Optional real-market symbol fed from a public HTTP API instead of the simulated walk. */
+    public boolean realMarketEnabled = false;
+    public String realMarketSymbol = "BTC";
+    public String realMarketName = "ビットコイン";
+    public String realMarketApiUrl = "https://api.coinbase.com/v2/prices/BTC-USD/spot";
+    public int realMarketRefreshSeconds = 60;
+    public double realMarketInitialPrice = 60000;
     public double crashProbability = 0.0005;
     public double rallyProbability = 0.00035;
     public double shockMin = 0.04;
@@ -136,6 +155,14 @@ public final class FxConfig {
         dailyVolatilityMax = bounded(dailyVolatilityMax, dailyVolatilityMin, 5, 1.6);
         dailyShockMin = bounded(dailyShockMin, .1, 3, .6);
         dailyShockMax = bounded(dailyShockMax, dailyShockMin, 5, 1.6);
+        dailyReturnSigma = bounded(dailyReturnSigma, .0001, .5, .03);
+        dailyReturnMax = bounded(dailyReturnMax, .005, .9, .15);
+        garchAlpha = bounded(garchAlpha, 0, .5, .10);
+        garchBeta = bounded(garchBeta, 0, .98, .85);
+        if (garchAlpha + garchBeta >= .9999) garchBeta = Math.max(0, .9999 - garchAlpha);
+        jumpProbability = bounded(jumpProbability, 0, .5, .0008);
+        jumpSigma = bounded(jumpSigma, 0, .5, .035);
+        slowTrendPersistence = bounded(slowTrendPersistence, 0, .9999, .995);
         crashProbability = bounded(crashProbability, 0, 1, .0005);
         rallyProbability = bounded(rallyProbability, 0, 1 - crashProbability, .00035);
         shockMin = bounded(shockMin, .001, .9, .04);
@@ -145,6 +172,18 @@ public final class FxConfig {
         minimumPrice = bounded(minimumPrice, .0001, 1e5, .01);
         maximumPrice = bounded(maximumPrice, minimumPrice * 2, 1e9, 1e6);
         if (symbols == null || symbols.isEmpty()) symbols = new FxConfig().symbols;
+        if (realMarketEnabled) {
+            realMarketSymbol = realMarketSymbol == null || !realMarketSymbol.matches("[A-Z][A-Z0-9]{1,7}")
+                    ? "BTC" : realMarketSymbol;
+            realMarketName = realMarketName == null || realMarketName.isBlank() ? realMarketSymbol : realMarketName;
+            realMarketRefreshSeconds = Math.max(10, Math.min(3600, realMarketRefreshSeconds));
+            realMarketInitialPrice = bounded(realMarketInitialPrice, minimumPrice, maximumPrice, 60000);
+            if (symbols.stream().noneMatch(s -> s != null && realMarketSymbol.equals(s.id))) {
+                List<Symbol> grown = new ArrayList<>(symbols);
+                grown.add(new Symbol(realMarketSymbol, realMarketName, realMarketInitialPrice, 1.0, 0xF7931A, Style.VOLATILE));
+                symbols = grown;
+            }
+        }
         List<Symbol> clean = new ArrayList<>();
         for (Symbol s : symbols) {
             if (s == null || s.id == null || !s.id.matches("[A-Z][A-Z0-9]{1,7}")

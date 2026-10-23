@@ -53,6 +53,10 @@ public final class FxService {
                                         context.getSource().sendSuccess(() -> Component.literal("FX追証を" + (enabled ? "有効" : "無効") + "にしてfx.jsonへ保存しました。既存の債務は維持されます。"), true);
                                         return 1;
                                     })))
+                            .then(Commands.literal("realmarket")
+                                    .executes(context -> realMarket(context.getSource(), null))
+                                    .then(Commands.literal("on").executes(context -> realMarket(context.getSource(), true)))
+                                    .then(Commands.literal("off").executes(context -> realMarket(context.getSource(), false))))
                             .then(Commands.literal("reload").executes(context -> {
                                 boolean ok = FxSettings.load();
                                 context.getSource().sendSuccess(() -> Component.literal(ok ? "FX設定を再読込しました。" : "fx.jsonの読込に失敗しました。ログを確認してください。"), false);
@@ -68,6 +72,22 @@ public final class FxService {
         FxPersistentState state = FxPersistentState.get(server);
         try { state.engine().shock(symbol, crash); state.setDirty(); return 1; }
         catch (IllegalArgumentException ex) { return 0; }
+    }
+
+    /** `/guildadmin fx realmarket [on|off]`: query or toggle the real-API symbol. */
+    private static int realMarket(net.minecraft.commands.CommandSourceStack source, Boolean enable) {
+        if (enable != null) {
+            try {
+                FxSettings.setRealMarket(enable);
+            } catch (java.io.IOException ex) {
+                source.sendFailure(Component.literal("fx.jsonを保存できませんでした。変更は適用していません。"));
+                return 0;
+            }
+        }
+        FxConfig config = FxSettings.get();
+        source.sendSuccess(() -> Component.literal("FX実API銘柄（" + config.realMarketSymbol + "）: "
+                + (config.realMarketEnabled ? "有効" : "無効")), enable != null);
+        return 1;
     }
 
     public static void open(ServerPlayer player) {
@@ -151,6 +171,7 @@ public final class FxService {
     private static void tick(MinecraftServer server) {
         Session session = SESSIONS.computeIfAbsent(server, ignored -> new Session());
         FxConfig config = FxSettings.get();
+        RealMarket.maybeRefreshAsync(config.realMarketEnabled, config.realMarketApiUrl, config.realMarketRefreshSeconds);
         if (++session.marketTicks >= config.marketIntervalTicks) {
             FxPersistentState state = FxPersistentState.get(server);
             if (state.healthy()) {

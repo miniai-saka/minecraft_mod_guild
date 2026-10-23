@@ -49,6 +49,14 @@ public final class FxModels {
         public String event = "通常相場";
         public long eventTime;
         public List<Candle> candles = new ArrayList<>();
+        /** In-game day this anchor belongs to, and the once-per-day open/target drawn from it. */
+        public long day;
+        public double dayOpen;
+        public double dayTarget;
+        public long dayStart;
+        /** GARCH(1,1) variance and the slow trend component. */
+        public double variance;
+        public double slowTrend;
     }
 
     public static final class Position {

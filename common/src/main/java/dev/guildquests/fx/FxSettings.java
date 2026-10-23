@@ -16,8 +16,17 @@ public final class FxSettings {
     private FxSettings() { }
     public static FxConfig get() { return current; }
     public static synchronized void setMarginCall(boolean enabled) throws java.io.IOException {
+        write(current -> current.marginCallEnabled = enabled);
+    }
+
+    /** Turns the real-API symbol on or off and saves fx.json. */
+    public static synchronized void setRealMarket(boolean enabled) throws java.io.IOException {
+        write(current -> current.realMarketEnabled = enabled);
+    }
+
+    private static void write(java.util.function.Consumer<FxConfig> change) throws java.io.IOException {
         FxConfig next = JSON.fromJson(JSON.toJson(current), FxConfig.class);
-        next.marginCallEnabled = enabled;
+        change.accept(next);
         Path path = Platform.configDir().resolve("fx.json");
         Files.createDirectories(path.getParent());
         Path temporary = path.resolveSibling("fx.json.tmp");
