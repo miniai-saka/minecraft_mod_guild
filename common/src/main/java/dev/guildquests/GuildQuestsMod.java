@@ -13,6 +13,7 @@ import dev.guildquests.item.ModItems;
 import dev.guildquests.platform.ContentRegistrar;
 import dev.guildquests.platform.Platform;
 import dev.guildquests.service.BossEvent;
+import dev.guildquests.service.BossProtection;
 import dev.guildquests.service.BossTier;
 import dev.guildquests.service.GuildService;
 import net.minecraft.commands.CommandSourceStack;
@@ -148,7 +149,32 @@ public final class GuildQuestsMod {
                             .executes(context -> {
                                 sendVersions(context.getSource());
                                 return 1;
-                            })));
+                            }))
+                    .then(Commands.literal("protect")
+                            .then(Commands.argument("tier", com.mojang.brigadier.arguments.StringArgumentType.word())
+                                    .executes(context -> {
+                                        ServerPlayer player = context.getSource().getPlayerOrException();
+                                        BossTier tier = BossTier.byId(
+                                                com.mojang.brigadier.arguments.StringArgumentType.getString(context, "tier"));
+                                        if (tier == null) {
+                                            GuildService.message(player, "ティアは weakest / weak / normal / strong / elite から選んでください。", ChatFormatting.RED);
+                                            return 0;
+                                        }
+                                        int price = tier.protectionPrice(ConfigManager.config().bossProtectionPrices);
+                                        PlayerGuildData data = GuildService.data(player);
+                                        if (data.coins < price) {
+                                            GuildService.message(player, "コインが足りません（必要 " + price + " GC）", ChatFormatting.RED);
+                                            return 0;
+                                        }
+                                        if (!GuildService.payCoins(player, price)) {
+                                            GuildService.message(player, "支払いに失敗しました。", ChatFormatting.RED);
+                                            return 0;
+                                        }
+                                        BossProtection.grant(player);
+                                        GuildService.message(player, "【" + tier.label() + "】ボス保護を " + price + " GC で購入しました。",
+                                                ChatFormatting.GREEN);
+                                        return 1;
+                                    }))));
 
             var guildAdmin = Commands.literal("guildadmin")
                     .requires(source -> source.hasPermission(2))

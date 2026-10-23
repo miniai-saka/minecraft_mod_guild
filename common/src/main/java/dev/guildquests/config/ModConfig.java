@@ -35,7 +35,13 @@ public final class ModConfig {
     public double bossEventHealth = 300;
 
     /** Spawn weights for [weak, normal, strong, elite]. Zero weights disable that tier. */
-    public int[] bossTierWeights = {30, 40, 22, 8};
+    public int[] bossTierWeights = {20, 35, 28, 12, 5};
+
+    /** Chance that killing the weakest boss revives it as the strongest. */
+    public double bossWeakestPromoteChance = 0.01;
+
+    /** Coin price to buy boss protection, ordered weakest, weak, normal, strong, elite. */
+    public int[] bossProtectionPrices = {100, 100, 100, 100, 100};
 
     /** Seconds of boss protection granted after dying during a boss fight (0 disables). */
     public int bossProtectionSeconds = 300;

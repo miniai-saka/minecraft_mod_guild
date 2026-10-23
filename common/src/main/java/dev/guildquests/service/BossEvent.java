@@ -72,6 +72,7 @@ public final class BossEvent {
     private static int adoptTicker;
     /** Living bosses keyed by entity UUID, in spawn order. */
     private static final Map<UUID, BossInstance> bosses = new LinkedHashMap<>();
+    private static Mob lastSpawned;
     /** Boss the shared client-side pin currently points at, or null. */
     private static UUID pinned;
     private static int pinLife;
@@ -209,27 +210,43 @@ public final class BossEvent {
 
         int spawned = 0;
         for (int i = 0; i < count && bosses.size() < MAX_ACTIVE; i++) {
-            if (spawnOne(server, world, players, forced)) {
+            if (spawnOne(server, world, players, forced, null)) {
                 spawned++;
             }
         }
         return spawned;
     }
 
+    /** Spawns one boss of the given tier at an exact position (used by the weakest-to-strongest promotion). */
+    public static boolean spawnAt(MinecraftServer server, ServerLevel world,
+                                  net.minecraft.core.BlockPos at, BossTier tier) {
+        List<ServerPlayer> players = server.getPlayerList().getPlayers();
+        if (players.isEmpty() || at == null) return false;
+        adoptExisting(world);
+        return spawnOne(server, world, players, tier, at);
+    }
+
     private static boolean spawnOne(MinecraftServer server, ServerLevel world, List<ServerPlayer> players,
-                                    BossTier forced) {
+                                    BossTier forced, net.minecraft.core.BlockPos at) {
         ModConfig config = ConfigManager.config();
         BossTier tier = forced != null ? forced : BossTier.roll(RANDOM, config.bossTierWeights);
 
         ServerPlayer anchor = players.get(RANDOM.nextInt(players.size()));
-        double angle = RANDOM.nextDouble() * Math.PI * 2.0;
-        double distance = 50 + RANDOM.nextDouble() * 50;
-        int x = Mth.clamp((int) Math.floor(anchor.getX() + Math.cos(angle) * distance),
-                -29999000, 29999000);
-        int z = Mth.clamp((int) Math.floor(anchor.getZ() + Math.sin(angle) * distance),
-                -29999000, 29999000);
+        int x;
+        int z;
+        if (at != null) {
+            x = Mth.clamp(at.getX(), -29999000, 29999000);
+            z = Mth.clamp(at.getZ(), -29999000, 29999000);
+        } else {
+            double angle = RANDOM.nextDouble() * Math.PI * 2.0;
+            double distance = 50 + RANDOM.nextDouble() * 50;
+            x = Mth.clamp((int) Math.floor(anchor.getX() + Math.cos(angle) * distance),
+                    -29999000, 29999000);
+            z = Mth.clamp((int) Math.floor(anchor.getZ() + Math.sin(angle) * distance),
+                    -29999000, 29999000);
+        }
         world.getChunk(x >> 4, z >> 4);
-        int y = world.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
+        int y = at != null ? at.getY() : world.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
 
         EntityType<?> type = tier.randomMob(RANDOM);
         if (!(type.create(world) instanceof Mob mob)) return false;
@@ -251,9 +268,23 @@ public final class BossEvent {
             mob.getAttribute(Attributes.KNOCKBACK_RESISTANCE).setBaseValue(1.0);
         }
         mob.setHealth((float) health);
+        // Higher tiers hit harder, swing faster and reach farther.
+        if (mob.getAttribute(Attributes.ATTACK_DAMAGE) != null) {
+            double base = mob.getAttribute(Attributes.ATTACK_DAMAGE).getBaseValue();
+            mob.getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(Math.max(base * tier.attackMultiplier(), tier.attackFloor()));
+        }
+        if (mob.getAttribute(Attributes.ATTACK_SPEED) != null) {
+            double base = mob.getAttribute(Attributes.ATTACK_SPEED).getBaseValue();
+            mob.getAttribute(Attributes.ATTACK_SPEED).setBaseValue(base * tier.attackSpeedMultiplier());
+        }
+        BossReach.set(mob, tier.reachBonus());
+        ((dev.guildquests.mixin.MobGoalAccessor) mob).guildquests$goalSelector().addGoal(0,
+                new BossRangedGoal(mob, 6.0, 24.0,
+                        (int) Math.max(10, 40 / tier.attackSpeedMultiplier()), tier.arrowDamage()));
         equip(mob, tier);
         applyTierEffects(mob, tier);
         world.addFreshEntity(mob);
+        lastSpawned = mob;
 
         adopt(mob, tier);
 
@@ -499,6 +530,46 @@ public final class BossEvent {
                 : stripBossPrefix(entity.getCustomName() != null ? entity.getCustomName().getString()
                         : entity.getDisplayName().getString());
         payout(server, name, instance);
+
+        // The weakest boss can come back as the strongest, right where it fell, with a power-up burst.
+        if (instance != null && entity.level() instanceof ServerLevel world
+                && RANDOM.nextDouble() < instance.tier.promoteChance(ConfigManager.config().bossWeakestPromoteChance)) {
+            net.minecraft.core.BlockPos at = entity.blockPosition();
+            if (spawnAt(server, world, at, BossTier.ELITE)) {
+                world.sendParticles(net.minecraft.core.particles.ParticleTypes.TOTEM_OF_UNDYING,
+                        at.getX() + 0.5, at.getY() + 1.0, at.getZ() + 0.5, 120, 1.5, 2.0, 1.5, 0.35);
+                world.sendParticles(net.minecraft.core.particles.ParticleTypes.EXPLOSION_EMITTER,
+                        at.getX() + 0.5, at.getY() + 1.0, at.getZ() + 0.5, 1, 0, 0, 0, 0);
+                world.playSound(null, at.getX() + 0.5, at.getY() + 1.0, at.getZ() + 0.5,
+                        net.minecraft.sounds.SoundEvents.WITHER_SPAWN,
+                        net.minecraft.sounds.SoundSource.HOSTILE, 2.0f, 0.6f);
+                for (ServerPlayer nearby : world.getPlayers(p -> p.distanceToSqr(at.getX(), at.getY(), at.getZ()) < 48 * 48)) {
+                    nearby.displayClientMessage(Component.literal("最強ボスが覚醒した！体力が増加する……")
+                            .withStyle(ChatFormatting.DARK_PURPLE), true);
+                }
+                GuildService.broadcast(server, "【最弱】の怨念が【最強】を呼び覚ました！", ChatFormatting.DARK_PURPLE);
+                // Nobody around the corpse? Send the awakened boss to a random unprotected player.
+                Mob elite = lastSpawned;
+                boolean anyoneNear = !world.getPlayers(p -> p.distanceToSqr(at.getX(), at.getY(), at.getZ()) < 48 * 48
+                        && !p.isSpectator()).isEmpty();
+                if (elite != null && !anyoneNear) {
+                    ServerPlayer focus = randomUnprotected(server);
+                    if (focus != null) {
+                        elite.teleportTo(focus.getX(), focus.getY(), focus.getZ());
+                        elite.getNavigation().stop();
+                        retargetPin(server);
+                    }
+                }
+            }
+        }
+    }
+
+    /** A random alive player who is not under post-death boss protection. */
+    private static ServerPlayer randomUnprotected(MinecraftServer server) {
+        List<ServerPlayer> candidates = server.getPlayerList().getPlayers().stream()
+                .filter(player -> player.isAlive() && !player.isSpectator() && !BossProtection.isProtected(player))
+                .toList();
+        return candidates.isEmpty() ? null : candidates.get(RANDOM.nextInt(candidates.size()));
     }
 
     /** Removes the "【緊急ボス…】" prefix so chat messages do not nest it twice. */

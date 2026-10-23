@@ -26,9 +26,12 @@ public enum BossTier {
             List.of(EntityType.ENDERMAN, EntityType.SKELETON, EntityType.STRAY,
                     EntityType.WITCH, EntityType.PILLAGER, EntityType.VINDICATOR,
                     EntityType.EVOKER, EntityType.RAVAGER)),
-    ELITE("最強", 4.0, 4.0, BossBarColor.PURPLE, 1, 1, 0,
+    ELITE("最強", 4.0, 5.0, BossBarColor.PURPLE, 1, 1, 0,
             List.of(EntityType.VINDICATOR, EntityType.EVOKER, EntityType.RAVAGER,
-                    EntityType.WITCH));
+                    EntityType.WITCH)),
+    WEAKEST("最弱", 0.25, 0.25, BossBarColor.WHITE, -1, -1, -1,
+            List.of(EntityType.ZOMBIE, EntityType.HUSK, EntityType.DROWNED,
+                    EntityType.SKELETON, EntityType.STRAY, EntityType.SPIDER, EntityType.CAVE_SPIDER));
 
     private final String label;
     private final double healthMultiplier;
@@ -57,6 +60,59 @@ public enum BossTier {
 
     public double healthMultiplier() {
         return healthMultiplier;
+    }
+
+    /** Attack damage grows with the square root of health, so elite bosses hit about twice as hard. */
+    public double attackMultiplier() {
+        return Math.sqrt(healthMultiplier);
+    }
+
+    /** Extra melee reach in blocks; weaker tiers keep the vanilla range. */
+    public double reachBonus() {
+        return Math.max(0, Math.min(2, healthMultiplier - 1));
+    }
+
+    /** Attack speed grows with the tier, so elite bosses swing roughly twice as often. */
+    public double attackSpeedMultiplier() {
+        return Math.min(2.0, 1.0 + (healthMultiplier - 1) * 0.33);
+    }
+
+    /** Minimum attack damage; only the elite tier reaches far enough to one-shot the ender dragon (200 HP). */
+    public double attackFloor() {
+        return this == ELITE ? 250.0 : 0.0;
+    }
+
+    /** Cost position of this tier in the protection price table (weakest to elite). */
+    public int priceIndex() {
+        return switch (this) {
+            case WEAKEST -> 0;
+            case WEAK -> 1;
+            case NORMAL -> 2;
+            case STRONG -> 3;
+            case ELITE -> 4;
+        };
+    }
+
+    /** Coin price to buy protection against this tier, from the configured table. */
+    public int protectionPrice(int[] prices) {
+        int index = priceIndex();
+        return prices != null && index < prices.length ? Math.max(0, prices[index]) : 0;
+    }
+
+    /** Arrow damage: lower than melee, but still meaningful for every tier. */
+    public double arrowDamage() {
+        return switch (this) {
+            case WEAKEST -> 3;
+            case WEAK -> 5;
+            case NORMAL -> 7;
+            case STRONG -> 9;
+            case ELITE -> 60;
+        };
+    }
+
+    /** The weakest boss revives as the elite with this chance when killed. */
+    public double promoteChance(double configured) {
+        return this == WEAKEST ? Math.max(0, Math.min(1, configured)) : 0;
     }
 
     public double rewardMultiplier() {

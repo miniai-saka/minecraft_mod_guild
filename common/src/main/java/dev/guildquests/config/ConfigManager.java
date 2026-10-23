@@ -83,6 +83,7 @@ public final class ConfigManager {
         c.exploreRandomRange = Math.max(1, Math.min(100000, c.exploreRandomRange));
         c.bossEventIntervalMinutes = Math.max(1, Math.min(1440, c.bossEventIntervalMinutes));
         c.bossEventChancePercent = Math.max(0, Math.min(100, c.bossEventChancePercent));
+        c.bossWeakestPromoteChance = Math.max(0, Math.min(1, Double.isFinite(c.bossWeakestPromoteChance) ? c.bossWeakestPromoteChance : 0.01));
         c.bossEventReward = Math.max(0, c.bossEventReward);
         c.bossEventHealth = Math.max(1, Math.min(100000, c.bossEventHealth));
         if (c.bossTierWeights == null || c.bossTierWeights.length != 4) {
