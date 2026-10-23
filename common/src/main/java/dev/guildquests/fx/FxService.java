@@ -57,6 +57,10 @@ public final class FxService {
                                     .executes(context -> realMarket(context.getSource(), null))
                                     .then(Commands.literal("on").executes(context -> realMarket(context.getSource(), true)))
                                     .then(Commands.literal("off").executes(context -> realMarket(context.getSource(), false))))
+                            .then(Commands.literal("model")
+                                    .executes(context -> model(context.getSource(), null))
+                                    .then(Commands.literal("on").executes(context -> model(context.getSource(), true)))
+                                    .then(Commands.literal("off").executes(context -> model(context.getSource(), false))))
                             .then(Commands.literal("reload").executes(context -> {
                                 boolean ok = FxSettings.load();
                                 context.getSource().sendSuccess(() -> Component.literal(ok ? "FX設定を再読込しました。" : "fx.jsonの読込に失敗しました。ログを確認してください。"), false);
@@ -72,6 +76,22 @@ public final class FxService {
         FxPersistentState state = FxPersistentState.get(server);
         try { state.engine().shock(symbol, crash); state.setDirty(); return 1; }
         catch (IllegalArgumentException ex) { return 0; }
+    }
+
+    /** `/guildadmin fx model [on|off]`: classic or realistic price model. */
+    private static int model(net.minecraft.commands.CommandSourceStack source, Boolean enable) {
+        if (enable != null) {
+            try {
+                FxSettings.setRealisticPrices(enable);
+            } catch (java.io.IOException ex) {
+                source.sendFailure(Component.literal("fx.jsonを保存できませんでした。変更は適用していません。"));
+                return 0;
+            }
+        }
+        FxConfig config = FxSettings.get();
+        source.sendSuccess(() -> Component.literal("FX価格モデル: "
+                + (config.realisticPricesEnabled ? "新（実相場風）" : "旧（クラシック）")), enable != null);
+        return 1;
     }
 
     /** `/guildadmin fx realmarket [on|off]`: query or toggle the real-API symbol. */

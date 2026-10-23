@@ -57,7 +57,9 @@ public final class FabricClientBackend implements PlatformClient.ClientBackend {
             int y = buf.readVarInt();
             int z = buf.readVarInt();
             int life = buf.readVarInt();
-            client.execute(() -> handler.accept(x, y, z, life));
+            client.execute(() -> {
+                if (client.getConnection() == listener) handler.accept(x, y, z, life);
+            });
         });
     }
 

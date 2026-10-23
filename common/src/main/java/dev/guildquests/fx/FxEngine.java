@@ -257,27 +257,35 @@ public final class FxEngine {
             double targetVol = config.volatility * s.volatilityMultiplier * style.volatilityFactor()
                     * dailyVolatility(m.symbol);
             double targetVar = Math.max(1e-12, targetVol * targetVol);
-            // GARCH(1,1): the last return feeds the next variance, so calm and stormy phases cluster.
-            if (!(m.variance > 0)) m.variance = targetVar;
-            double sigma = Math.sqrt(m.variance) * (m.shockLeft > 0 ? config.shockVolatilityMultiplier : 1);
-            double stepReturn = noise * sigma;
-            // Merton jump diffusion: rare fat-tailed moves on top of the diffusion.
-            if (random() < config.jumpProbability) {
-                stepReturn += config.jumpSigma * Math.max(-4, Math.min(4, normal(state.randomState)));
-            }
-            m.variance = targetVar * Math.max(.01, 1 - config.garchAlpha - config.garchBeta)
-                    + config.garchAlpha * stepReturn * stepReturn + config.garchBeta * m.variance;
-            m.slowTrend = m.slowTrend * config.slowTrendPersistence + (random() - .5) * targetVol * .05;
             m.trend = m.trend * Math.min(.9999, config.trendPersistence * style.trendFactor())
                     + (random() - .5) * targetVol * .08;
-            double dayLengthMs = 24000.0 * 50.0;
-            double dayFraction = m.dayTarget > 0
-                    ? Math.max(0, Math.min(1, (state.time - m.dayStart) / dayLengthMs)) : 1;
-            double dayPath = m.dayTarget > 0
-                    ? m.dayOpen * Math.exp(Math.log(m.dayTarget / m.dayOpen) * dayFraction) : m.price;
-            double dayPull = m.dayTarget > 0 ? Math.log(dayPath / m.price) * 0.02 : 0;
-            double move = stepReturn + m.trend + m.slowTrend + dailyBias(m.symbol) + dayPull
-                    + Math.log(s.initialPrice / m.price) * config.meanReversion * style.meanReversionFactor();
+            double move;
+            if (config.realisticPricesEnabled) {
+                // GARCH(1,1): the last return feeds the next variance, so calm and stormy phases cluster.
+                if (!(m.variance > 0)) m.variance = targetVar;
+                double sigma = Math.sqrt(m.variance) * (m.shockLeft > 0 ? config.shockVolatilityMultiplier : 1);
+                double stepReturn = noise * sigma;
+                // Merton jump diffusion: rare fat-tailed moves on top of the diffusion.
+                if (random() < config.jumpProbability) {
+                    stepReturn += config.jumpSigma * Math.max(-4, Math.min(4, normal(state.randomState)));
+                }
+                m.variance = targetVar * Math.max(.01, 1 - config.garchAlpha - config.garchBeta)
+                        + config.garchAlpha * stepReturn * stepReturn + config.garchBeta * m.variance;
+                m.slowTrend = m.slowTrend * config.slowTrendPersistence + (random() - .5) * targetVol * .05;
+                double dayLengthMs = 24000.0 * 50.0;
+                double dayFraction = m.dayTarget > 0
+                        ? Math.max(0, Math.min(1, (state.time - m.dayStart) / dayLengthMs)) : 1;
+                double dayPath = m.dayTarget > 0
+                        ? m.dayOpen * Math.exp(Math.log(m.dayTarget / m.dayOpen) * dayFraction) : m.price;
+                double dayPull = m.dayTarget > 0 ? Math.log(dayPath / m.price) * 0.02 : 0;
+                move = stepReturn + m.trend + m.slowTrend + dailyBias(m.symbol) + dayPull
+                        + Math.log(s.initialPrice / m.price) * config.meanReversion * style.meanReversionFactor();
+            } else {
+                // Classic model: plain random walk with trend and weak mean reversion.
+                move = noise * targetVol * (m.shockLeft > 0 ? config.shockVolatilityMultiplier : 1)
+                        + m.trend + dailyBias(m.symbol)
+                        + Math.log(s.initialPrice / m.price) * config.meanReversion * style.meanReversionFactor();
+            }
             m.previous = m.price;
             updatePrice(m, m.price * Math.exp(Math.max(-1, Math.min(1, move))) * (1 + shock));
             if (m.shockLeft > 0) m.shockLeft--;

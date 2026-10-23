@@ -35,6 +35,9 @@ public final class FxConfig {
     public double dailyVolatilityMax = 1.6;
     public double dailyShockMin = 0.6;
     public double dailyShockMax = 1.6;
+    /** Realistic price model: daily normal anchor, GARCH, jumps and a slow trend. Off = classic walk. */
+    public boolean realisticPricesEnabled = false;
+
     /** Standard deviation of the once-per-day log return draw (0.03 is about 3%). */
     public double dailyReturnSigma = 0.03;
     /** Hard cap on a single day's log return, in either direction. */

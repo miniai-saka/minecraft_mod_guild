@@ -9,8 +9,16 @@ import java.util.function.Consumer;
 public final class FabricFxClientNetwork implements FxNetwork.ClientTransport {
     public void listen(Consumer<Snapshot> receiver) {
         ClientPlayNetworking.registerGlobalReceiver(FxService.SNAPSHOT, (client, handler, buffer, sender) -> {
-            Snapshot snapshot = FxSettings.JSON.fromJson(buffer.readUtf(1_000_000), Snapshot.class);
-            client.execute(() -> receiver.accept(snapshot));
+            final Snapshot snapshot;
+            try {
+                snapshot = FxSettings.JSON.fromJson(buffer.readUtf(1_000_000), Snapshot.class);
+            } catch (RuntimeException ex) {
+                return;
+            }
+            if (snapshot == null) return;
+            client.execute(() -> {
+                if (client.getConnection() == handler) receiver.accept(snapshot);
+            });
         });
     }
     public void send(Request request) {

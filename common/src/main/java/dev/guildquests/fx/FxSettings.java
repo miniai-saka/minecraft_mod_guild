@@ -24,9 +24,15 @@ public final class FxSettings {
         write(current -> current.realMarketEnabled = enabled);
     }
 
+    /** Switches between the classic price model and the realistic one. */
+    public static synchronized void setRealisticPrices(boolean enabled) throws java.io.IOException {
+        write(current -> current.realisticPricesEnabled = enabled);
+    }
+
     private static void write(java.util.function.Consumer<FxConfig> change) throws java.io.IOException {
         FxConfig next = JSON.fromJson(JSON.toJson(current), FxConfig.class);
         change.accept(next);
+        next.sanitize();
         Path path = Platform.configDir().resolve("fx.json");
         Files.createDirectories(path.getParent());
         Path temporary = path.resolveSibling("fx.json.tmp");
@@ -35,7 +41,7 @@ public final class FxSettings {
         }
         try { Files.move(temporary, path, java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING); }
         catch (java.nio.file.AtomicMoveNotSupportedException ex) { Files.move(temporary, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING); }
-        current = next.sanitize();
+        current = next;
     }
     public static boolean load() {
         Path path = Platform.configDir().resolve("fx.json");
