@@ -9,8 +9,8 @@
   },
   "elements": [
     {
-      "from": [1, 0, 1],
-      "to": [15, 14, 15],
+      "from": [0, 0, 0],
+      "to": [16, 16, 16],
       "faces": {
         "down": { "texture": "#bottom" },
         "up": { "texture": "#top" },

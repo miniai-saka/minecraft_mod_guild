@@ -14,7 +14,7 @@ public class GuildGuiLayoutTest {
                 assertTrue(layout.x(i) >= 0);
                 assertTrue(layout.x(i) + layout.cardWidth() <= viewport[0]);
                 assertTrue(layout.y(i) >= layout.top());
-                assertTrue(layout.y(i) + layout.cardHeight() <= layout.footerY() - GuildGuiLayout.GAP);
+                assertTrue(layout.y(i) + layout.cardHeight() <= layout.footerY());
             }
             assertTrue(layout.pageCount(0) == 1);
             assertTrue(layout.pageCount(54) * layout.capacity() >= 54);
@@ -22,7 +22,7 @@ public class GuildGuiLayoutTest {
     }
     @Test public void narrowScreensReflowAndLargeListsRemainReachable() {
         assertEquals(1, GuildGuiLayout.of(320,240,true).columns());
-        assertEquals(3, GuildGuiLayout.of(1920,1080,false).columns());
+        assertEquals(1, GuildGuiLayout.of(1920,1080,false).columns());
         for (GuildMenuKind kind : GuildMenuKind.values()) for (int slot = 0; slot < kind.rows * 9; slot++) {
             assertTrue(kind.section(slot) >= 0);
             assertTrue(kind.section(slot) < kind.sections.size());

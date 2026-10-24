@@ -31,7 +31,7 @@ public final class BankScreenHandler extends GuildMenu {
     private final ServerPlayer owner;
     private final boolean feeWaived;
     private final Map<Integer, MenuAction> actions = new HashMap<>();
-    /** Amount selected via digit heads / paper buttons, 0..Integer.MAX_VALUE. */
+    /** Amount selected via the client keypad, 0..Integer.MAX_VALUE. */
     private long bankAmount;
 
     public BankScreenHandler(int syncId, Container playerInventory, ServerPlayer owner, boolean feeWaived) {
@@ -128,8 +128,12 @@ public final class BankScreenHandler extends GuildMenu {
         long balance = data.coins;
         if (bankAmount < 0) bankAmount = 0;
 
-        // Row 0: bank balance / held coins / fee / blank / transfer / digit heads.
-        set(0, item(Items.GOLD_INGOT, "銀行残高: " + balance, "電子通貨として保存されています"));
+        // Slot 5 is background only; it supplies the summary line above the row list.
+        set(5, GuildItems.header(item(Items.NAME_TAG, "銀行サマリー"),
+                "残高 " + balance + " GC / 借入 " + data.loan + " GC / FX・リボ " + data.debt
+                        + " GC / 滞納 " + (data.delinquent ? "あり" : "なし")));
+
+        // Row 0: held coins / fee / transfer / loan. (Bank balance lives in the header.)
         set(1, item(ModItems.COIN, "所持コイン: " + held, "インベントリ内のギルドコイン"));
         set(2, feeWaived
                 ? item(Items.EMERALD, "手数料: 無料", "ギルド銀行ブロック経由のため", "すべての取引が無料です")
@@ -141,55 +145,25 @@ public final class BankScreenHandler extends GuildMenu {
                 "送金先の選択・金額指定はこちらで",
                 "手数料: 無料"),
                 (p, b, t) -> TransferScreenHandler.open(p));
-        setAction(3, item(Items.REDSTONE, "消費者金融",
-                "クリックで借入メニューを開きます",
+        setAction(3, item(Items.REDSTONE, "返済",
+                "クリックで借入・返済メニューを開きます",
                 "ギルドランクに応じた上限まで借入できます",
                 "返済は手動（利息が付きます）"),
                 (p, b, t) -> LoanScreenHandler.open(p));
 
-        // Row 0, slots 5-8: digit heads (thousands, hundreds, tens, ones).
-        int[] places = {1000, 100, 10, 1};
-        String[] labels = {"千の位", "百の位", "十の位", "一の位"};
-        for (int i = 0; i < 4; i++) {
-            long place = places[i];
-            long digit = (bankAmount / place) % 10;
-            setAction(5 + i, TransferScreenHandler.digitHead((int) digit, labels[i]),
-                    (p, b, t) -> {
-                        if (b != 0 && b != 1) return;
-                        long cur = (bankAmount / place) % 10;
-                        long next = Math.floorMod(cur + (b == 0 ? 1 : -1), 10);
-                        bankAmount = bankAmount - cur * place + next * place;
-                    });
-        }
-
-        // Row 1: ribo debt info / help / paper buttons.
-        riboDebtInfo(9, data);
+        // Ribo debt detail moved into the header; the amount book follows below.
         set(13, item(Items.WRITABLE_BOOK, "ギルド銀行",
                 "数字頭・紙で金額を選択してから",
                 "下段の入金・出金ボタンで実行",
                 "所持金全部ボタンで全額をまとめて選択",
                 "支払い方法: 引き落とし / リボ / 無効"));
-        addPaper(14, 1);
-        addPaper(15, 10);
-        addPaper(16, 100);
-        addPaper(17, 64);
 
-        // Row 2: payment modes / blank / close / clear / select all / deposit / withdraw.
+        // Row 2: payment modes / blank / close / deposit / withdraw.
         String mode = GuildService.paymentMode(data);
         paymentModeButton(18, GuildService.MODE_DEBIT, "引き落とし", mode);
         paymentModeButton(19, GuildService.MODE_RIBO, "リボ", mode);
         paymentModeButton(20, GuildService.MODE_DISABLED, "無効", mode);
         setAction(22, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeContainer());
-        setAction(23, item(Items.BARRIER, "金額クリア"),
-                (p, b, t) -> {
-                    if (b == 0) bankAmount = 0;
-                });
-        setAction(24, item(ModItems.COIN, "所持金全部選択",
-                        "クリックで所持コイン全額を選択",
-                        "現在: " + bankAmount + " → " + held),
-                (p, b, t) -> {
-                    if (b == 0) bankAmount = Math.min(held, Integer.MAX_VALUE);
-                });
         depositAction(25, held);
         withdrawAction(26, balance);
     }
@@ -241,16 +215,6 @@ public final class BankScreenHandler extends GuildMenu {
                         feeLine(fee)),
                 (p, b, t) -> {
                     if (b == 0) GuildService.bankWithdraw(p, bankAmount, feeWaived);
-                });
-    }
-
-    private void addPaper(int slot, int amount) {
-        long preview = Math.min(Integer.MAX_VALUE, bankAmount + amount);
-        setAction(slot, item(Items.PAPER, "＋" + amount,
-                        "クリックで " + amount + " 加算",
-                        "現在: " + bankAmount + " → " + preview),
-                (p, b, t) -> {
-                    if (b == 0) bankAmount = Math.min(Integer.MAX_VALUE, bankAmount + amount);
                 });
     }
 

@@ -1,10 +1,10 @@
 package dev.guildquests.client.gui;
 
 import dev.guildquests.gui.GuildClientMenu;
+import dev.guildquests.gui.GuildItems;
 import dev.guildquests.gui.GuildMenuKind;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
@@ -22,29 +22,37 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Button-based presentation of the current server menu, preserving the original navigation.
+ * Row-list presentation of the current server menu, preserving the original navigation.
  * No inventory slots, background texture, chart panels or client-side economic mutations.
  */
 public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMenu> {
+    private static final int SCROLL_STEP = 2;
+    private static final int SECONDARY_WIDTH = 46;
+    private static final String HINT = "▶";
     private final GuildClientMenu menu;
-    private final List<ItemStack> previous = new ArrayList<>();
-    private final List<Card> cards = new ArrayList<>();
-    private final int[] pages;
+    private final List<Integer> visible = new ArrayList<>();
+    private final List<Integer> visibleSnapshot = new ArrayList<>();
+    private final List<Row> rows = new ArrayList<>();
+    private final int[] scroll;
     private int section;
     private GuildGuiLayout layout;
-    private EditBox amountInput;
-    private Button applyAmount;
+    private Button amountButton;
+    private Button navPrev;
+    private Button navNext;
     private CompoundTag amount;
-    private String draft;
+    private String headerText;
+    private final GuildKeypad keypad = new GuildKeypad();
     private long lastServerAmount = -1;
     private int discardSlot = -1;
     private long discardUntil;
-    private record Card(int slot, int x, int y, int width, int height, List<Component> text, boolean action) { }
+    private boolean loaded;
+    private record Row(int slot, int x, int y, int width, int height, String name, List<String> lore,
+                       boolean action, boolean secondary) { }
 
     public GuildMenuScreen(GuildClientMenu menu, Inventory inventory, Component title) {
         super(title);
         this.menu = menu;
-        pages = new int[menu.kind.sections.size()];
+        scroll = new int[menu.kind.sections.size()];
     }
 
     public static GuildMenuScreen create(GuildClientMenu menu, Inventory inventory, Component title) {
@@ -68,34 +76,64 @@ public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMen
 
     @Override public void tick() {
         if (minecraft.player == null || !minecraft.player.isAlive() || minecraft.player.isRemoved()) { onClose(); return; }
-        if (amountInput != null) amountInput.tick();
-        boolean changed = previous.size() != menu.kind.rows * 9;
-        for (int i = 0; !changed && i < previous.size(); i++)
-            changed = !ItemStack.matches(previous.get(i), menu.getSlot(i).getItem());
-        if (changed) {
-            previous.clear();
-            for (int i = 0; i < menu.kind.rows * 9; i++) previous.add(menu.getSlot(i).getItem().copy());
+        boolean amountChanged = syncAmount();
+        refreshVisible();
+        if (amountChanged || !visible.equals(visibleSnapshot)) {
             rebuild();
+        } else {
+            clampScroll();
+            buildRows();
+            updateNavigation();
         }
-        if (discardSlot >= 0 && System.currentTimeMillis() > discardUntil) { discardSlot = -1; rebuild(); }
+        if (discardSlot >= 0 && System.currentTimeMillis() > discardUntil) discardSlot = -1;
+        loaded = true;
+    }
+
+    private boolean syncAmount() {
+        CompoundTag found = findAmount();
+        boolean changed = (found != null) != (amount != null);
+        if (found == null) {
+            if (keypad.isOpen()) keypad.close();
+            amount = null;
+            lastServerAmount = -1;
+            keypad.setMax(0);
+            keypad.reset(0);
+            return changed;
+        }
+        amount = found;
+        long value = found.getLong("value");
+        keypad.setMax(found.getLong("max"));
+        if (!keypad.isOpen() && value != lastServerAmount) keypad.reset(value);
+        lastServerAmount = value;
+        return changed;
+    }
+
+    private CompoundTag findAmount() {
+        for (int i = 0; i < menu.kind.rows * 9; i++) {
+            var tag = menu.getSlot(i).getItem().getTag();
+            if (tag != null && tag.contains("GuildGuiAmount")) return tag.getCompound("GuildGuiAmount");
+        }
+        return null;
     }
 
     private void rebuild() {
-        boolean focused = amountInput != null && amountInput.isFocused();
-        int cursor = amountInput == null ? 0 : amountInput.getCursorPosition();
-        if (amountInput != null) draft = amountInput.getValue();
-        amount = null;
-        for (int i = 0; i < menu.kind.rows * 9; i++) {
-            var tag = menu.getSlot(i).getItem().getTag();
-            if (tag != null && tag.contains("GuildGuiAmount")) { amount = tag.getCompound("GuildGuiAmount"); break; }
-        }
+        boolean keypadWasOpen = keypad.isOpen();
+        amount = findAmount();
         if (amount != null) {
             long value = amount.getLong("value");
-            if (draft == null || !focused && value != lastServerAmount) draft = Long.toString(value);
+            keypad.setMax(amount.getLong("max"));
+            if (!keypadWasOpen && value != lastServerAmount) keypad.reset(value);
             lastServerAmount = value;
-        } else { draft = null; lastServerAmount = -1; }
+        } else {
+            if (keypadWasOpen) keypad.close();
+            keypad.setMax(0);
+            keypad.reset(0);
+            lastServerAmount = -1;
+        }
         clearWidgets();
-        cards.clear();
+        amountButton = null;
+        navPrev = null;
+        navNext = null;
         layout = GuildGuiLayout.of(width, height, amount != null);
         int tabCount = menu.kind.sections.size();
         int tabWidth = (layout.width() - GuildGuiLayout.GAP * (tabCount - 1)) / tabCount;
@@ -105,53 +143,44 @@ public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMen
                     layout.tabsY(), tabWidth, () -> { section = selected; discardSlot = -1; rebuild(); });
             tab.active = i != section;
         }
-        amountInput = null;
         if (amount != null) {
-            int labelWidth = Math.min(72, layout.width() / 4);
-            int inputWidth = Math.min(180, layout.width() - labelWidth - 78);
-            amountInput = new EditBox(font, layout.left() + labelWidth, layout.amountY(), inputWidth, 20,
-                    Component.literal(amount.getString("label")));
-            amountInput.setMaxLength(19);
-            amountInput.setFilter(value -> value.isEmpty() || value.chars().allMatch(c -> c >= '0' && c <= '9'));
-            amountInput.setValue(draft == null ? "0" : draft);
-            // Reset horizontal scrolling when rebuilding a field after tab/page changes.
-            amountInput.moveCursorTo(0);
-            amountInput.setTooltip(Tooltip.create(Component.literal("0 ～ " + amount.getLong("max") + " の整数を入力")));
-            addRenderableWidget(amountInput);
-            applyAmount = button("金額を適用", amountInput.getX() + inputWidth + 6, layout.amountY(), 72, this::sendAmount);
-            amountInput.setResponder(value -> updateAmountButton());
-            updateAmountButton();
-            if (focused) { setFocused(amountInput); amountInput.setFocused(true); amountInput.moveCursorTo(Math.min(cursor, amountInput.getValue().length())); }
+            amountButton = button("入力", layout.left() + layout.width() - 72, layout.amountY(), 72, this::openKeypad);
+            amountButton.setTooltip(Tooltip.create(Component.literal("0 ～ " + amount.getLong("max") + " の整数を入力")));
         }
-
-        List<Integer> slots = visibleSlots();
-        int pageCount = layout.pageCount(slots.size());
-        pages[section] = Math.min(pages[section], pageCount - 1);
-        int first = pages[section] * layout.capacity();
-        for (int i = 0; i < layout.capacity() && first + i < slots.size(); i++) addCard(slots.get(first + i), i);
 
         int edgeButton = Math.min(76, layout.width() / 4);
         button("閉じる", layout.left() + layout.width() - edgeButton, layout.footerY(), edgeButton, this::onClose);
         if (menu.kind != GuildMenuKind.GUILD) button("戻る", layout.left(), layout.footerY(), edgeButton,
                 () -> minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0));
         int center = layout.left() + layout.width() / 2;
-        Button prev = button("<", center - 64, layout.footerY(), 24, () -> turnPage(-1));
-        Button next = button(">", center + 40, layout.footerY(), 24, () -> turnPage(1));
-        prev.active = pages[section] > 0;
-        next.active = pages[section] + 1 < pageCount;
+        navPrev = button("<", center - 64, layout.footerY(), 24, () -> turnPage(-1));
+        navNext = button(">", center + 40, layout.footerY(), 24, () -> turnPage(1));
+
+        refreshVisible();
+        clampScroll();
+        buildRows();
+        visibleSnapshot.clear();
+        visibleSnapshot.addAll(visible);
+        updateNavigation();
     }
 
-    private List<Integer> visibleSlots() {
-        List<Integer> result = new ArrayList<>();
+    private void refreshVisible() {
+        visible.clear();
+        headerText = null;
         for (int i = 0; i < menu.kind.rows * 9; i++) {
             ItemStack stack = menu.getSlot(i).getItem();
-            if (stack.isEmpty() || menu.kind.digitSlot(i) || menu.kind.section(i) != section) continue;
+            if (stack.isEmpty()) continue;
+            CompoundTag tag = stack.getTag();
+            if (tag != null && tag.contains(GuildItems.HEADER_TAG, net.minecraft.nbt.Tag.TAG_STRING)) {
+                if (menu.kind.section(i) == section) headerText = tag.getString(GuildItems.HEADER_TAG);
+                continue;
+            }
+            if (menu.kind.digitSlot(i) || menu.kind.section(i) != section) continue;
             String name = stack.getHoverName().getString();
             if (name.isBlank() || name.equals("閉じる") || stack.is(Items.WHITE_BANNER) && name.equals("Goal")) continue;
-            result.add(i);
+            visible.add(i);
         }
-        result.sort(java.util.Comparator.comparingInt(this::priority));
-        return result;
+        visible.sort(java.util.Comparator.comparingInt(this::priority));
     }
 
     private int priority(int slot) {
@@ -164,44 +193,71 @@ public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMen
         };
     }
 
-    private void addCard(int slot, int index) {
-        ItemStack stack = menu.getSlot(slot).getItem();
-        List<Component> text = new ArrayList<>();
-        text.add(Component.literal(present(stack.getHoverName().getString())));
-        var lore = stack.getOrCreateTagElement("display").getList("Lore", net.minecraft.nbt.Tag.TAG_STRING);
-        for (int i = 0; i < lore.size(); i++) {
-            try {
-                Component line = Component.Serializer.fromJson(lore.getString(i));
-                if (line != null) text.add(Component.literal(present(line.getString())));
-            } catch (com.google.gson.JsonParseException ignored) { }
-        }
-        boolean action = stack.hasTag() && stack.getTag().getBoolean("GuildGuiAction");
-        int x = layout.x(index), y = layout.y(index), w = layout.cardWidth(), h = layout.cardHeight();
-        cards.add(new Card(slot, x, y, w, h, text, action));
-        if (!action) return;
-        boolean secondary = menu.kind == GuildMenuKind.GUILD && slot >= 36 && slot <= 44
-                || text.stream().anyMatch(line -> line.getString().contains("右クリック"));
-        int alternateWidth = secondary ? Math.min(70, w / 3) : 0;
-        Button primary = button(primaryLabel(stack, slot), x + 5, y + h - 24, w - 10 - alternateWidth - (secondary ? 4 : 0), () -> click(slot, 0));
-        primary.setTooltip(Tooltip.create(Component.literal(String.join("\n", text.stream().map(Component::getString).toList()))));
-        if (secondary) {
-            boolean cancel = menu.kind == GuildMenuKind.GUILD;
-            String label = cancel ? discardSlot == slot ? "破棄を確定" : "破棄" : "減らす";
-            button(label, x + w - alternateWidth - 5, y + h - 24, alternateWidth, () -> {
-                if (cancel && discardSlot != slot) { discardSlot = slot; discardUntil = System.currentTimeMillis() + 5000; rebuild(); }
-                else { discardSlot = -1; click(slot, 1); }
-            });
+    private void clampScroll() {
+        if (layout == null) return;
+        int max = layout.maxScroll(visible.size());
+        if (scroll[section] > max) scroll[section] = max;
+        if (scroll[section] < 0) scroll[section] = 0;
+    }
+
+    private void buildRows() {
+        rows.clear();
+        if (layout == null) return;
+        int first = scroll[section];
+        for (int i = first; i < visible.size() && rows.size() < layout.capacity(); i++) {
+            int slot = visible.get(i);
+            ItemStack stack = menu.getSlot(slot).getItem();
+            List<String> lore = new ArrayList<>();
+            CompoundTag display = stack.getTagElement("display");
+            if (display != null) {
+                var lines = display.getList("Lore", net.minecraft.nbt.Tag.TAG_STRING);
+                for (int line = 0; line < lines.size(); line++) {
+                    try {
+                        Component text = Component.Serializer.fromJson(lines.getString(line));
+                        if (text != null) lore.add(present(text.getString()));
+                    } catch (com.google.gson.JsonParseException ignored) { }
+                }
+            }
+            String name = present(stack.getHoverName().getString());
+            boolean action = stack.hasTag() && stack.getTag().getBoolean("GuildGuiAction");
+            boolean secondary = action && ((menu.kind == GuildMenuKind.GUILD && slot >= 36 && slot <= 44)
+                    || name.startsWith("賭け ±")
+                    || lore.stream().anyMatch(line -> line.contains("右クリック")));
+            int index = rows.size();
+            rows.add(new Row(slot, layout.x(index), layout.y(index), layout.cardWidth(), layout.cardHeight(),
+                    name, lore, action, secondary));
         }
     }
 
-    private String primaryLabel(ItemStack stack, int slot) {
-        String name = stack.getHoverName().getString();
-        if (menu.kind == GuildMenuKind.GUILD) {
-            if (slot >= 9 && slot <= 17) return "受注する";
-            if (slot >= 36 && slot <= 44) return "納品・報酬受取";
+    private int contentRight() {
+        return layout.left() + layout.width() - (hasScrollbar() ? 8 : 4);
+    }
+
+    private boolean hasScrollbar() {
+        return layout != null && visible.size() > layout.capacity();
+    }
+
+    private String secondaryLabel(Row row) {
+        if (menu.kind != GuildMenuKind.GUILD) return "減らす";
+        return discardSlot == row.slot() ? "破棄を確定" : "破棄";
+    }
+
+    private int secondaryWidth(Row row) {
+        return Math.max(SECONDARY_WIDTH, font.width(secondaryLabel(row)) + 8);
+    }
+
+    private int secondaryLeft(Row row) {
+        return contentRight() - secondaryWidth(row);
+    }
+
+    private void secondaryAction(Row row) {
+        if (menu.kind == GuildMenuKind.GUILD && discardSlot != row.slot()) {
+            discardSlot = row.slot();
+            discardUntil = System.currentTimeMillis() + 5000;
+            return;
         }
-        if (name.startsWith("賭け ±")) return "増やす +" + name.substring(4);
-        return name;
+        discardSlot = -1;
+        click(row.slot(), 1);
     }
 
     private Button button(String label, int x, int y, int w, Runnable action) {
@@ -216,73 +272,135 @@ public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMen
             minecraft.gameMode.handleInventoryMouseClick(menu.containerId, slot, button, ClickType.PICKUP, minecraft.player);
     }
 
-    private Long inputAmount() {
-        if (amountInput == null || amount == null || amountInput.getValue().isEmpty()) return null;
-        try {
-            long value = Long.parseLong(amountInput.getValue());
-            return value >= 0 && value <= amount.getLong("max") ? value : null;
-        } catch (NumberFormatException ex) { return null; }
-    }
-    private void updateAmountButton() {
-        if (applyAmount != null) applyAmount.active = inputAmount() != null;
-        if (amountInput != null) amountInput.setTextColor(inputAmount() != null ? 0xFFFFFF : 0xFF7777);
-    }
-    private void sendAmount() {
-        Long value = inputAmount();
-        if (value == null) return;
-        GuildGuiActions.amountSender.accept(menu.containerId, value);
-        amountInput.setFocused(false);
+    private void openKeypad() {
+        if (amount == null) return;
+        keypad.setMax(amount.getLong("max"));
+        keypad.open();
         setFocused(null);
     }
+
+    private void closeKeypad() {
+        keypad.close();
+        keypad.reset(lastServerAmount >= 0 ? lastServerAmount : 0);
+    }
+
+    private void applyKeypad() {
+        if (amount == null) { keypad.close(); return; }
+        Long value = keypad.value();
+        if (value == null) return;
+        GuildGuiActions.amountSender.accept(menu.containerId, value);
+        keypad.close();
+    }
     private void turnPage(int delta) {
-        int next = Math.max(0, Math.min(layout.pageCount(visibleSlots().size()) - 1, pages[section] + delta));
-        if (next != pages[section]) { pages[section] = next; rebuild(); }
+        if (layout == null) return;
+        int next = Math.max(0, Math.min(layout.maxScroll(visible.size()),
+                scroll[section] + delta * layout.capacity()));
+        if (next == scroll[section]) return;
+        scroll[section] = next;
+        buildRows();
+        updateNavigation();
+    }
+
+    private void updateNavigation() {
+        if (layout == null) return;
+        int max = layout.maxScroll(visible.size());
+        if (navPrev != null) navPrev.active = scroll[section] > 0;
+        if (navNext != null) navNext.active = scroll[section] < max;
     }
 
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         // Exactly the in-world dimming used by vanilla menus; never cache or replace the world frame.
         renderBackground(graphics);
         graphics.drawString(font, fit(title.getString(), layout.width()), layout.left(), layout.titleY(), 0xFFFFFF);
-        if (height >= 220) graphics.drawString(font, "冒険者ギルド  /  " + menu.kind.sections.get(section),
-                layout.left(), layout.titleY() + 15, 0xC0C0C0);
-        if (amount != null) graphics.drawString(font, amount.getString("label"), layout.left(), layout.amountY() + 6, 0xFFFFFF);
-        Card hover = null;
-        for (Card card : cards) {
-            graphics.fill(card.x(), card.y(), card.x() + card.width(), card.y() + card.height(), 0xB0202020);
-            graphics.fill(card.x(), card.y(), card.x() + 2, card.y() + card.height(), card.action() ? 0xFF8FB467 : 0xFF696969);
-            graphics.renderItem(menu.getSlot(card.slot()).getItem(), card.x() + 6, card.y() + 5);
-            if (!card.text().isEmpty()) graphics.drawString(font, fit(card.text().get(0).getString(), card.width() - 32),
-                    card.x() + 27, card.y() + 8, 0xFFFFFF);
-            int lines = Math.max(0, (card.height() - (card.action() ? 48 : 26)) / 10);
-            for (int i = 1; i < card.text().size() && i <= lines; i++)
-                graphics.drawString(font, fit(card.text().get(i).getString(), card.width() - 14), card.x() + 7, card.y() + 24 + (i - 1) * 10, 0xCCCCCC);
-            if (menu.kind == GuildMenuKind.HORSE_RACE && card.slot() < 36 && !card.action())
-                renderRaceProgress(graphics, card);
-            if (mouseX >= card.x() && mouseX < card.x() + card.width() && mouseY >= card.y() && mouseY < card.y() + card.height()) hover = card;
+        if (height >= 220) {
+            String subtitle = headerText != null ? headerText
+                    : "冒険者ギルド  /  " + menu.kind.sections.get(section);
+            graphics.drawString(font, fit(subtitle, layout.width()), layout.left(), layout.titleY() + 15, 0xC0C0C0);
+        }
+        if (amount != null) {
+            int textWidth = layout.width() - (amountButton == null ? 0 : 76);
+            graphics.drawString(font, fit("金額: " + keypad.draft(), textWidth),
+                    layout.left(), layout.amountY() + 6, 0xFFFFFF);
+        }
+        boolean keypadOpen = keypad.isOpen();
+        int hovered = -1;
+        int hoveredSecondary = -1;
+        int hintWidth = font.width(HINT);
+        boolean overScrollbar = !keypadOpen && hasScrollbar()
+                && mouseX >= layout.left() + layout.width() - 4 && mouseX < layout.left() + layout.width()
+                && mouseY >= layout.top() && mouseY < layout.footerY();
+        for (int i = 0; i < rows.size(); i++) {
+            Row row = rows.get(i);
+            boolean hover = !keypadOpen && !overScrollbar && mouseX >= row.x() && mouseX < row.x() + row.width()
+                    && mouseY >= row.y() && mouseY < row.y() + row.height();
+            if (hover) {
+                hovered = i;
+                graphics.fill(row.x(), row.y(), row.x() + row.width(), row.y() + row.height(), 0x40FFFFFF);
+            }
+            graphics.renderItem(menu.getSlot(row.slot()).getItem(), row.x() + 4, row.y() + 1);
+            int nameX = row.x() + 24;
+            int nameRight = !row.action() ? contentRight()
+                    : row.secondary() ? secondaryLeft(row) - hintWidth - 8 : contentRight() - hintWidth - 4;
+            int nameWidth = Math.max(0, nameRight - nameX);
+            if (nameWidth > 0)
+                graphics.drawString(font, fit(row.name(), nameWidth), nameX, row.y() + 5, 0xFFFFFF);
+            if (row.action()) {
+                int hintX = row.secondary() ? secondaryLeft(row) - 4 - hintWidth : contentRight() - hintWidth;
+                graphics.drawString(font, HINT, hintX, row.y() + 5, 0xFFAAAAAA);
+            }
+            if (row.secondary()) {
+                int bx = secondaryLeft(row);
+                int bw = secondaryWidth(row);
+                int by = row.y() + 1;
+                int bh = row.height() - 2;
+                boolean buttonHover = !keypadOpen && mouseX >= bx && mouseX < bx + bw && mouseY >= by && mouseY < by + bh;
+                if (buttonHover) hoveredSecondary = i;
+                int fill = discardSlot == row.slot() ? 0xFF8C3B3B : buttonHover ? 0xFF7A7A7A : 0xFF4F4F4F;
+                graphics.fill(bx, by, bx + bw, by + bh, fill);
+                graphics.fill(bx, by, bx + bw, by + 1, 0xB0FFFFFF);
+                graphics.drawCenteredString(font, fit(secondaryLabel(row), bw - 4), bx + bw / 2, by + (bh - 8) / 2, 0xFFFFFF);
+            }
+            if (menu.kind == GuildMenuKind.HORSE_RACE && row.slot() < 36 && !row.action())
+                renderRaceProgress(graphics, row);
+        }
+        if (hasScrollbar()) {
+            int trackX = layout.left() + layout.width() - 4;
+            int trackY = layout.top();
+            int trackHeight = layout.capacity() * layout.cardHeight();
+            graphics.fill(trackX, trackY, trackX + 4, trackY + trackHeight, 0x40000000);
+            int thumbHeight = Math.max(10, trackHeight * layout.capacity() / visible.size());
+            int max = Math.max(1, layout.maxScroll(visible.size()));
+            int thumbY = trackY + (trackHeight - thumbHeight) * scroll[section] / max;
+            graphics.fill(trackX, thumbY, trackX + 4, thumbY + thumbHeight, 0xFFB8B8B8);
         }
         for (var child : children()) if (child instanceof net.minecraft.client.gui.components.Renderable widget)
             widget.render(graphics, mouseX, mouseY, partialTick);
-        String page = (pages[section] + 1) + " / " + layout.pageCount(visibleSlots().size());
+        int total = visible.size();
+        String page = total == 0 ? "0 / 0"
+                : (scroll[section] + 1) + "-" + Math.min(scroll[section] + layout.capacity(), total) + " / " + total;
         graphics.drawCenteredString(font, page, layout.left() + layout.width() / 2, layout.footerY() + 6, 0xFFFFFF);
-        if (cards.isEmpty()) graphics.drawCenteredString(font, previous.isEmpty() ? "読み込み中…" : "表示する項目はありません",
+        if (visible.isEmpty()) graphics.drawCenteredString(font, loaded ? "表示する項目はありません" : "読み込み中…",
                 width / 2, layout.top() + 16, 0xCCCCCC);
-        if (hover != null && mouseY < hover.y() + hover.height() - (hover.action() ? 24 : 0)) {
+        if (keypadOpen) keypad.render(graphics, font, keypadBounds(), width, height, mouseX, mouseY);
+        if (!keypadOpen && hovered >= 0 && hoveredSecondary < 0) {
             List<FormattedCharSequence> tooltip = new ArrayList<>();
             int wrapWidth = Math.max(100, Math.min(360, width - 30));
-            for (Component line : menu.getSlot(hover.slot()).getItem().getTooltipLines(minecraft.player, TooltipFlag.Default.NORMAL))
+            for (Component line : menu.getSlot(rows.get(hovered).slot()).getItem().getTooltipLines(minecraft.player, TooltipFlag.Default.NORMAL))
                 tooltip.addAll(font.split(Component.literal(present(line.getString())), wrapWidth));
             graphics.renderTooltip(font, tooltip, mouseX, mouseY);
         }
     }
 
-    private void renderRaceProgress(GuiGraphics graphics, Card card) {
-        for (Component line : card.text()) {
-            String value = line.getString();
+    private void renderRaceProgress(GuiGraphics graphics, Row row) {
+        for (String value : row.lore()) {
             if (!value.matches("[0-9]+%")) continue;
             int progress = Math.min(100, Integer.parseInt(value.substring(0, value.length() - 1)));
-            int y = card.y() + card.height() - 10;
-            graphics.fill(card.x() + 6, y, card.x() + card.width() - 6, y + 4, 0xFF444444);
-            graphics.fill(card.x() + 6, y, card.x() + 6 + (card.width() - 12) * progress / 100, y + 4, 0xFF8FB467);
+            int left = row.x() + 24;
+            int right = row.secondary() ? secondaryLeft(row) - 6 : contentRight();
+            if (right <= left) return;
+            int y = row.y() + row.height() - 4;
+            graphics.fill(left, y, right, y + 3, 0xFF444444);
+            graphics.fill(left, y, left + (right - left) * progress / 100, y + 3, 0xFF8FB467);
         }
     }
 
@@ -298,35 +416,87 @@ public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMen
                 .replace("下段の", "操作の").replace("下の一覧", "一覧");
     }
 
+    private GuildKeypad.Bounds keypadBounds() {
+        return new GuildKeypad.Bounds(layout.left(), layout.top(),
+                layout.left() + layout.width(), layout.footerY());
+    }
+
     @Override public boolean mouseClicked(double x, double y, int button) {
+        if (keypad.isOpen() && layout != null) {
+            switch (keypad.click(x, y, button, keypadBounds(), width, height)) {
+                case APPLY -> applyKeypad();
+                case CLOSE -> closeKeypad();
+                default -> { }
+            }
+            setFocused(null);
+            return true;
+        }
         for (GuiEventListener child : children()) if (child.mouseClicked(x, y, button)) {
             setFocused(child); if (button == 0) setDragging(true); return true;
         }
-        if (amountInput != null) amountInput.setFocused(false);
         setFocused(null);
+        if (layout == null) return false;
+        if (hasScrollbar() && x >= layout.left() + layout.width() - 4
+                && y >= layout.top() && y < layout.footerY()) return true;
+        for (int i = 0; i < rows.size(); i++) {
+            Row row = rows.get(i);
+            if (x < row.x() || x >= row.x() + row.width() || y < row.y() || y >= row.y() + row.height()) continue;
+            if (button == 0) {
+                if (row.secondary()) {
+                    int bx = secondaryLeft(row);
+                    if (x >= bx && x < bx + secondaryWidth(row)) { secondaryAction(row); return true; }
+                }
+                if (row.action()) click(row.slot(), 0);
+                return true;
+            }
+            if (button == 1 && row.secondary()) { secondaryAction(row); return true; }
+            return false;
+        }
         return false;
     }
     @Override public boolean mouseReleased(double x, double y, int button) {
         setDragging(false);
+        if (keypad.isOpen()) return true;
         return getFocused() != null && getFocused().mouseReleased(x, y, button);
     }
     @Override public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
+        if (keypad.isOpen()) return true;
         return getFocused() != null && getFocused().mouseDragged(x, y, button, dx, dy);
     }
     @Override public boolean mouseScrolled(double x, double y, double delta) {
-        if (delta != 0) turnPage(delta < 0 ? 1 : -1);
+        if (keypad.isOpen()) return true;
+        if (layout == null || delta == 0 || !hasScrollbar()) return false;
+        if (x < layout.left() || x >= layout.left() + layout.width()
+                || y < layout.top() || y >= layout.footerY()) return false;
+        int max = layout.maxScroll(visible.size());
+        int next = Math.max(0, Math.min(max, scroll[section] - (int) Math.round(delta * SCROLL_STEP)));
+        if (next == scroll[section]) return false;
+        scroll[section] = next;
+        buildRows();
+        updateNavigation();
         return true;
     }
     @Override public boolean keyPressed(int key, int scanCode, int modifiers) {
-        if (key == GLFW.GLFW_KEY_ESCAPE) { onClose(); return true; }
-        if (amountInput != null && amountInput.isFocused()) {
-            if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) { sendAmount(); return true; }
-            if (key != GLFW.GLFW_KEY_TAB) return amountInput.keyPressed(key, scanCode, modifiers);
+        if (keypad.isOpen()) {
+            if (key == GLFW.GLFW_KEY_ESCAPE) { closeKeypad(); return true; }
+            if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) { applyKeypad(); return true; }
+            if (key == GLFW.GLFW_KEY_BACKSPACE) { keypad.backspace(); return true; }
+            if (key >= GLFW.GLFW_KEY_0 && key <= GLFW.GLFW_KEY_9) {
+                keypad.append((char) ('0' + key - GLFW.GLFW_KEY_0));
+                return true;
+            }
+            if (key >= GLFW.GLFW_KEY_KP_0 && key <= GLFW.GLFW_KEY_KP_9) {
+                keypad.append((char) ('0' + key - GLFW.GLFW_KEY_KP_0));
+                return true;
+            }
+            return true;
         }
+        if (key == GLFW.GLFW_KEY_ESCAPE) { onClose(); return true; }
         if (key == GLFW.GLFW_KEY_PAGE_DOWN || key == GLFW.GLFW_KEY_PAGE_UP) { turnPage(key == GLFW.GLFW_KEY_PAGE_DOWN ? 1 : -1); return true; }
         return super.keyPressed(key, scanCode, modifiers);
     }
     @Override public boolean charTyped(char character, int modifiers) {
-        return amountInput != null && amountInput.isFocused() && amountInput.charTyped(character, modifiers);
+        if (keypad.isOpen()) return true;
+        return super.charTyped(character, modifiers);
     }
 }

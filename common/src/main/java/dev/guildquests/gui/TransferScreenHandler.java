@@ -36,7 +36,7 @@ public final class TransferScreenHandler extends GuildMenu {
     /** Currently selected recipient; null = unselected. */
     private UUID transferTargetId;
     private int recipientPage;
-    /** Amount to send, 0..9999, composed via digit heads and paper buttons. */
+    /** Amount to send, 0..9999, set via the client keypad. */
     private long transferAmount;
 
     public TransferScreenHandler(int syncId, Container playerInventory, ServerPlayer owner) {
@@ -195,31 +195,6 @@ public final class TransferScreenHandler extends GuildMenu {
                     });
         }
 
-        // Row 0, columns 5-8 (slots 5-8): digit heads (thousands, hundreds, tens, ones).
-        int[] places = {1000, 100, 10, 1};
-        String[] labels = {"千の位", "百の位", "十の位", "一の位"};
-        for (int i = 0; i < 4; i++) {
-            int place = places[i];
-            setAction(5 + i, digitHead((int) ((transferAmount / place) % 10), labels[i]),
-                    (p, b, t) -> {
-                        int digit = (int) ((transferAmount / place) % 10);
-                        int next = Math.floorMod(digit + (b == 0 ? 1 : -1), 10);
-                        transferAmount = Math.min(9999, transferAmount - (long) digit * place + (long) next * place);
-                    });
-        }
-
-        // Row 1, columns 5-8 (slots 14-17): paper buttons to add amounts.
-        addPaper(14, 1);
-        addPaper(15, 10);
-        addPaper(16, 100);
-        addPaper(17, 64);
-
-        // Row 2, column 7: clear amount.
-        setAction(25, item(Items.BARRIER, "金額クリア"),
-                (p, b, t) -> {
-                    if (b == 0) transferAmount = 0;
-                });
-
         // Row 2, column 4: close.
         setAction(22, item(Items.BARRIER, "閉じる"), (p, b, t) -> p.closeContainer());
     }
@@ -229,20 +204,6 @@ public final class TransferScreenHandler extends GuildMenu {
         int row = index / 4;
         int col = index % 4;
         return col + row * 9;
-    }
-
-    private void addPaper(int slot, int amount) {
-        long preview = Math.min(9999, transferAmount + amount);
-        setAction(slot, item(Items.PAPER, "＋" + amount,
-                        "クリックで " + amount + " 加算",
-                        "現在: " + transferAmount + " → " + preview),
-                (p, b, t) -> {
-                    if (b == 0) transferAmount = Math.min(9999, transferAmount + amount);
-                });
-    }
-
-    static ItemStack digitHead(int digit, String placeLabel) {
-        return GuildItems.digitHead(digit, placeLabel);
     }
 
     /** Online players other than the owner, sorted by name. */
@@ -278,7 +239,9 @@ public final class TransferScreenHandler extends GuildMenu {
     }
 
     private void set(int slot, ItemStack stack) {
-        if (slot == 13) GuildItems.amount(stack, transferAmount, 9999, "送金額");
+        // Publish the keypad payload only after a recipient is chosen, so no amount row
+        // (and no keypad) appears while the target is still unselected.
+        if (slot == 13 && transferTargetId != null) GuildItems.amount(stack, transferAmount, 9999, "送金額");
         display.setItem(slot, stack);
     }
 

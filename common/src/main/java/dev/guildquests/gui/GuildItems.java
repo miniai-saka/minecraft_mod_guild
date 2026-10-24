@@ -34,12 +34,23 @@ public final class GuildItems {
             "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvOGQ3OTEwZTEwMzM0Zjg5MGE2MjU0ODNhYzBjODI0YjVlNGExYTRiMTVhOTU2MzI3YTNlM2FlNDU4ZDllYTQifX19"
     };
 
+    /** Tag key read by the client menu screen to lift one row into the header line. */
+    public static final String HEADER_TAG = "GuildGuiHeader";
+
     private GuildItems() {
     }
 
     /** UI-only metadata on display copies; the server remains the authority for actions. */
     public static ItemStack action(ItemStack stack) {
         stack.getOrCreateTag().putBoolean("GuildGuiAction", true);
+        return stack;
+    }
+
+    /** Attach a one-line header string; blank text removes it. Null-safe. */
+    public static ItemStack header(ItemStack stack, String text) {
+        if (stack == null) return null;
+        if (text == null || text.isBlank()) stack.getOrCreateTag().remove(HEADER_TAG);
+        else stack.getOrCreateTag().putString(HEADER_TAG, text);
         return stack;
     }
 
