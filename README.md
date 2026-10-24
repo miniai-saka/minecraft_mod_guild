@@ -75,7 +75,7 @@ Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨�
 
 ### 管理者向け
 
-- 借入・滞納・コイン・ボス・FX を操作できる管理チェスト UI（引数なしの `/guildadmin`、またはギルド画面の「ギルド管理」）
+- 借入・滞納・コイン・ボス・FX を操作できる管理 UI（引数なしの `/guildadmin`、またはギルド画面の「ギルド管理」）
 - すべての管理コマンドを UI から実行できる。操作は [ADMIN.md](ADMIN.md) を参照
 
 ### その他
@@ -115,7 +115,9 @@ forge/build/libs/guildquests_forge-1.20.1_26.15.2.jar
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定を変更したら、サーバーを再起動するか `/guildadmin reload` を実行します。
 
-クエストや銀行は Minecraft 標準のチェスト画面、Guild FX は専用のクライアント画面を使います。
+Fabric版・Forge版では、クエスト・銀行・送金・消費者金融・全ギャンブル・ランキング・オークション・管理・入金ブロック設定を専用のボタンGUIで操作します。背景のワールドを動かしたまま暗転して表示し、ウィンドウサイズとGUIスケールに応じて1〜3列へ並べ替えます。長い一覧は画面下の矢印、マウスホイール、PageUp/PageDownで切り替えます。
+
+銀行・送金・出品・入札・管理の金額は、入力欄に整数を入力して「金額を適用」（またはEnter）で反映します。取引はその後に各操作ボタンで実行します。Escは入力中でも画面を閉じます。サーバーとクライアントの両方に同じ改修版JARを導入してください。Guild FX本体は既存の専用画面です。詳細は[GUI.md](GUI.md)を参照してください。
 
 ## コマンド
 
@@ -126,7 +128,7 @@ forge/build/libs/guildquests_forge-1.20.1_26.15.2.jar
 | `/guild bank` | 銀行 GUI を開く |
 | `/guild auction` | オークション市場 GUI を開く |
 | `/guild fx` | Guild FX を開く（F8 は任意で有効化） |
-| `/guildadmin` | 借入・滞納などの管理チェスト UI を開く（OP Lv2） |
+| `/guildadmin` | 借入・滞納などの管理 UI を開く（OP Lv2） |
 | `/guildadmin reload` | JSON 設定を再読込する（OP Lv2） |
 | `/guildadmin boss [count] [weak\|normal\|strong\|elite]` | 緊急ボスを即時に出現させる（count省略時は1体、最大32体、階層を省略すると抽選、OP Lv2） |
 | `/guildadmin boss info` | 生存中の緊急ボスの体力と現在のターゲットを表示する（OP Lv2） |
@@ -137,7 +139,9 @@ forge/build/libs/guildquests_forge-1.20.1_26.15.2.jar
 | `/guildadmin fx margincall [true\|false]` | 追証の確認・変更・保存をする（OP Lv2） |
 | `/guildadmin fx reload` | FX 設定を再読込する（OP Lv2） |
 
-## GUI 構成
+## GUI 構成（サーバー内部の表示枠）
+
+以下の枠数は状態同期に使う内部形式です。Fabric・Forgeの画面上ではチェストのマス目や固定座標を使わず、内容をボタンと説明へ配置します。
 
 | 画面 | サイズ | 内容 |
 |---|---|---|

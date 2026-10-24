@@ -11,8 +11,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.inventory.ClickType;
@@ -28,7 +26,7 @@ import java.util.Map;
  * Global auction market. Buyout listings are purchased with a left click;
  * auction listings are bid on using the digit-head amount in the bottom row.
  */
-public final class AuctionBrowseScreenHandler extends AbstractContainerMenu {
+public final class AuctionBrowseScreenHandler extends GuildMenu {
     @FunctionalInterface
     private interface MenuAction {
         void run(ServerPlayer player, int button, ClickType actionType);
@@ -46,7 +44,7 @@ public final class AuctionBrowseScreenHandler extends AbstractContainerMenu {
     private long bidAmount;
 
     public AuctionBrowseScreenHandler(int syncId, Inventory playerInventory, ServerPlayer owner) {
-        super(MenuType.GENERIC_9x6, syncId);
+        super(GuildMenuKind.AUCTION_BROWSE, syncId);
         this.owner = owner;
 
         for (int row = 0; row < 6; row++) {
@@ -111,7 +109,13 @@ public final class AuctionBrowseScreenHandler extends AbstractContainerMenu {
         return ItemStack.EMPTY;
     }
 
-    private void populate() {
+    @Override public boolean setGuiAmount(long value) {
+        if (value < 0 || value > MAX_BID) return false;
+        bidAmount = value;
+        populate();
+        return true;
+    }
+    @Override protected void populate() {
         actions.clear();
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, ItemStack.EMPTY);
         fillBackground();
@@ -264,11 +268,12 @@ public final class AuctionBrowseScreenHandler extends AbstractContainerMenu {
     }
 
     private void set(int slot, ItemStack stack) {
+        if (slot == 49) GuildItems.amount(stack, bidAmount, MAX_BID, "入札額");
         display.setItem(slot, stack);
     }
 
     private void setAction(int slot, ItemStack stack, MenuAction action) {
-        set(slot, stack);
+        set(slot, GuildItems.action(stack));
         actions.put(slot, action);
     }
 }

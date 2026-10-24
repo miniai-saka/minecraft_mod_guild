@@ -11,8 +11,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.inventory.ClickType;
@@ -28,7 +26,7 @@ import java.util.Map;
  * as a fixed-price or auction sale. The price is chosen with the digit heads and
  * paper buttons. Only display slots are interactive (inventory stays vanilla).
  */
-public final class AuctionSellScreenHandler extends AbstractContainerMenu {
+public final class AuctionSellScreenHandler extends GuildMenu {
     @FunctionalInterface
     private interface MenuAction {
         void run(ServerPlayer player, int button, ClickType actionType);
@@ -44,7 +42,7 @@ public final class AuctionSellScreenHandler extends AbstractContainerMenu {
     private boolean auctionMode;
 
     public AuctionSellScreenHandler(int syncId, Inventory playerInventory, ServerPlayer owner) {
-        super(MenuType.GENERIC_9x3, syncId);
+        super(GuildMenuKind.AUCTION_SELL, syncId);
         this.owner = owner;
 
         for (int row = 0; row < 3; row++) {
@@ -109,7 +107,13 @@ public final class AuctionSellScreenHandler extends AbstractContainerMenu {
         return ItemStack.EMPTY;
     }
 
-    private void populate() {
+    @Override public boolean setGuiAmount(long value) {
+        if (value < 0 || value > MAX_PRICE) return false;
+        price = value;
+        populate();
+        return true;
+    }
+    @Override protected void populate() {
         actions.clear();
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, ItemStack.EMPTY);
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, GuildItems.item(Items.GRAY_STAINED_GLASS_PANE, " "));
@@ -230,11 +234,12 @@ public final class AuctionSellScreenHandler extends AbstractContainerMenu {
     }
 
     private void set(int slot, ItemStack stack) {
+        if (slot == 10) GuildItems.amount(stack, price, MAX_PRICE, "出品価格");
         display.setItem(slot, stack);
     }
 
     private void setAction(int slot, ItemStack stack, MenuAction action) {
-        set(slot, stack);
+        set(slot, GuildItems.action(stack));
         actions.put(slot, action);
     }
 }

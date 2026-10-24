@@ -7,8 +7,6 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.inventory.ClickType;
@@ -22,7 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-public final class HorseRaceScreenHandler extends AbstractContainerMenu {
+public final class HorseRaceScreenHandler extends GuildMenu {
     @FunctionalInterface
     private interface MenuAction {
         void run(ServerPlayer player, int button, ClickType actionType);
@@ -68,7 +66,7 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
     private final RaceState state;
 
     public HorseRaceScreenHandler(int syncId, Container playerInventory, ServerPlayer owner) {
-        super(MenuType.GENERIC_9x6, syncId);
+        super(GuildMenuKind.HORSE_RACE, syncId);
         this.owner = owner;
         this.state = RACES.computeIfAbsent(owner.getUUID(), ignored -> new RaceState());
         this.state.menuOpen = true;
@@ -192,7 +190,7 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
         state.positions[0] = 0; state.positions[1] = 0; state.positions[2] = 0; state.positions[3] = 0;
     }
 
-    private void populate() {
+    @Override protected void populate() {
         actions.clear();
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, ItemStack.EMPTY);
 
@@ -307,7 +305,7 @@ public final class HorseRaceScreenHandler extends AbstractContainerMenu {
     }
 
     private void setAction(int slot, ItemStack stack, MenuAction action) {
-        set(slot, stack);
+        set(slot, GuildItems.action(stack));
         actions.put(slot, action);
     }
 

@@ -7,8 +7,6 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.inventory.ClickType;
@@ -29,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * The outcome is settled immediately on spin; the SPINNING state is a display animation
  * advanced from {@link #tickAll(MinecraftServer)} so closing the GUI never affects payout.
  */
-public final class RouletteScreenHandler extends AbstractContainerMenu {
+public final class RouletteScreenHandler extends GuildMenu {
     @FunctionalInterface
     private interface MenuAction {
         void run(ServerPlayer player, int button, ClickType actionType);
@@ -67,7 +65,7 @@ public final class RouletteScreenHandler extends AbstractContainerMenu {
     private String result = "";
 
     public RouletteScreenHandler(int syncId, Container playerInventory, ServerPlayer owner) {
-        super(MenuType.GENERIC_9x3, syncId);
+        super(GuildMenuKind.ROULETTE, syncId);
         this.owner = owner;
 
         for (int i = 0; i < DISPLAY_SLOTS; i++) {
@@ -161,7 +159,7 @@ public final class RouletteScreenHandler extends AbstractContainerMenu {
         result = "";
     }
 
-    private void populate() {
+    @Override protected void populate() {
         actions.clear();
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, ItemStack.EMPTY);
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, item(Items.GRAY_STAINED_GLASS_PANE, " "));
@@ -242,7 +240,7 @@ public final class RouletteScreenHandler extends AbstractContainerMenu {
     }
 
     private void setAction(int slot, ItemStack stack, MenuAction action) {
-        set(slot, stack);
+        set(slot, GuildItems.action(stack));
         actions.put(slot, action);
     }
 

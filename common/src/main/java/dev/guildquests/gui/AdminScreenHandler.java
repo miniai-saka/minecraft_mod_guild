@@ -13,9 +13,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -32,7 +30,7 @@ import java.util.UUID;
  * Exposes every admin command: reload, boss, coins add/set, loan add/set/clear,
  * delinquent on/off and the FX operations (margin-call toggle, reload, crash/rally).
  */
-public final class AdminScreenHandler extends AbstractContainerMenu {
+public final class AdminScreenHandler extends GuildMenu {
     private final ServerPlayer owner;
     private final SimpleContainer display = new SimpleContainer(54);
     private final Map<Integer, java.util.function.IntConsumer> actions = new HashMap<>();
@@ -44,7 +42,7 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
     private String fxSymbol;
 
     public AdminScreenHandler(int id, net.minecraft.world.Container inventory, ServerPlayer owner) {
-        super(MenuType.GENERIC_9x6, id); this.owner = owner;
+        super(GuildMenuKind.ADMIN, id); this.owner = owner;
         for (int i = 0; i < 54; i++) addSlot(new Slot(display, i, 8 + i % 9 * 18, 18 + i / 9 * 18) {
             @Override public boolean mayPlace(ItemStack stack) { return false; }
             @Override public boolean mayPickup(Player player) { return false; }
@@ -67,7 +65,7 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
         String known = state().get(id).playerName;
         return known == null || known.isBlank() ? id.toString().substring(0, 8) : known;
     }
-    private void set(int slot, Item item, String title, String... lore) { display.setItem(slot, GuildItems.item(item, title, lore)); }
+    private void set(int slot, Item item, String title, String... lore) { ItemStack stack = GuildItems.item(item, title, lore); if (slot == 13 && view.equals("AMOUNT")) GuildItems.amount(stack, amount, Integer.MAX_VALUE, "入力額"); display.setItem(slot, stack); }
     private void action(int slot, Item item, String title, Runnable action, String... lore) {
         set(slot, item, title, lore); actions.put(slot, b -> action.run());
     }
@@ -75,7 +73,13 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
     private void actionStack(int slot, ItemStack stack, java.util.function.IntConsumer action) {
         display.setItem(slot, stack); actions.put(slot, action);
     }
-    private void populate() {
+    @Override public boolean setGuiAmount(long value) {
+        if (!(view.equals("AMOUNT") && allowed(owner)) || value < 0 || value > Integer.MAX_VALUE) return false;
+        amount = value;
+        populate();
+        return true;
+    }
+    @Override protected void populate() {
         actions.clear();
         for (int i = 0; i < 54; i++) set(i, Items.GRAY_STAINED_GLASS_PANE, " ");
         if (view.equals("PLAYERS")) players();
@@ -86,6 +90,7 @@ public final class AdminScreenHandler extends AbstractContainerMenu {
             switch (view) { case "DETAIL" -> detail(); case "AMOUNT" -> input(); case "CONFIRM" -> confirmation(); }
         }
         if (!notice.isEmpty()) set(0, Items.PAPER, notice);
+        actions.keySet().forEach(slot -> GuildItems.action(display.getItem(slot)));
     }
     private void players() {
         for (var online : owner.getServer().getPlayerList().getPlayers()) GuildService.data(online);

@@ -10,8 +10,6 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.inventory.ClickType;
@@ -22,7 +20,7 @@ import net.minecraft.ChatFormatting;
 import java.util.HashMap;
 import java.util.Map;
 
-public final class BankScreenHandler extends AbstractContainerMenu {
+public final class BankScreenHandler extends GuildMenu {
     @FunctionalInterface
     private interface MenuAction {
         void run(ServerPlayer player, int button, ClickType actionType);
@@ -37,7 +35,7 @@ public final class BankScreenHandler extends AbstractContainerMenu {
     private long bankAmount;
 
     public BankScreenHandler(int syncId, Container playerInventory, ServerPlayer owner, boolean feeWaived) {
-        super(MenuType.GENERIC_9x3, syncId);
+        super(GuildMenuKind.BANK, syncId);
         this.owner = owner;
         this.feeWaived = feeWaived;
 
@@ -114,7 +112,13 @@ public final class BankScreenHandler extends AbstractContainerMenu {
         return ItemStack.EMPTY;
     }
 
-    private void populate() {
+    @Override public boolean setGuiAmount(long value) {
+        if (value < 0 || value > Integer.MAX_VALUE) return false;
+        bankAmount = value;
+        populate();
+        return true;
+    }
+    @Override protected void populate() {
         actions.clear();
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, ItemStack.EMPTY);
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, item(Items.GRAY_STAINED_GLASS_PANE, " "));
@@ -329,11 +333,12 @@ public final class BankScreenHandler extends AbstractContainerMenu {
     }
 
     private void set(int slot, ItemStack stack) {
+        if (slot == 13) GuildItems.amount(stack, bankAmount, Integer.MAX_VALUE, "入出金額");
         display.setItem(slot, stack);
     }
 
     private void setAction(int slot, ItemStack stack, MenuAction action) {
-        set(slot, stack);
+        set(slot, GuildItems.action(stack));
         actions.put(slot, action);
     }
 

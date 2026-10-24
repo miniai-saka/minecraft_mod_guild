@@ -36,6 +36,7 @@ public final class GuildQuestsForge {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
 
         ForgeNetwork.register();
+        ForgeGuildGui.register(modBus);
         Platform.bind(backend);
         backend.registerForgeEvents();
         modBus.addListener(this::handleRegister);
