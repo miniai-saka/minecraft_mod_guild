@@ -87,6 +87,7 @@ public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMen
         }
         if (discardSlot >= 0 && System.currentTimeMillis() > discardUntil) discardSlot = -1;
         loaded = true;
+        keypad.tick();
     }
 
     private boolean syncAmount() {
@@ -117,6 +118,7 @@ public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMen
     }
 
     private void rebuild() {
+        keypad.init(font);
         boolean keypadWasOpen = keypad.isOpen();
         amount = findAmount();
         if (amount != null) {
@@ -145,7 +147,7 @@ public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMen
         }
         if (amount != null) {
             amountButton = button("入力", layout.left() + layout.width() - 72, layout.amountY(), 72, this::openKeypad);
-            amountButton.setTooltip(Tooltip.create(Component.literal("0 ～ " + amount.getLong("max") + " の整数を入力")));
+            amountButton.setTooltip(Tooltip.create(Component.literal("テンキー・キーボード・貼り付けで 0 ～ " + amount.getLong("max") + " の整数を入力")));
         }
 
         int edgeButton = Math.min(76, layout.width() / 4);
@@ -460,7 +462,7 @@ public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMen
         return getFocused() != null && getFocused().mouseReleased(x, y, button);
     }
     @Override public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
-        if (keypad.isOpen()) return true;
+        if (keypad.isOpen()) { keypad.mouseDragged(x, y, button, dx, dy); return true; }
         return getFocused() != null && getFocused().mouseDragged(x, y, button, dx, dy);
     }
     @Override public boolean mouseScrolled(double x, double y, double delta) {
@@ -480,15 +482,7 @@ public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMen
         if (keypad.isOpen()) {
             if (key == GLFW.GLFW_KEY_ESCAPE) { closeKeypad(); return true; }
             if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) { applyKeypad(); return true; }
-            if (key == GLFW.GLFW_KEY_BACKSPACE) { keypad.backspace(); return true; }
-            if (key >= GLFW.GLFW_KEY_0 && key <= GLFW.GLFW_KEY_9) {
-                keypad.append((char) ('0' + key - GLFW.GLFW_KEY_0));
-                return true;
-            }
-            if (key >= GLFW.GLFW_KEY_KP_0 && key <= GLFW.GLFW_KEY_KP_9) {
-                keypad.append((char) ('0' + key - GLFW.GLFW_KEY_KP_0));
-                return true;
-            }
+            keypad.keyPressed(key, scanCode, modifiers);
             return true;
         }
         if (key == GLFW.GLFW_KEY_ESCAPE) { onClose(); return true; }
@@ -496,7 +490,7 @@ public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMen
         return super.keyPressed(key, scanCode, modifiers);
     }
     @Override public boolean charTyped(char character, int modifiers) {
-        if (keypad.isOpen()) return true;
+        if (keypad.isOpen()) { keypad.charTyped(character, modifiers); return true; }
         return super.charTyped(character, modifiers);
     }
 }

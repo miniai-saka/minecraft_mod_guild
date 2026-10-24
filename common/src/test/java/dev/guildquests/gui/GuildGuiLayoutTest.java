@@ -5,6 +5,14 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class GuildGuiLayoutTest {
+    @Test public void bankServicesShareTheDepositWithdrawalSection() {
+        assertEquals(java.util.List.of("入出金", "支払い方法"), GuildMenuKind.BANK.sections);
+        for (int slot : new int[]{1, 2, 3, 4, 13, 25, 26})
+            assertEquals(0, GuildMenuKind.BANK.section(slot));
+        for (int slot : new int[]{18, 19, 20})
+            assertEquals(1, GuildMenuKind.BANK.section(slot));
+    }
+
     @Test public void cardsStayInsideViewportAcrossWindowSizesAndGuiScales() {
         int[][] viewports = {{320,180}, {320,240}, {427,240}, {480,270}, {640,360}, {854,480}, {960,540}, {1280,720}, {1920,1080}, {3440,1440}};
         for (int[] viewport : viewports) for (boolean amount : new boolean[]{false, true}) {

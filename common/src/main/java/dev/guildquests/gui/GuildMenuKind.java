@@ -5,7 +5,7 @@ import java.util.List;
 /** Stable view identities and semantic sections, independent of screen coordinates. */
 public enum GuildMenuKind {
     GUILD(6, "本日のクエスト", "受注中", "各種メニュー", "ギルド情報"),
-    BANK(3, "入出金", "支払い方法", "各種サービス"),
+    BANK(3, "入出金", "支払い方法"),
     TRANSFER(3, "送金先", "金額・送金"),
     GAMBLE(3, "ゲームを選ぶ"),
     LOAN(3, "借入", "返済", "借入状況"),
@@ -27,7 +27,7 @@ public enum GuildMenuKind {
         return switch (this) {
             case GUILD -> slot >= 9 && slot <= 17 || slot == 4 ? 0
                     : slot >= 36 && slot <= 44 || slot == 6 ? 1 : slot <= 2 ? 3 : 2;
-            case BANK -> slot >= 18 && slot <= 20 ? 1 : slot == 3 || slot == 4 ? 2 : 0;
+            case BANK -> slot >= 18 && slot <= 20 ? 1 : 0;
             case TRANSFER -> slot % 9 < 4 || slot == 23 || slot == 24 ? 0 : 1;
             case LOAN -> slot >= 9 && slot <= 12 ? 0 : slot >= 13 && slot <= 17 ? 1 : 2;
             case HORSE_RACE -> slot < 36 || slot >= 45 && slot <= 52 ? 0 : 1;

@@ -34,7 +34,7 @@ public final class GuiDebugClient {
         c = client;
         if (client.player == null) {
             String address = System.getProperty("guildquests.guiQaServer");
-            if (!joining && address != null && client.screen instanceof TitleScreen) {
+            if (!joining && address != null && client.screen instanceof TitleScreen && client.getOverlay() == null) {
                 joining = true;
                 ConnectScreen.startConnecting(client.screen, client, ServerAddress.parseString(address),
                         new ServerData("Isolated GUI QA", address, false), false);

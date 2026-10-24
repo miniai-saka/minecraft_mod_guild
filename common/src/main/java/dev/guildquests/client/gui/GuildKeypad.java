@@ -2,6 +2,9 @@ package dev.guildquests.client.gui;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.network.chat.Component;
+import org.lwjgl.glfw.GLFW;
 
 final class GuildKeypad {
     enum Result { NONE, HANDLED, APPLY, CLOSE }
@@ -14,6 +17,7 @@ final class GuildKeypad {
     private boolean open;
     private String draft = "0";
     private long max = Long.MAX_VALUE;
+    private EditBox input;
 
     record Bounds(int left, int top, int right, int bottom) {
         int width() { return right - left; }
@@ -30,8 +34,25 @@ final class GuildKeypad {
                            int pad, int gap) { }
 
     boolean isOpen() { return open; }
-    void open() { open = true; }
-    void close() { open = false; }
+    void init(Font font) {
+        if (input != null) return;
+        input = new EditBox(font, 0, 0, 100, 20, Component.literal("金額"));
+        input.setMaxLength(MAX_DIGITS);
+        input.setFilter(this::validDraft);
+        input.setValue(draft);
+        input.setResponder(value -> draft = value);
+        input.setCanLoseFocus(false);
+    }
+    void open() {
+        open = true;
+        input.setFocused(true);
+        input.moveCursorToEnd();
+        input.setHighlightPos(0);
+    }
+    void close() {
+        open = false;
+        if (input != null) input.setFocused(false);
+    }
     String draft() { return draft; }
 
     void setMax(long max) {
@@ -40,7 +61,7 @@ final class GuildKeypad {
     }
 
     void reset(long value) {
-        draft = Long.toString(Math.max(0, Math.min(max, value)));
+        setDraft(Long.toString(Math.max(0, Math.min(max, value))));
     }
 
     Long value() {
@@ -52,32 +73,48 @@ final class GuildKeypad {
         }
     }
 
-    void append(char digit) {
-        if (digit < '0' || digit > '9') return;
-        String next = (draft.equals("0") ? "" : draft) + digit;
-        if (next.length() > MAX_DIGITS) return;
-        long parsed;
+    private boolean validDraft(String text) {
+        if (text.isEmpty()) return true;
+        if (text.length() > MAX_DIGITS || !text.chars().allMatch(c -> c >= '0' && c <= '9')) return false;
         try {
-            parsed = Long.parseLong(next);
+            return Long.parseLong(text) <= max;
         } catch (NumberFormatException ex) {
-            return;
+            return false;
         }
-        if (parsed > max) return;
-        draft = next;
     }
 
-    void appendDoubleZero() { append('0'); append('0'); }
+    private void setDraft(String text) {
+        draft = text;
+        if (input != null) input.setValue(text);
+    }
 
-    void backspace() { draft = draft.length() <= 1 ? "0" : draft.substring(0, draft.length() - 1); }
+    boolean keyPressed(int key, int scanCode, int modifiers) {
+        return input.keyPressed(key, scanCode, modifiers);
+    }
 
-    void clear() { draft = "0"; }
+    boolean charTyped(char character, int modifiers) {
+        return input.charTyped(character, modifiers);
+    }
+
+    boolean mouseDragged(double x, double y, int button, double dx, double dy) {
+        return input.mouseDragged(x, y, button, dx, dy);
+    }
+
+    void tick() { if (input != null && open) input.tick(); }
+
+    private void clear() {
+        setDraft("0");
+        input.moveCursorToEnd();
+        input.setHighlightPos(0);
+    }
 
     private void clampDraft() {
+        if (draft.isEmpty()) return;
         try {
             long parsed = Long.parseLong(draft);
-            if (parsed > max) draft = Long.toString(max);
+            if (parsed > max) setDraft(Long.toString(max));
         } catch (NumberFormatException ex) {
-            draft = "0";
+            setDraft("0");
         }
     }
 
@@ -89,15 +126,8 @@ final class GuildKeypad {
         graphics.fill(m.panelX, m.panelY, m.panelX + m.panelW, m.panelY + m.panelH, 0xF0181818);
         border(graphics, m.panelX, m.panelY, m.panelW, m.panelH);
 
-        int fieldX = m.panelX + m.pad;
-        int fieldW = m.panelW - m.pad * 2;
-        graphics.fill(fieldX, m.headerY, fieldX + fieldW, m.headerY + m.headerH, 0xFF0B0B0B);
-        graphics.drawString(font, "金額", fieldX + 4, m.headerY + 6, 0xFFA0A0A0, false);
-        int textRight = fieldX + fieldW - 4;
-        int textLimit = textRight - (fieldX + 4 + font.width("金額") + 6);
-        String shown = draft;
-        while (font.width(shown) > textLimit && shown.length() > 1) shown = shown.substring(1);
-        graphics.drawString(font, shown, textRight - font.width(shown), m.headerY + 6, 0xFFFFFFFF, false);
+        positionInput(m);
+        input.render(graphics, mouseX, mouseY, 0);
 
         for (int i = 0; i < KEYS.length; i++) {
             Rect key = keyRect(m, i);
@@ -115,6 +145,8 @@ final class GuildKeypad {
         if (!open) return Result.NONE;
         if (button != 0) return Result.HANDLED;
         Metrics m = metrics(area, screenWidth, screenHeight);
+        positionInput(m);
+        if (input.mouseClicked(mouseX, mouseY, button)) return Result.HANDLED;
         if (closeRect(m).contains(mouseX, mouseY)) return Result.CLOSE;
         if (confirmRect(m).contains(mouseX, mouseY)) return value() != null ? Result.APPLY : Result.HANDLED;
         if (clearRect(m).contains(mouseX, mouseY)) { clear(); return Result.HANDLED; }
@@ -129,9 +161,14 @@ final class GuildKeypad {
     }
 
     private void press(int index) {
-        if (index == 9) appendDoubleZero();
-        else if (index == 11) backspace();
-        else append(KEYS[index].charAt(0));
+        if (index == 11) input.keyPressed(GLFW.GLFW_KEY_BACKSPACE, 0, 0);
+        else input.insertText(KEYS[index]);
+    }
+
+    private void positionInput(Metrics m) {
+        input.setX(m.panelX + m.pad);
+        input.setY(m.headerY);
+        input.setWidth(m.panelW - m.pad * 2);
     }
 
     private Metrics metrics(Bounds area, int screenWidth, int screenHeight) {
