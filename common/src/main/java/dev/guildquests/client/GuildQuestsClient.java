@@ -18,7 +18,6 @@ public final class GuildQuestsClient {
     public static void init() {
         FxClient.init();
         GuildQuestsMod.LOGGER.info("[Client] GuildQuestsClient.init() called");
-        PlatformClient.onBlockRenderCutout(ModBlocks.GUILD_BANK);
 
         PlatformClient.registerKeyBinding("key.guildquests.openguild", GLFW.GLFW_KEY_G,
                 PlatformClient::sendOpenGuild);
@@ -49,5 +48,10 @@ public final class GuildQuestsClient {
             }
         });
         GuildQuestsMod.LOGGER.info("[Client] GuildQuestsClient.init() done");
+    }
+
+    /** Content registries must be populated before referencing the guild blocks. */
+    public static void initRenderLayers() {
+        PlatformClient.onBlockRenderCutout(ModBlocks.GUILD_BANK);
     }
 }

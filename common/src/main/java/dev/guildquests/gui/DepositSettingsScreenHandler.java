@@ -10,8 +10,6 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.inventory.ClickType;
@@ -22,7 +20,7 @@ import net.minecraft.ChatFormatting;
 import java.util.HashMap;
 import java.util.Map;
 
-public final class DepositSettingsScreenHandler extends AbstractContainerMenu {
+public final class DepositSettingsScreenHandler extends GuildMenu {
     @FunctionalInterface
     private interface MenuAction {
         void run(ServerPlayer player, int button, ClickType actionType);
@@ -36,7 +34,7 @@ public final class DepositSettingsScreenHandler extends AbstractContainerMenu {
 
     public DepositSettingsScreenHandler(int syncId, Container playerInventory,
                                         ServerPlayer owner, GuildDepositBlockEntity deposit) {
-        super(MenuType.GENERIC_9x1, syncId);
+        super(GuildMenuKind.DEPOSIT_SETTINGS, syncId);
         this.owner = owner;
         this.deposit = deposit;
 
@@ -104,7 +102,7 @@ public final class DepositSettingsScreenHandler extends AbstractContainerMenu {
         return ItemStack.EMPTY;
     }
 
-    private void populate() {
+    @Override protected void populate() {
         actions.clear();
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, item(Items.GRAY_STAINED_GLASS_PANE, " "));
 
@@ -186,7 +184,7 @@ public final class DepositSettingsScreenHandler extends AbstractContainerMenu {
     }
 
     private void setAction(int slot, ItemStack stack, MenuAction action) {
-        set(slot, stack);
+        set(slot, GuildItems.action(stack));
         actions.put(slot, action);
     }
 

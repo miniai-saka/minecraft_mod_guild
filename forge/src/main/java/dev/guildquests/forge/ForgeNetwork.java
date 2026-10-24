@@ -1,6 +1,7 @@
 package dev.guildquests.forge;
 
 import dev.guildquests.GuildQuestsMod;
+import dev.guildquests.gui.GuildMenu;
 import dev.guildquests.fx.FxModels;
 import dev.guildquests.fx.FxNetwork;
 import dev.guildquests.fx.FxService;
@@ -20,7 +21,7 @@ import java.util.function.Consumer;
  * The single Forge play channel, shared by guild, boss pin and FX packets.
  */
 public final class ForgeNetwork {
-    public static final String PROTOCOL = "2";
+    public static final String PROTOCOL = "3";
 
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation("guildquests", "main"),
@@ -96,6 +97,19 @@ public final class ForgeNetwork {
                     });
                     ctx.get().setPacketHandled(true);
                 }, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(4, GuiAmountC2S.class,
+                (msg, buf) -> { buf.writeInt(msg.containerId()); buf.writeLong(msg.amount()); },
+                buf -> buf.readableBytes() == 12
+                        ? new GuiAmountC2S(buf.readInt(), buf.readLong()) : new GuiAmountC2S(-1, -1),
+                (msg, ctx) -> {
+                    ctx.get().enqueueWork(() -> {
+                        ServerPlayer sender = ctx.get().getSender();
+                        if (sender == null || sender.isRemoved() || msg.amount() < 0) return;
+                        if (sender.containerMenu instanceof GuildMenu menu && menu.containerId == msg.containerId()
+                                && menu.stillValid(sender) && menu.setGuiAmount(msg.amount())) menu.broadcastChanges();
+                    });
+                    ctx.get().setPacketHandled(true);
+                }, Optional.of(NetworkDirection.PLAY_TO_SERVER));
         FxNetwork.server = new FxNetwork.ServerTransport() {
             @Override public boolean canSend(ServerPlayer player) { return CHANNEL.isRemotePresent(player.connection.connection); }
             @Override public void send(ServerPlayer player, FxModels.Snapshot snapshot) {
@@ -120,6 +134,10 @@ public final class ForgeNetwork {
     public static void sendFxRequest(FxModels.Request request) { CHANNEL.sendToServer(new FxRequestC2S(FxSettings.JSON.toJson(request))); }
     public record FxRequestC2S(String json) { }
     public record FxSnapshotS2C(String json) { }
+    public record GuiAmountC2S(int containerId, long amount) { }
+    public static void sendGuiAmount(int containerId, long amount) {
+        CHANNEL.sendToServer(new GuiAmountC2S(containerId, amount));
+    }
 
     /** C2S: the client asked to open the guild quest screen. */
     public record OpenGuildC2S() {

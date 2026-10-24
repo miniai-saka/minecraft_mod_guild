@@ -7,8 +7,6 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.inventory.ClickType;
@@ -25,7 +23,7 @@ import java.util.Random;
  * Hand ranking (high to low): アリ (1-1-1) &gt; ゾロ目 6 &gt; 5 &gt; 4 &gt; 3 &gt; 2 &gt; 目9 &gt; … &gt; 目1 &gt; バン (目0).
  * Win pays 2x (3x if the winner rolled a triple); equal hands refund the bet.
  */
-public final class ChinchirorinScreenHandler extends AbstractContainerMenu {
+public final class ChinchirorinScreenHandler extends GuildMenu {
     @FunctionalInterface
     private interface MenuAction {
         void run(ServerPlayer player, int button, ClickType actionType);
@@ -52,7 +50,7 @@ public final class ChinchirorinScreenHandler extends AbstractContainerMenu {
     private long payout;
 
     public ChinchirorinScreenHandler(int syncId, Container playerInventory, ServerPlayer owner) {
-        super(MenuType.GENERIC_9x3, syncId);
+        super(GuildMenuKind.CHINCHIRORIN, syncId);
         this.owner = owner;
 
         for (int i = 0; i < DISPLAY_SLOTS; i++) {
@@ -139,7 +137,7 @@ public final class ChinchirorinScreenHandler extends AbstractContainerMenu {
         payout = 0;
     }
 
-    private void populate() {
+    @Override protected void populate() {
         actions.clear();
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, ItemStack.EMPTY);
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, item(Items.GRAY_STAINED_GLASS_PANE, " "));
@@ -192,6 +190,13 @@ public final class ChinchirorinScreenHandler extends AbstractContainerMenu {
 
         setAction(26, item(Items.BARRIER, "閉じる"),
                 (p, b, t) -> p.closeContainer());
+
+        var view = GuildGamblingView.round(state.name(), betAmount, balance, result, payout);
+        view.putIntArray("dealerDice", rolled ? dealerDice : new int[0]);
+        view.putIntArray("playerDice", rolled ? playerDice : new int[0]);
+        view.putString("dealerHand", rolled ? handName(dealerDice[0], dealerDice[1], dealerDice[2]) : "相手");
+        view.putString("playerHand", rolled ? handName(playerDice[0], playerDice[1], playerDice[2]) : "あなた");
+        GuildGamblingView.publish(display, view);
     }
 
     private static ItemStack dieItem(int value) {
@@ -207,7 +212,7 @@ public final class ChinchirorinScreenHandler extends AbstractContainerMenu {
     }
 
     private void setAction(int slot, ItemStack stack, MenuAction action) {
-        set(slot, stack);
+        set(slot, GuildItems.action(stack));
         actions.put(slot, action);
     }
 

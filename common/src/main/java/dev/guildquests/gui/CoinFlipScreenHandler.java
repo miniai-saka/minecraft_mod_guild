@@ -8,8 +8,6 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.inventory.ClickType;
@@ -29,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * The outcome is settled immediately on flip; the FLIPPING state is a display animation
  * advanced from {@link #tickAll(MinecraftServer)} so closing the GUI never affects payout.
  */
-public final class CoinFlipScreenHandler extends AbstractContainerMenu {
+public final class CoinFlipScreenHandler extends GuildMenu {
     @FunctionalInterface
     private interface MenuAction {
         void run(ServerPlayer player, int button, ClickType actionType);
@@ -62,7 +60,7 @@ public final class CoinFlipScreenHandler extends AbstractContainerMenu {
     private String result = "";
 
     public CoinFlipScreenHandler(int syncId, Container playerInventory, ServerPlayer owner) {
-        super(MenuType.GENERIC_9x3, syncId);
+        super(GuildMenuKind.COIN_FLIP, syncId);
         this.owner = owner;
 
         for (int i = 0; i < DISPLAY_SLOTS; i++) {
@@ -147,7 +145,7 @@ public final class CoinFlipScreenHandler extends AbstractContainerMenu {
         return side == 0 ? "表 (オモテ)" : "裏 (ウラ)";
     }
 
-    private void populate() {
+    @Override protected void populate() {
         actions.clear();
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, ItemStack.EMPTY);
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, item(Items.GRAY_STAINED_GLASS_PANE, " "));
@@ -213,6 +211,12 @@ public final class CoinFlipScreenHandler extends AbstractContainerMenu {
 
         setAction(26, item(Items.BARRIER, "閉じる"),
                 (p, b, t) -> p.closeContainer());
+
+        var view = GuildGamblingView.round(state.name(), betAmount, balance, result, payout);
+        view.putInt("choice", choice);
+        view.putInt("side", state == State.DONE ? landedSide : -1);
+        view.putInt("ticks", flipTicks);
+        GuildGamblingView.publish(display, view);
     }
 
     private static ItemStack item(Item item, String name, String... lore) {
@@ -224,7 +228,7 @@ public final class CoinFlipScreenHandler extends AbstractContainerMenu {
     }
 
     private void setAction(int slot, ItemStack stack, MenuAction action) {
-        set(slot, stack);
+        set(slot, GuildItems.action(stack));
         actions.put(slot, action);
     }
 

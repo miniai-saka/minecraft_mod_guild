@@ -37,6 +37,21 @@ public final class GuildItems {
     private GuildItems() {
     }
 
+    /** UI-only metadata on display copies; the server remains the authority for actions. */
+    public static ItemStack action(ItemStack stack) {
+        stack.getOrCreateTag().putBoolean("GuildGuiAction", true);
+        return stack;
+    }
+
+    public static ItemStack amount(ItemStack stack, long value, long max, String label) {
+        CompoundTag input = new CompoundTag();
+        input.putLong("value", value);
+        input.putLong("max", max);
+        input.putString("label", label);
+        stack.getOrCreateTag().put("GuildGuiAmount", input);
+        return stack;
+    }
+
     public static ItemStack item(Item item, String name, String... lore) {
         return item(item, ChatFormatting.WHITE, name, lore);
     }

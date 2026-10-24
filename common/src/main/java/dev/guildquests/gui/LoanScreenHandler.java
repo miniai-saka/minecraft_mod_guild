@@ -10,8 +10,6 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.inventory.ClickType;
@@ -26,7 +24,7 @@ import java.util.Map;
  * Consumer finance (消費者金融): borrow coins against a rank-based limit and repay manually.
  * Interest accrues on the outstanding loan periodically; there is no automatic collection.
  */
-public final class LoanScreenHandler extends AbstractContainerMenu {
+public final class LoanScreenHandler extends GuildMenu {
     @FunctionalInterface
     private interface MenuAction {
         void run(ServerPlayer player, int button, ClickType actionType);
@@ -39,7 +37,7 @@ public final class LoanScreenHandler extends AbstractContainerMenu {
     private final Map<Integer, MenuAction> actions = new HashMap<>();
 
     public LoanScreenHandler(int syncId, Container playerInventory, ServerPlayer owner) {
-        super(MenuType.GENERIC_9x3, syncId);
+        super(GuildMenuKind.LOAN, syncId);
         this.owner = owner;
 
         for (int i = 0; i < DISPLAY_SLOTS; i++) {
@@ -90,7 +88,7 @@ public final class LoanScreenHandler extends AbstractContainerMenu {
     @Override
     public ItemStack quickMoveStack(Player player, int slot) { return ItemStack.EMPTY; }
 
-    private void populate() {
+    @Override protected void populate() {
         actions.clear();
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, ItemStack.EMPTY);
         for (int i = 0; i < DISPLAY_SLOTS; i++) display.setItem(i, item(Items.GRAY_STAINED_GLASS_PANE, " "));
@@ -178,7 +176,7 @@ public final class LoanScreenHandler extends AbstractContainerMenu {
     }
 
     private void setAction(int slot, ItemStack stack, MenuAction action) {
-        set(slot, stack);
+        set(slot, GuildItems.action(stack));
         actions.put(slot, action);
     }
 }

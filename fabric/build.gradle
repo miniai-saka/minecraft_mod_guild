@@ -71,3 +71,6 @@ remapJar {
 if (providers.gradleProperty('fxDebug').isPresent()) {
     apply from: 'fx-debug.gradle'
 }
+if (providers.gradleProperty('guiDebug').isPresent()) {
+    apply from: 'gui-debug.gradle'
+}
