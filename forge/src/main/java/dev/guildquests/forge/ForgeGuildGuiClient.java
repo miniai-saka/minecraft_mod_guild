@@ -15,7 +15,7 @@ final class ForgeGuildGuiClient {
     static void init(IEventBus bus) {
         bus.addListener((FMLClientSetupEvent event) -> event.enqueueWork(() -> {
             for (GuildMenuKind kind : GuildMenuKind.values())
-                MenuScreens.register(GuildMenus.clientType(kind), GuildMenuScreen::new);
+                MenuScreens.register(GuildMenus.clientType(kind), GuildMenuScreen::create);
             GuildGuiActions.amountSender = ForgeNetwork::sendGuiAmount;
         }));
     }

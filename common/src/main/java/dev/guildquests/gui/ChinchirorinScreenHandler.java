@@ -190,6 +190,13 @@ public final class ChinchirorinScreenHandler extends GuildMenu {
 
         setAction(26, item(Items.BARRIER, "閉じる"),
                 (p, b, t) -> p.closeContainer());
+
+        var view = GuildGamblingView.round(state.name(), betAmount, balance, result, payout);
+        view.putIntArray("dealerDice", rolled ? dealerDice : new int[0]);
+        view.putIntArray("playerDice", rolled ? playerDice : new int[0]);
+        view.putString("dealerHand", rolled ? handName(dealerDice[0], dealerDice[1], dealerDice[2]) : "相手");
+        view.putString("playerHand", rolled ? handName(playerDice[0], playerDice[1], playerDice[2]) : "あなた");
+        GuildGamblingView.publish(display, view);
     }
 
     private static ItemStack dieItem(int value) {

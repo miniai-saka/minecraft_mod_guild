@@ -25,7 +25,7 @@ import java.util.List;
  * Button-based presentation of the current server menu, preserving the original navigation.
  * No inventory slots, background texture, chart panels or client-side economic mutations.
  */
-public final class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMenu> {
+public class GuildMenuScreen extends Screen implements MenuAccess<GuildClientMenu> {
     private final GuildClientMenu menu;
     private final List<ItemStack> previous = new ArrayList<>();
     private final List<Card> cards = new ArrayList<>();
@@ -45,6 +45,14 @@ public final class GuildMenuScreen extends Screen implements MenuAccess<GuildCli
         super(title);
         this.menu = menu;
         pages = new int[menu.kind.sections.size()];
+    }
+
+    public static GuildMenuScreen create(GuildClientMenu menu, Inventory inventory, Component title) {
+        return switch (menu.kind) {
+            case BLACKJACK, CHINCHIRORIN, SLOT, ROULETTE, COIN_FLIP, HORSE_RACE ->
+                    new GuildGamblingScreen(menu, inventory, title);
+            default -> new GuildMenuScreen(menu, inventory, title);
+        };
     }
 
     @Override public boolean isPauseScreen() { return false; }

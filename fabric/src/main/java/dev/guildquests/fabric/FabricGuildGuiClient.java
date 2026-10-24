@@ -12,7 +12,7 @@ public final class FabricGuildGuiClient {
     private FabricGuildGuiClient() { }
     public static void init() {
         for (GuildMenuKind kind : GuildMenuKind.values())
-            MenuScreens.register(GuildMenus.clientType(kind), GuildMenuScreen::new);
+            MenuScreens.register(GuildMenus.clientType(kind), GuildMenuScreen::create);
         GuildGuiActions.amountSender = (id, amount) -> {
             if (!ClientPlayNetworking.canSend(FabricGuildGui.AMOUNT)) return;
             var buf = PacketByteBufs.create();

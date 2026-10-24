@@ -71,6 +71,28 @@ public final class GuiDebugFixtures {
             .then(Commands.literal("bankfree").executes(context -> {
                 BankScreenHandler.openFromBlock(context.getSource().getPlayerOrException()); return 1;
             }))
+            .then(Commands.literal("blackjackhand").executes(context -> {
+                var player = context.getSource().getPlayerOrException();
+                if (!(player.containerMenu instanceof BlackjackScreenHandler menu)) throw new IllegalStateException("Expected blackjack");
+                try {
+                    Class<?> card = java.util.Arrays.stream(BlackjackScreenHandler.class.getDeclaredClasses())
+                            .filter(c -> c.getSimpleName().equals("Card")).findFirst().orElseThrow();
+                    var constructor = card.getDeclaredConstructor(String.class, String.class, int.class); constructor.setAccessible(true);
+                    var players = (java.util.List<Object>) field(menu, "playerHand").get(menu);
+                    var dealers = (java.util.List<Object>) field(menu, "dealerHand").get(menu);
+                    players.clear(); dealers.clear();
+                    String[] suits = {"♠","♥","♦","♣"};
+                    for (int i = 0; i < 11; i++) {
+                        String rank = i < 4 ? "A" : i < 8 ? "2" : "3";
+                        players.add(constructor.newInstance(rank, suits[i % 4], rank.equals("A") ? 11 : Integer.parseInt(rank)));
+                    }
+                    dealers.add(constructor.newInstance("K", "♣", 10)); dealers.add(constructor.newInstance("9", "♥", 9));
+                    var state = field(menu, "state");
+                    for (Object value : state.getType().getEnumConstants()) if (((Enum<?>)value).name().equals("PLAYER_TURN")) state.set(menu, value);
+                    var populate = BlackjackScreenHandler.class.getDeclaredMethod("populate"); populate.setAccessible(true); populate.invoke(menu);
+                    menu.broadcastChanges(); return 1;
+                } catch (ReflectiveOperationException ex) { throw new RuntimeException(ex); }
+            }))
             .then(Commands.literal("normalchest").executes(context -> {
                 var p = context.getSource().getPlayerOrException();
                 p.openMenu(new SimpleMenuProvider((id, inv, ignored) -> ChestMenu.threeRows(id, inv, new SimpleContainer(27)),
@@ -96,5 +118,9 @@ public final class GuiDebugFixtures {
                 catch (java.io.IOException ex) { throw new RuntimeException(ex); }
                 return 1;
             })));
+    }
+
+    private static java.lang.reflect.Field field(Object object, String name) throws ReflectiveOperationException {
+        var field = object.getClass().getDeclaredField(name); field.setAccessible(true); return field;
     }
 }

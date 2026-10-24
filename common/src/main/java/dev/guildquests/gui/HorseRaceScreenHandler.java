@@ -294,6 +294,24 @@ public final class HorseRaceScreenHandler extends GuildMenu {
             setAction(53, item(Items.BARRIER, "閉じる"),
                     (p, b, t) -> p.closeContainer());
         }
+        publishRaceView(balance);
+    }
+
+    private void publishRaceView(long balance) {
+        String phase = state.raceActive ? "RACING" : state.raceDone ? "DONE" : "BETTING";
+        boolean won = state.raceDone && state.winner == state.selectedHorse && state.selectedHorse >= 0;
+        long payout = won ? state.betAmount * ODDS[state.selectedHorse] : 0;
+        var view = GuildGamblingView.round(phase, state.betAmount, balance,
+                state.raceDone ? (won ? "勝ち！" : "負け…") : "", payout);
+        view.putInt("choice", state.selectedHorse);
+        view.putInt("winner", state.raceDone ? state.winner : -1);
+        view.putInt("ticks", state.raceTicks);
+        view.putIntArray("positions", state.positions);
+        view.putIntArray("odds", ODDS);
+        var names = new net.minecraft.nbt.ListTag();
+        for (String name : HORSE_NAMES) names.add(net.minecraft.nbt.StringTag.valueOf(name));
+        view.put("horses", names);
+        GuildGamblingView.publish(display, view);
     }
 
     private static ItemStack item(Item item, String name, String... lore) {

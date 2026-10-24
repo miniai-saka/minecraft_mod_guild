@@ -1,6 +1,7 @@
 package dev.guildquests.guidebug;
 import dev.guildquests.client.gui.GuildGuiActions;
 import dev.guildquests.client.gui.GuildMenuScreen;
+import dev.guildquests.client.gui.GuildGamblingScreen;
 import dev.guildquests.gui.*;
 import net.minecraft.client.*;
 import net.minecraft.client.gui.screens.ConnectScreen;
@@ -16,13 +17,15 @@ import java.util.*;
 
 /** Drives real widgets and actual C2S packets in the disposable production-runtime client. */
 public final class GuiDebugClient {
-    private record Step(String label, Runnable run, long delay) { }
+    private record Step(String label, Runnable run, long delay, java.util.function.BooleanSupplier ready) { }
     private final List<Step> steps = new ArrayList<>();
     private final List<String> results = new ArrayList<>();
     private int phase, oldId;
     private long next, worldTime;
+    private long waitingUntil;
     private boolean ready, finished, joining;
     private Minecraft c;
+    private final Set<String> gamblingStages = new HashSet<>();
 
     public void tick(Minecraft client) {
         boolean runScenarios = Boolean.getBoolean("guildquests.guiQa");
@@ -42,7 +45,7 @@ public final class GuiDebugClient {
             Path control = Path.of("gui-control.txt");
             if (Files.exists(control)) {
                 String value = Files.readString(control).trim(); Files.delete(control);
-                if (value.startsWith("resume:")) { phase = Integer.parseInt(value.substring(7)); finished = false; next = System.currentTimeMillis() + 1000; }
+                if (value.startsWith("resume:")) { phase = Integer.parseInt(value.substring(7)); finished = false; waitingUntil = 0; next = System.currentTimeMillis() + 1000; }
                 else if (value.startsWith("command:")) command(value.substring(8));
                 else if (value.startsWith("click:")) click(value.substring(6));
                 else if (value.startsWith("input:")) input(value.substring(6));
@@ -50,11 +53,21 @@ public final class GuiDebugClient {
                 Files.writeString(Path.of("gui-controls.txt"), "PASS " + value + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             }
         } catch (Exception ex) { ex.printStackTrace(); }
+        if (runScenarios && !finished) {
+            try { monitorGambling(); }
+            catch (Exception ex) { results.add("FAIL public gambling state: " + ex); finished = true; save("FAIL"); ex.printStackTrace(); return; }
+        }
         if (!runScenarios || finished || System.currentTimeMillis() < next) return;
         if (!ready) { ready = true; prepare(); next = System.currentTimeMillis() + 4000; return; }
         if (phase >= steps.size()) { finished = true; save("PASS"); command("guild"); return; }
         Step step = steps.get(phase);
         try {
+            if (!step.ready().getAsBoolean()) {
+                if (waitingUntil == 0) waitingUntil = System.currentTimeMillis() + 15000;
+                if (System.currentTimeMillis() < waitingUntil) { next = System.currentTimeMillis() + 100; return; }
+                throw new IllegalStateException("Timed out waiting for " + step.label());
+            }
+            waitingUntil = 0;
             c.getToasts().clear();
             step.run().run();
             results.add("PASS " + phase + " " + step.label());
@@ -67,8 +80,9 @@ public final class GuiDebugClient {
             try { shot("failure"); } catch (Exception ignored) { }
         }
     }
-    private void step(String label, Runnable run) { steps.add(new Step(label, run, 850)); }
-    private void waitStep(String label, long ms, Runnable run) { steps.add(new Step(label, run, ms)); }
+    private void step(String label, Runnable run) { steps.add(new Step(label, run, 850, () -> true)); }
+    private void waitStep(String label, long ms, Runnable run) { steps.add(new Step(label, run, ms, () -> true)); }
+    private void awaitStep(String label, java.util.function.BooleanSupplier ready, Runnable run) { steps.add(new Step(label, run, 850, ready)); }
     private void prepare() {
         step("seed isolated server fixtures", () -> command("guiqa setup"));
         step("guild command opens menu", () -> { if(c.screen!=null)c.screen.onClose(); command("guild"); });
@@ -101,34 +115,34 @@ public final class GuiDebugClient {
         step("ranking updated", () -> { shot("ranking"); click("戻る"); });
         step("gambling hub entry", () -> { click("各種メニュー"); click("ギャンブル"); });
         step("gambling hub", () -> { view(GuildMenuKind.GAMBLE); shot("gambling"); click("ブラックジャック"); });
-        step("blackjack bet increment", () -> { view(GuildMenuKind.BLACKJACK); click("増やす +10"); });
-        step("blackjack bet decrement", () -> { click("減らす"); });
-        step("blackjack restored bet and start", () -> { click("増やす +10"); });
+        step("blackjack bet increment", () -> { view(GuildMenuKind.BLACKJACK); click("+10"); });
+        step("blackjack bet decrement", () -> { click("-10"); });
+        step("blackjack restored bet and start", () -> { click("+10"); });
         step("blackjack start", () -> click("スタート"));
         step("blackjack hand controls", () -> { shot("blackjack"); if (has("ヒット")) click("ヒット"); });
         step("blackjack stand", () -> { if (has("スタンド")) click("スタンド"); });
         step("blackjack result and back", () -> { click("戻る"); });
         step("chinchirorin entry", () -> click("チンチロ"));
-        step("chinchirorin bet", () -> { view(GuildMenuKind.CHINCHIRORIN); click("増やす +10"); });
+        step("chinchirorin bet", () -> { view(GuildMenuKind.CHINCHIRORIN); click("+10"); });
         waitStep("chinchirorin roll", 4000, () -> click("サイコロを投げる"));
         step("chinchirorin result", () -> { shot("chinchirorin"); click("戻る"); });
         step("slot entry", () -> click("スロット"));
-        step("slot bet", () -> { view(GuildMenuKind.SLOT); click("増やす +10"); });
+        step("slot bet", () -> { view(GuildMenuKind.SLOT); click("+10"); });
         waitStep("slot spin", 7000, () -> click("スピン"));
         step("slot result", () -> { shot("slot"); check(has("もう一回"),"slot did not finish"); click("戻る"); });
         step("roulette entry", () -> click("ルーレット"));
         step("roulette color selection", () -> { view(GuildMenuKind.ROULETTE); clickPrefix("赤"); });
-        step("roulette bet", () -> click("増やす +10"));
+        step("roulette bet", () -> click("+10"));
         waitStep("roulette spin", 7000, () -> click("ルーレットを回す"));
         step("roulette result", () -> { shot("roulette"); check(has("もう一回"),"roulette did not finish"); click("戻る"); });
         step("coin flip entry", () -> click("コイントス"));
         step("coin flip side", () -> { view(GuildMenuKind.COIN_FLIP); click("表 (オモテ)"); });
-        step("coin flip bet", () -> click("増やす +10"));
+        step("coin flip bet", () -> click("+10"));
         waitStep("coin flip animation", 5000, () -> click("コインを投げる"));
         step("coin flip result", () -> { shot("coin-flip"); check(has("もう一回"),"coin flip did not finish"); click("戻る"); });
         step("horse race entry", () -> click("競馬"));
         step("horse selection", () -> { view(GuildMenuKind.HORSE_RACE); clickPrefix("白馬"); click("馬・賭け金"); });
-        step("horse race bet", () -> click("増やす +10"));
+        step("horse race bet", () -> click("+10"));
         step("horse race start", () -> { click("レース"); click("レース開始"); });
         waitStep("horse race live animation", 12000, () -> { shot("horse-race-running"); });
         step("horse race result", () -> { shot("horse-race-result"); check(has("もう一回"),"race did not finish"); click("戻る"); });
@@ -169,6 +183,77 @@ public final class GuiDebugClient {
         step("wide screen layout", () -> { bounds(); shot("bank-1920x1080-scale2"); resize(1280,800,2); });
         step("Escape closes while typing", () -> { input("99"); c.screen.keyPressed(GLFW.GLFW_KEY_ESCAPE,0,0); });
         step("Escape closed server menu", () -> { check(c.screen==null,"Escape did not close"); command("guiqa persist"); command("save-all flush"); });
+        prepareGamblingViews();
+    }
+
+    private net.minecraft.nbt.CompoundTag gameView() {
+        return menu().getSlot(0).getItem().getOrCreateTag().getCompound(GuildGamblingView.TAG);
+    }
+
+    private void monitorGambling() throws java.io.IOException {
+        if (!(c.screen instanceof GuildGamblingScreen)) return;
+        var v = gameView(); String phase = v.getString("phase"); if (phase.isEmpty()) return;
+        String key = menu().kind + ":" + phase;
+        boolean animating = phase.equals("SPINNING") || phase.equals("FLIPPING") || phase.equals("RACING");
+        if (animating) check(!v.contains("result") && !v.contains("payout"), "outcome leaked during animation");
+        if (menu().kind == GuildMenuKind.ROULETTE && phase.equals("SPINNING")) check(v.getInt("number") == -1, "roulette number leaked");
+        if (menu().kind == GuildMenuKind.COIN_FLIP && phase.equals("FLIPPING")) check(v.getInt("side") == -1, "coin side leaked");
+        if (menu().kind == GuildMenuKind.HORSE_RACE && phase.equals("RACING"))
+            check(v.getInt("winner") == -1 && !v.contains("plannedWinner"), "race winner leaked");
+        if (menu().kind == GuildMenuKind.BLACKJACK && phase.equals("PLAYER_TURN")) {
+            var dealer = v.getList("dealerCards", net.minecraft.nbt.Tag.TAG_COMPOUND);
+            if (dealer.size() > 1) check(dealer.getCompound(1).getAllKeys().equals(Set.of("hidden")), "dealer hole card leaked");
+        }
+        if (gamblingStages.add(key)) {
+            Files.writeString(Path.of("gambling-stages.txt"), key + " viewport=" + c.screen.width + "x" + c.screen.height + "\n",
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            if (animating) shot("visual-" + menu().kind.id() + "-running");
+        }
+        if (menu().kind == GuildMenuKind.SLOT && phase.equals("SPINNING")) {
+            int mask = 0; int[] reels = v.getIntArray("reels");
+            for (int i = 0; i < reels.length; i++) if (reels[i] >= 0) mask |= 1 << i;
+            String stop = "SLOT:stops-" + mask;
+            if (gamblingStages.add(stop)) { Files.writeString(Path.of("gambling-stages.txt"), stop + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND); shot("visual-slot-stops-" + mask); }
+        }
+    }
+
+    private void prepareGamblingViews() {
+        step("visual game checks return to guild", () -> command("guild"));
+        awaitStep("visual game checks open game hub", () -> c.screen instanceof GuildMenuScreen screen && screen.getMenu().kind == GuildMenuKind.GUILD,
+                () -> { click("各種メニュー"); click("ギャンブル"); });
+        GuildMenuKind[] kinds = {GuildMenuKind.BLACKJACK, GuildMenuKind.CHINCHIRORIN, GuildMenuKind.SLOT,
+                GuildMenuKind.ROULETTE, GuildMenuKind.COIN_FLIP, GuildMenuKind.HORSE_RACE};
+        String[] names = {"ブラックジャック", "チンチロ", "スロット", "ルーレット", "コイントス", "競馬"};
+        for (int i = 0; i < kinds.length; i++) {
+            GuildMenuKind kind = kinds[i]; String name = names[i];
+            step("dedicated " + kind + " screen", () -> click(name));
+            step(kind + " full viewport", () -> { view(kind); check(c.screen instanceof GuildGamblingScreen, "generic game screen");
+                check(!c.screen.isPauseScreen(), "game paused world"); bounds(); shot("visual-" + kind.id() + "-wide"); if(has("もう一回"))click("もう一回"); });
+            step(kind + " resize", () -> resize(854,480,4));
+            step(kind + " compact board", () -> { bounds(); shot("visual-" + kind.id() + "-compact"); click(kind==GuildMenuKind.HORSE_RACE?"馬・賭け金":"賭け金"); });
+            step(kind + " compact bet controls", () -> { bounds(); click("+10"); });
+            step(kind + " compact bet synchronized", () -> { check(gameView().getLong("bet")==10,"compact bet not synced"); shot("visual-"+kind.id()+"-bet"); click(kind==GuildMenuKind.HORSE_RACE?"レース":"戻る"); });
+            step(kind + " restore viewport", () -> resize(1280,800,2));
+            if (kind == GuildMenuKind.SLOT) {
+                waitStep("slot machine lever starts real spin", 2600, () -> {
+                    var l = dev.guildquests.client.gui.GamblingLayout.of(c.screen.width,c.screen.height);
+                    int machineWidth=l.width()>=560?l.width()-180:l.width()-16;
+                    check(c.screen.mouseClicked(l.left()+8+machineWidth-18,l.boardY()+18,0),"lever click not consumed");
+                });
+                step("lever spin settles and displays result", () -> { check(gameView().getString("phase").equals("DONE"),"lever spin did not finish"); shot("visual-slot-lever-result"); });
+            }
+            if (kind == GuildMenuKind.BLACKJACK) {
+                step("eleven-card blackjack fixture", () -> command("guiqa blackjackhand"));
+                step("all eleven cards and hidden dealer", () -> { check(gameView().getList("playerCards",net.minecraft.nbt.Tag.TAG_COMPOUND).size()==11,"long hand truncated"); bounds(); shot("visual-blackjack-eleven-cards"); resize(854,480,4); });
+                step("long blackjack hand compact", () -> { bounds(); shot("visual-blackjack-eleven-cards-compact"); resize(1280,800,2); });
+            }
+            step(kind + " navigation back", () -> { bounds(); click("戻る"); });
+        }
+        step("all animated server phases observed", () -> {
+            for(String stage:new String[]{"SLOT:SPINNING","ROULETTE:SPINNING","COIN_FLIP:FLIPPING","HORSE_RACE:RACING","BLACKJACK:PLAYER_TURN"})
+                check(gamblingStages.contains(stage),"missing phase "+stage);
+            command("guiqa persist"); command("save-all flush");
+        });
     }
 
     private void command(String text) { c.player.connection.sendCommand(text); }
@@ -183,6 +268,13 @@ public final class GuiDebugClient {
     private void clickPrefix(String name) { seek(name,true,true); }
     private boolean has(String name) { return seek(name,false,false); }
     private boolean seek(String name,boolean prefix,boolean press) {
+        if(c.screen instanceof GuildGamblingScreen) {
+            for(var child:List.copyOf(c.screen.children())) if(child instanceof Button b && b.active && (prefix?b.getMessage().getString().startsWith(name):b.getMessage().getString().equals(name))) {
+                if(press)c.screen.mouseClicked(b.getX()+b.getWidth()/2.0,b.getY()+b.getHeight()/2.0,0); return true;
+            }
+            if(press)throw new IllegalStateException("missing active game button "+name+"; visible="+labels());
+            return false;
+        }
         for(int page=0;page<60;page++) {
             for(var child:List.copyOf(c.screen.children())) if(child instanceof Button b && b.active && (prefix?b.getMessage().getString().startsWith(name):b.getMessage().getString().equals(name))) {
                 if(press)c.screen.mouseClicked(b.getX()+b.getWidth()/2.0,b.getY()+10,0);return true;

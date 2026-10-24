@@ -229,6 +229,12 @@ public final class RouletteScreenHandler extends GuildMenu {
 
         setAction(26, item(Items.BARRIER, "閉じる"),
                 (p, b, t) -> p.closeContainer());
+
+        var view = GuildGamblingView.round(state.name(), betAmount, balance, result, payout);
+        view.putInt("choice", choice);
+        view.putInt("number", state == State.DONE ? rolled : -1);
+        view.putInt("ticks", spinTicks);
+        GuildGamblingView.publish(display, view);
     }
 
     private static ItemStack item(Item item, String name, String... lore) {

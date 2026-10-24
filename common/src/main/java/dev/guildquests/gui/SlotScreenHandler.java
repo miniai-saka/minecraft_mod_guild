@@ -229,6 +229,12 @@ public final class SlotScreenHandler extends GuildMenu {
 
         setAction(26, item(Items.BARRIER, "閉じる"),
                 (p, b, t) -> p.closeContainer());
+
+        var view = GuildGamblingView.round(state.name(), betAmount, balance, result, payout);
+        view.putIntArray("reels", GuildGamblingView.visibleReels(reels, spinTicks, STOP_TICKS,
+                state == State.SPINNING, state == State.DONE));
+        view.putInt("ticks", spinTicks);
+        GuildGamblingView.publish(display, view);
     }
 
     private static ItemStack item(Item item, String name, String... lore) {

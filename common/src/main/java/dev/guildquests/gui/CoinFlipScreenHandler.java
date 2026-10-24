@@ -211,6 +211,12 @@ public final class CoinFlipScreenHandler extends GuildMenu {
 
         setAction(26, item(Items.BARRIER, "閉じる"),
                 (p, b, t) -> p.closeContainer());
+
+        var view = GuildGamblingView.round(state.name(), betAmount, balance, result, payout);
+        view.putInt("choice", choice);
+        view.putInt("side", state == State.DONE ? landedSide : -1);
+        view.putInt("ticks", flipTicks);
+        GuildGamblingView.publish(display, view);
     }
 
     private static ItemStack item(Item item, String name, String... lore) {

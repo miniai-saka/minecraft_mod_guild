@@ -245,6 +245,20 @@ public final class BlackjackScreenHandler extends GuildMenu {
 
         setAction(26, item(Items.BARRIER, "閉じる"),
                 (p, b, t) -> p.closeContainer());
+
+        var view = GuildGamblingView.round(state.name(), betAmount, balance, result, payout);
+        var playerCards = new net.minecraft.nbt.ListTag();
+        var dealerCards = new net.minecraft.nbt.ListTag();
+        for (Card card : playerHand) playerCards.add(GuildGamblingView.card(card.rank(), card.suit(), false));
+        for (int i = 0; i < dealerHand.size(); i++) {
+            Card card = dealerHand.get(i);
+            dealerCards.add(GuildGamblingView.card(card.rank(), card.suit(), state == State.PLAYER_TURN && i == 1));
+        }
+        view.put("playerCards", playerCards);
+        view.put("dealerCards", dealerCards);
+        view.putInt("playerTotal", handValue(playerHand));
+        view.putInt("dealerTotal", state == State.PLAYER_TURN ? dealerHand.get(0).value() : handValue(dealerHand));
+        GuildGamblingView.publish(display, view);
     }
 
     private static ItemStack item(Item item, String name, String... lore) {
