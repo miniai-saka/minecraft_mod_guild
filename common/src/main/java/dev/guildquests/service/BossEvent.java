@@ -157,6 +157,7 @@ public final class BossEvent {
         for (BossInstance instance : new ArrayList<>(bosses.values())) {
             releaseProtectedTarget(instance);
             rescue(instance);
+            BossRanged.tick(instance.entity, instance.tier);
         }
 
         // Tick down the client-side pin.
@@ -279,9 +280,6 @@ public final class BossEvent {
             mob.getAttribute(Attributes.ATTACK_SPEED).setBaseValue(base * tier.attackSpeedMultiplier());
         }
         BossReach.set(mob, tier.reachBonus());
-        ((dev.guildquests.mixin.MobGoalAccessor) mob).guildquests$goalSelector().addGoal(0,
-                new BossRangedGoal(mob, 6.0, 24.0,
-                        (int) Math.max(10, 40 / tier.attackSpeedMultiplier()), tier.arrowDamage()));
         equip(mob, tier);
         applyTierEffects(mob, tier);
         world.addFreshEntity(mob);
@@ -517,6 +515,7 @@ public final class BossEvent {
         MinecraftServer server = entity.level().getServer();
         if (server == null) return;
 
+        BossRanged.clear(entity.getUUID());
         BossInstance instance = bosses.remove(entity.getUUID());
         boolean wasPinned = entity.getUUID().equals(pinned);
         if (instance != null) {
