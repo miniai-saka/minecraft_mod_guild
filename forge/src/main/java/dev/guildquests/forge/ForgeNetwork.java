@@ -1,11 +1,6 @@
 package dev.guildquests.forge;
 
-import dev.guildquests.GuildQuestsMod;
 import dev.guildquests.gui.GuildMenu;
-import dev.guildquests.fx.FxModels;
-import dev.guildquests.fx.FxNetwork;
-import dev.guildquests.fx.FxService;
-import dev.guildquests.fx.FxSettings;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -18,10 +13,10 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * The single Forge play channel, shared by guild, boss pin and FX packets.
+ * The single Forge play channel, shared by guild, boss pin and GUI packets.
  */
 public final class ForgeNetwork {
-    public static final String PROTOCOL = "3";
+    public static final String PROTOCOL = "4";
 
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation("guildquests", "main"),
@@ -31,7 +26,6 @@ public final class ForgeNetwork {
 
     private static Consumer<ServerPlayer> openGuildHandler;
     private static BossPinSink bossPinSink;
-    private static Consumer<FxModels.Snapshot> fxSnapshotSink;
 
     private ForgeNetwork() {
     }
@@ -66,37 +60,6 @@ public final class ForgeNetwork {
                     ctx.get().setPacketHandled(true);
                 },
                 Optional.of(NetworkDirection.PLAY_TO_CLIENT));
-        CHANNEL.registerMessage(2, FxRequestC2S.class,
-                (msg, buf) -> buf.writeUtf(msg.json(), 4096),
-                buf -> new FxRequestC2S(buf.readUtf(4096)),
-                (msg, ctx) -> {
-                    ctx.get().enqueueWork(() -> {
-                        ServerPlayer sender = ctx.get().getSender();
-                        if (sender == null) return;
-                        try {
-                            FxModels.Request request = FxSettings.JSON.fromJson(msg.json(), FxModels.Request.class);
-                            if (request != null) FxService.handle(sender.getServer(), sender, request);
-                        } catch (RuntimeException ex) {
-                            GuildQuestsMod.LOGGER.debug("Rejected malformed FX request", ex);
-                        }
-                    });
-                    ctx.get().setPacketHandled(true);
-                }, Optional.of(NetworkDirection.PLAY_TO_SERVER));
-        CHANNEL.registerMessage(3, FxSnapshotS2C.class,
-                (msg, buf) -> buf.writeUtf(msg.json(), 1_000_000),
-                buf -> new FxSnapshotS2C(buf.readUtf(1_000_000)),
-                (msg, ctx) -> {
-                    ctx.get().enqueueWork(() -> {
-                        if (fxSnapshotSink == null) return;
-                        try {
-                            FxModels.Snapshot snapshot = FxSettings.JSON.fromJson(msg.json(), FxModels.Snapshot.class);
-                            if (snapshot != null) fxSnapshotSink.accept(snapshot);
-                        } catch (RuntimeException ex) {
-                            GuildQuestsMod.LOGGER.warn("Invalid FX snapshot", ex);
-                        }
-                    });
-                    ctx.get().setPacketHandled(true);
-                }, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         CHANNEL.registerMessage(4, GuiAmountC2S.class,
                 (msg, buf) -> { buf.writeInt(msg.containerId()); buf.writeLong(msg.amount()); },
                 buf -> buf.readableBytes() == 12
@@ -110,12 +73,6 @@ public final class ForgeNetwork {
                     });
                     ctx.get().setPacketHandled(true);
                 }, Optional.of(NetworkDirection.PLAY_TO_SERVER));
-        FxNetwork.server = new FxNetwork.ServerTransport() {
-            @Override public boolean canSend(ServerPlayer player) { return CHANNEL.isRemotePresent(player.connection.connection); }
-            @Override public void send(ServerPlayer player, FxModels.Snapshot snapshot) {
-                CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new FxSnapshotS2C(FxSettings.JSON.toJson(snapshot)));
-            }
-        };
     }
 
     public static void setOpenGuildHandler(Consumer<ServerPlayer> handler) {
@@ -130,10 +87,6 @@ public final class ForgeNetwork {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new BossPinS2C(x, y, z, lifetime));
     }
 
-    public static void setFxSnapshotSink(Consumer<FxModels.Snapshot> sink) { fxSnapshotSink = sink; }
-    public static void sendFxRequest(FxModels.Request request) { CHANNEL.sendToServer(new FxRequestC2S(FxSettings.JSON.toJson(request))); }
-    public record FxRequestC2S(String json) { }
-    public record FxSnapshotS2C(String json) { }
     public record GuiAmountC2S(int containerId, long amount) { }
     public static void sendGuiAmount(int containerId, long amount) {
         CHANNEL.sendToServer(new GuiAmountC2S(containerId, amount));

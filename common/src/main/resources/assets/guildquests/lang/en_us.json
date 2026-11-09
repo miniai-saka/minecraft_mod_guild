@@ -4,6 +4,5 @@
   "block.guildquests.guild_deposit": "Guild Deposit Block",
   "effect.guildquests.boss_protection": "Emergency Boss Protection",
   "key.categories.guildquests": "Guild Quests",
-  "key.guildquests.openguild": "Open Guild Quests",
-  "key.guildquests.openfx": "Open Guild FX"
+  "key.guildquests.openguild": "Open Guild Quests"
 }

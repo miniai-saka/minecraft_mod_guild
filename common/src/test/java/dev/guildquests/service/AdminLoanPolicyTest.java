@@ -1,8 +1,6 @@
-package dev.guildquests.fx;
+package dev.guildquests.service;
 
 import dev.guildquests.data.PlayerGuildData;
-import dev.guildquests.service.AdminLoanPolicy;
-import dev.guildquests.service.GuildDebtPolicy;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -33,7 +31,7 @@ public class AdminLoanPolicyTest {
         var loaded = PlayerGuildData.fromNbt(data.toNbt());
         assertTrue(loaded.delinquent); assertTrue(loaded.adminDelinquent);
     }
-    @Test public void repayingFxDebtDoesNotOverrideAdministratorLock() {
+    @Test public void repayingRiboDebtDoesNotOverrideAdministratorLock() {
         var data = new PlayerGuildData(); data.coins = 50; data.debt = 20;
         AdminLoanPolicy.delinquent(data, true); GuildDebtPolicy.repay(data, 20);
         assertEquals(0, data.debt); assertTrue(data.delinquent);

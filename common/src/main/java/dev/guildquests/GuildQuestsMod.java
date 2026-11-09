@@ -58,7 +58,6 @@ public final class GuildQuestsMod {
     public static void init() {
         ConfigManager.loadAll();
         dev.guildquests.update.ServerUpdateService.register();
-        dev.guildquests.fx.FxService.init();
         BossEvent.init();
 
         Platform.onOpenGuildRequest(GuildScreenHandler::openQuests);

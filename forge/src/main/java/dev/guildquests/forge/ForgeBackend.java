@@ -27,8 +27,8 @@ import java.util.function.Consumer;
  * Forge implementation of the loader-neutral {@link Platform.Backend}.
  * <p>
  * Each hook keeps a list of handlers (like Fabric's event callbacks), so registering more than
- * one handler per hook accumulates them instead of overwriting — e.g. the boss event, the FX
- * service and the guild core all register a server tick.
+ * one handler per hook accumulates them instead of overwriting — e.g. the boss event and the
+ * guild core both register a server tick.
  */
 public final class ForgeBackend implements Platform.Backend {
     private final List<Consumer<MinecraftServer>> serverStarted = new ArrayList<>();

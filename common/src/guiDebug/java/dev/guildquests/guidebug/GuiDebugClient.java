@@ -146,9 +146,7 @@ public final class GuiDebugClient {
         step("horse race start", () -> { click("レース"); click("レース開始"); });
         waitStep("horse race live animation", 12000, () -> { shot("horse-race-running"); });
         step("horse race result", () -> { shot("horse-race-result"); check(has("もう一回"),"race did not finish"); click("戻る"); });
-        step("FX entry remains available", () -> { clickPrefix("Guild FX"); });
-        step("FX opens existing dedicated screen", () -> { check(c.screen instanceof dev.guildquests.client.FxScreen,"FX navigation failed"); c.screen.onClose(); command("guild auction"); });
-        step("auction marketplace", () -> { view(GuildMenuKind.AUCTION_BROWSE); shot("auction"); input("25"); click("金額を適用"); });
+        step("auction marketplace", () -> { command("guild auction"); view(GuildMenuKind.AUCTION_BROWSE); shot("auction"); input("25"); click("金額を適用"); });
         step("auction bid amount", () -> { check(amount()==25,"bid input mismatch"); click(title(9)); });
         step("auction buyout delivers mailbox", () -> { click(title(9)); });
         step("auction service navigation", () -> { click("出品・受取・案内"); click("出品する"); });
