@@ -95,6 +95,18 @@ public final class ConfigManager {
             }
             if (!any) c.bossTierWeights = new int[]{30, 40, 22, 8};
         }
+        if (c.bossTierUnlockDays == null || c.bossTierUnlockDays.length != 4) {
+            c.bossTierUnlockDays = new int[]{5, 10, 20, 30};
+        } else {
+            for (int i = 0; i < c.bossTierUnlockDays.length; i++) {
+                c.bossTierUnlockDays[i] = Math.max(0, Math.min(10000, c.bossTierUnlockDays[i]));
+            }
+            // Unlock days must never go backwards, or a later tier could open before an earlier one.
+            for (int i = 1; i < c.bossTierUnlockDays.length; i++) {
+                c.bossTierUnlockDays[i] = Math.max(c.bossTierUnlockDays[i], c.bossTierUnlockDays[i - 1]);
+            }
+        }
+        c.bossTierRampStartPercent = Math.max(5, Math.min(100, c.bossTierRampStartPercent));
         c.bossProtectionSeconds = Math.max(0, Math.min(3600, c.bossProtectionSeconds));
         c.bossProtectionReleaseRange = Math.max(8, Math.min(128, c.bossProtectionReleaseRange));
         c.bankFeePercent = Math.max(0, Math.min(100, c.bankFeePercent));

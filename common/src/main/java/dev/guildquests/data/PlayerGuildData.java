@@ -13,6 +13,10 @@ import java.util.Set;
 public final class PlayerGuildData {
     public long coins = 0;
     public int completedTotal = 0;
+    /** In-game days this player was online for; averaged to pick the emergency-boss tier. */
+    public int playedDays = 0;
+    /** In-game day number already counted into {@link #playedDays}; -1 = never counted. */
+    public long lastPlayedDay = -1;
     /** Last known player name; used for the ranking when the player is offline. */
     public String playerName = "";
     /** Payment mode for Create shop purchases: RIBO / DEBIT / DISABLED. */
@@ -78,10 +82,26 @@ public final class PlayerGuildData {
         collectClaimedDay.put(questId, boardDay);
     }
 
+    /**
+     * Counts the given in-game day for this player. Only a day that immediately follows the
+     * last counted one is added, so days spent offline are never counted. Returns true when
+     * {@link #playedDays} changed.
+     */
+    public boolean countPlayedDay(long day) {
+        if (lastPlayedDay == day) return false;
+        boolean counted = lastPlayedDay < 0 || day == lastPlayedDay + 1;
+        lastPlayedDay = day;
+        if (!counted) return false;
+        playedDays++;
+        return true;
+    }
+
     public CompoundTag toNbt() {
         CompoundTag nbt = new CompoundTag();
         nbt.putLong("Coins", coins);
         nbt.putInt("CompletedTotal", completedTotal);
+        nbt.putInt("PlayedDays", playedDays);
+        nbt.putLong("LastPlayedDay", lastPlayedDay);
         nbt.putString("PlayerName", playerName == null ? "" : playerName);
         nbt.putString("PaymentMode", paymentMode == null ? "DEBIT" : paymentMode);
         nbt.putLong("Debt", debt);
@@ -131,6 +151,9 @@ public final class PlayerGuildData {
         PlayerGuildData data = new PlayerGuildData();
         data.coins = Math.max(0L, nbt.getLong("Coins"));
         data.completedTotal = Math.max(0, nbt.getInt("CompletedTotal"));
+        data.playedDays = Math.max(0, nbt.getInt("PlayedDays"));
+        // Absent on old saves: -1 so the next tick starts counting from the current day.
+        data.lastPlayedDay = nbt.contains("LastPlayedDay") ? nbt.getLong("LastPlayedDay") : -1;
         data.playerName = nbt.getString("PlayerName");
         data.paymentMode = nbt.getString("PaymentMode");
         if (data.paymentMode.isBlank()) data.paymentMode = "DEBIT";

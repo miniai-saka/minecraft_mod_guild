@@ -54,10 +54,17 @@ Minecraft 1.20.1 の Fabric / Forge 向けに、クエスト、ギルド通貨�
   - 強: HP 2.0倍・強化ダイヤ装備・攻撃力/速度上昇・報酬 2.0倍
   - 最強: HP 4.0倍（バニラ上限の1024で頭打ち）・ネザライト装備・攻撃力II/速度上昇/耐性・報酬 4.0倍
   - 出現比率は `bossTierWeights`（既定 弱30 / 並40 / 強22 / 最強8）
+- 階層は進行度で解禁される。プレイヤーごとに「オンラインで迎えたゲーム内日数」を記録し、出現時にオンライン勢の平均日数で上限を決める
+  - 平均 5日未満はボスが出現しない
+  - 平均 5日で弱、10日で並、20日で強、30日で最強が解禁（`bossTierUnlockDays`）
+  - 解禁直後は強さ55%で出現し、次のティアが解禁されるまでに100%まで上がる（`bossTierRampStartPercent`）
+  - 未解禁の階層は重みが 0 になる。最弱→最強の復活も最強の解禁後だけ発生する
+  - `bossDifficultyProgression: false` にすると旧来どおり最初から全階層が出る
 - 与えたダメージに応じて報酬を分配する（貢献度は防具・耐性・オーバーキルを除いた実際のHP減少量）
 - 環境ダメージによる撃破は無効
 - クライアント側にボス位置ピンを表示する
 - 管理コマンド `/guildadmin boss [count]` で同時に複数体（最大32体）を出現できる。各ボスは個別のボスバー・ダメージ集計・報酬分配を持つ
+- `/guildadmin boss progress` で現在の平均プレイ日数と解禁済みの階層を確認できる
 - ボスに倒されると、復活後に **`guildquests:boss_protection`（緊急ボス保護）** が付与される
   - 効果中はボスがそのプレイヤーをターゲットせず、ダメージも通らない
   - ボスを攻撃するか、全ボスから `bossProtectionReleaseRange` ブロック以上離れると解除
@@ -168,6 +175,9 @@ config/guildquests/server-update.json  # Fabric / Forge 専用サーバー
 - `bossEventReward`: ボス撃破の報酬（コイン）
 - `bossEventHealth`: ボスの体力（「並」の基準値。階層ごとに 0.5〜4.0 倍）
 - `bossTierWeights`: ボス階層の出現重み `[弱, 並, 強, 最強]`（既定 `[30, 40, 22, 8]`）
+- `bossDifficultyProgression`: オンライン勢の平均プレイ日数で階層を解禁する（既定 `true`）
+- `bossTierUnlockDays`: 階層が解禁される平均プレイ日数 `[弱, 並, 強, 最強]`（既定 `[5, 10, 20, 30]`。先頭未満はボス不出現）
+- `bossTierRampStartPercent`: 解禁直後の強さ（既定 `55`%。次のティア解禁までに100%へ上昇）
 - `bossProtectionSeconds`: 死亡時に付与する緊急ボス保護の秒数（既定300、0で無効）
 - `bossProtectionReleaseRange`: ボスからこの距離以上離れると保護を解除（既定48ブロック）
 - `bankFeePercent`: 銀行の手数料（%）

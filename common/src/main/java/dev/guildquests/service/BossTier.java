@@ -150,20 +150,107 @@ public enum BossTier {
 
     /** Weighted roll. Missing or empty weights fall back to an equal distribution. */
     public static BossTier roll(Random random, int[] weights) {
-        BossTier[] tiers = values();
+        return roll(random, weights, Double.MAX_VALUE, null);
+    }
+
+    /**
+     * Weighted roll limited to the tiers unlocked by progression. {@code unlockDays} is ordered
+     * [weak, normal, strong, elite]; missing entries mean "no limit". When every unlocked tier
+     * has weight 0, the strongest unlocked tier is returned instead of an early-game tier.
+     */
+    public static BossTier roll(Random random, int[] weights, double playedDays, int[] unlockDays) {
+        BossTier[] rollable = rollable();
+        int[] effective = new int[rollable.length];
         int total = 0;
-        for (int i = 0; i < tiers.length; i++) {
-            total += weight(weights, i);
+        for (int i = 0; i < rollable.length; i++) {
+            if (isUnlocked(i, playedDays, unlockDays)) {
+                effective[i] = weight(weights, i);
+                total += effective[i];
+            }
         }
-        if (total <= 0) {
-            return tiers[random.nextInt(tiers.length)];
-        }
+        if (total <= 0) return highestUnlocked(playedDays, unlockDays);
         int pick = random.nextInt(total);
-        for (int i = 0; i < tiers.length; i++) {
-            pick -= weight(weights, i);
-            if (pick < 0) return tiers[i];
+        for (int i = 0; i < rollable.length; i++) {
+            pick -= effective[i];
+            if (pick < 0) return rollable[i];
         }
-        return NORMAL;
+        return WEAK;
+    }
+
+    /** Tiers reachable by a random roll. WEAKEST only appears through the promotion rule. */
+    public static BossTier[] rollable() {
+        return new BossTier[]{WEAK, NORMAL, STRONG, ELITE};
+    }
+
+    /** True when the tier at {@code index} (weak..elite) may appear at this progression. */
+    public static boolean isUnlocked(int index, double playedDays, int[] unlockDays) {
+        if (unlockDays == null || index >= unlockDays.length) return true;
+        return playedDays >= Math.max(0, unlockDays[index]);
+    }
+
+    /** True when this tier may appear at the given average played days. */
+    public static boolean isUnlocked(BossTier tier, double playedDays, int[] unlockDays) {
+        int index = tier.rollIndex();
+        return index < 0 || isUnlocked(index, playedDays, unlockDays);
+    }
+
+    /** Strongest tier whose unlock day count has been reached (never null). */
+    public static BossTier highestUnlocked(double playedDays, int[] unlockDays) {
+        BossTier best = WEAK;
+        BossTier[] rollable = rollable();
+        for (int i = 0; i < rollable.length; i++) {
+            if (isUnlocked(i, playedDays, unlockDays)) best = rollable[i];
+        }
+        return best;
+    }
+
+    /** True when at least one rollable tier is unlocked at this progression. */
+    public static boolean anyUnlocked(double playedDays, int[] unlockDays) {
+        BossTier[] rollable = rollable();
+        for (int i = 0; i < rollable.length; i++) {
+            if (isUnlocked(i, playedDays, unlockDays)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Power multiplier for a tier: {@code startPercent} on its unlock day, rising linearly to
+     * 1.0 when the next tier unlocks (elite uses the gap of the tier before it). A freshly
+     * unlocked tier therefore never arrives at full strength.
+     */
+    public static double powerFactor(BossTier tier, double playedDays, int[] unlockDays, double startPercent) {
+        int index = tier.rollIndex();
+        if (index < 0) return 1.0;
+
+        int start = unlockDay(unlockDays, index);
+        int end;
+        if (unlockDays != null && index + 1 < unlockDays.length) {
+            end = unlockDay(unlockDays, index + 1);
+        } else {
+            int previous = index > 0 ? unlockDay(unlockDays, index - 1) : start;
+            end = start + Math.max(1, start - previous);
+        }
+
+        double floor = Math.max(0.05, Math.min(1.0, startPercent));
+        if (end <= start || playedDays >= end) return 1.0;
+        if (playedDays <= start) return floor;
+        return floor + (1.0 - floor) * ((playedDays - start) / (double) (end - start));
+    }
+
+    private static int unlockDay(int[] unlockDays, int index) {
+        if (unlockDays == null || index >= unlockDays.length) return 0;
+        return Math.max(0, unlockDays[index]);
+    }
+
+    /** Position in the rollable list (weak..elite), or -1 for WEAKEST. */
+    public int rollIndex() {
+        return switch (this) {
+            case WEAKEST -> -1;
+            case WEAK -> 0;
+            case NORMAL -> 1;
+            case STRONG -> 2;
+            case ELITE -> 3;
+        };
     }
 
     private static int weight(int[] weights, int index) {

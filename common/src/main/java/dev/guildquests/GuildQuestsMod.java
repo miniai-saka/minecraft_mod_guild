@@ -13,6 +13,7 @@ import dev.guildquests.item.ModItems;
 import dev.guildquests.platform.ContentRegistrar;
 import dev.guildquests.platform.Platform;
 import dev.guildquests.service.BossEvent;
+import dev.guildquests.service.BossProgression;
 import dev.guildquests.service.BossProtection;
 import dev.guildquests.service.BossTier;
 import dev.guildquests.service.GuildService;
@@ -195,6 +196,11 @@ public final class GuildQuestsMod {
                                 : "緊急ボス " + Numbers.format(lines.size()) + "体: " + String.join(" / ", lines)), false);
                         return lines.size();
                     }))
+                    .then(Commands.literal("progress").executes(context -> {
+                        context.getSource().sendSuccess(() -> Component.literal(
+                                BossProgression.describeProgression(context.getSource().getServer())), false);
+                        return 1;
+                    }))
                     .executes(context -> spawnBosses(context.getSource(), 1, null))
                     .then(Commands.argument("count", IntegerArgumentType.integer(1, BossEvent.MAX_ACTIVE))
                             .executes(context -> spawnBosses(context.getSource(),
@@ -317,7 +323,12 @@ public final class GuildQuestsMod {
         int spawned = BossEvent.spawn(source.getServer(), count, tier);
         String tierLabel = tier == null ? "" : " [" + tier.label() + "]";
         String message;
-        if (spawned == 0) {
+        if (spawned == 0 && tier == null && !BossProgression.canSpawn(source.getServer())) {
+            message = "Boss spawn skipped: average played days ("
+                    + Numbers.format(BossProgression.averagePlayedDays(source.getServer()))
+                    + ") is below the first unlock day ("
+                    + ConfigManager.config().bossTierUnlockDays[0] + ").";
+        } else if (spawned == 0) {
             message = "Boss spawn failed: no players online or the active boss limit ("
                     + Numbers.format(BossEvent.MAX_ACTIVE) + ") was reached.";
         } else if (spawned < count) {

@@ -10,6 +10,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.BossEvent.BossBarOverlay;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.world.damagesource.DamageSource;
@@ -64,6 +65,8 @@ public final class BossEvent {
     private static final int VIEW_RECONCILE_INTERVAL = 20;
     /** Vanilla's generic.max_health attribute cannot exceed 1024. */
     private static final double MAX_HEALTH_VALUE = 1024.0;
+    /** Fixed id for the progression power ramp so re-adopted bosses keep a single modifier. */
+    private static final UUID RAMP_MODIFIER_ID = UUID.fromString("6f1c2a54-8d1e-4b3a-9c7f-2e5d8a0b4c11");
 
     private static final EquipmentSlot[] ARMOR_SLOTS = {
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
@@ -136,6 +139,7 @@ public final class BossEvent {
 
     private static void tick(MinecraftServer server) {
         BossProtection.tick(server);
+        BossProgression.tick(server);
         ModConfig config = ConfigManager.config();
         if (!config.bossEventEnabled) {
             ticker = 0;
@@ -157,7 +161,7 @@ public final class BossEvent {
         for (BossInstance instance : new ArrayList<>(bosses.values())) {
             releaseProtectedTarget(instance);
             rescue(instance);
-            BossRanged.tick(instance.entity, instance.tier);
+            BossRanged.tick(instance.entity, instance.tier, instance.power);
         }
 
         // Tick down the client-side pin.
@@ -177,6 +181,7 @@ public final class BossEvent {
         ServerLevel overworld = server.getLevel(Level.OVERWORLD);
         if (overworld != null) adoptExisting(overworld);
         if (!bosses.isEmpty()) return;
+        if (!BossProgression.canSpawn(server)) return;
         int chance = Math.max(0, Math.min(100, config.bossEventChancePercent));
         if (RANDOM.nextInt(100) >= chance) return;
         spawnNow(server);
@@ -207,6 +212,8 @@ public final class BossEvent {
 
         List<ServerPlayer> players = server.getPlayerList().getPlayers();
         if (players.isEmpty()) return 0;
+        // Nothing spawns on its own before the first unlock day; explicit admin tiers still work.
+        if (forced == null && !BossProgression.canSpawn(server)) return 0;
 
         adoptExisting(world);
 
@@ -231,7 +238,9 @@ public final class BossEvent {
     private static boolean spawnOne(MinecraftServer server, ServerLevel world, List<ServerPlayer> players,
                                     BossTier forced, net.minecraft.core.BlockPos at) {
         ModConfig config = ConfigManager.config();
-        BossTier tier = forced != null ? forced : BossTier.roll(RANDOM, config.bossTierWeights);
+        BossTier tier = forced != null ? forced : BossProgression.roll(server, RANDOM);
+        // Just-unlocked tiers start weaker and grow to full strength at the next unlock.
+        double power = BossProgression.powerFactor(server, tier);
 
         ServerPlayer anchor = players.get(RANDOM.nextInt(players.size()));
         int x;
@@ -262,7 +271,8 @@ public final class BossEvent {
         mob.setPersistenceRequired();
 
         // Vanilla caps the max-health attribute at 1024, so elite HP tops out there.
-        double health = Math.max(1, Math.min(MAX_HEALTH_VALUE, config.bossEventHealth * tier.healthMultiplier()));
+        double health = Math.max(1, Math.min(MAX_HEALTH_VALUE,
+                config.bossEventHealth * tier.healthMultiplier() * power));
         if (mob.getAttribute(Attributes.MAX_HEALTH) != null) {
             mob.getAttribute(Attributes.MAX_HEALTH).setBaseValue(health);
         }
@@ -282,10 +292,11 @@ public final class BossEvent {
         BossReach.set(mob, tier.reachBonus());
         equip(mob, tier);
         applyTierEffects(mob, tier);
+        applyPowerRamp(mob, power);
         world.addFreshEntity(mob);
         lastSpawned = mob;
 
-        adopt(mob, tier);
+        adopt(mob, tier, power);
 
         // Show a client-rendered pin at the newest boss (5 minutes or until death).
         pinLife = PIN_LIFETIME_TICKS;
@@ -499,6 +510,21 @@ public final class BossEvent {
         mob.addEffect(new MobEffectInstance(effect, Integer.MAX_VALUE, amplifier, false, false, false));
     }
 
+    /**
+     * Scales the boss's total melee damage by the progression power. Applied after gear and
+     * effects so the multiplier covers their attribute modifiers too.
+     */
+    private static void applyPowerRamp(Mob mob, double power) {
+        var attack = mob.getAttribute(Attributes.ATTACK_DAMAGE);
+        if (attack == null) return;
+        // Re-adoption can call this again; keep exactly one ramp modifier.
+        attack.removeModifier(RAMP_MODIFIER_ID);
+        if (power >= 0.999) return;
+        attack.addTransientModifier(
+                new AttributeModifier(RAMP_MODIFIER_ID, "guildquests_progression_ramp",
+                        power - 1.0, AttributeModifier.Operation.MULTIPLY_TOTAL));
+    }
+
     /** Called from the {@code actuallyHurt} mixin with the HP the boss actually lost. */
     public static void recordActualDamage(LivingEntity entity, DamageSource source, float amount) {
         if (!entity.getTags().contains(BOSS_TAG)) return;
@@ -532,7 +558,9 @@ public final class BossEvent {
         payout(server, name, instance);
 
         // The weakest boss can come back as the strongest, right where it fell, with a power-up burst.
+        // The strongest tier stays locked until the average progression reaches it.
         if (instance != null && entity.level() instanceof ServerLevel world
+                && BossProgression.isUnlocked(server, BossTier.ELITE)
                 && RANDOM.nextDouble() < instance.tier.promoteChance(ConfigManager.config().bossWeakestPromoteChance)) {
             net.minecraft.core.BlockPos at = entity.blockPosition();
             if (spawnAt(server, world, at, BossTier.ELITE)) {
@@ -632,10 +660,19 @@ public final class BossEvent {
         String display = entity.getCustomName() != null
                 ? entity.getCustomName().getString()
                 : entity.getDisplayName().getString();
-        return adopt(entity, BossTier.fromDisplayName(display));
+        BossTier tier = BossTier.fromDisplayName(display);
+        MinecraftServer server = entity.level().getServer();
+        double power = server == null ? 1.0 : BossProgression.powerFactor(server, tier);
+        return adopt(entity, tier, power);
     }
 
     private static BossInstance adopt(LivingEntity entity, BossTier tier) {
+        MinecraftServer server = entity.level().getServer();
+        double power = server == null ? 1.0 : BossProgression.powerFactor(server, tier);
+        return adopt(entity, tier, power);
+    }
+
+    private static BossInstance adopt(LivingEntity entity, BossTier tier, double power) {
         BossInstance existing = bosses.get(entity.getUUID());
         if (existing != null) return existing;
 
@@ -643,8 +680,13 @@ public final class BossEvent {
                 ? entity.getCustomName().getString()
                 : entity.getDisplayName().getString();
         BossInstance instance = new BossInstance(entity, name, tier,
-                tier.label() + " " + stripBossPrefix(name));
+                tier.label() + " " + stripBossPrefix(name), power);
         bosses.put(entity.getUUID(), instance);
+
+        // Re-apply the ramp on adoption so a restart keeps the weakened damage.
+        if (entity instanceof Mob mob) {
+            applyPowerRamp(mob, power);
+        }
 
         // Ensure adopted bosses also resist knockback (anti-cheese).
         if (entity.getAttribute(Attributes.KNOCKBACK_RESISTANCE) != null) {
@@ -788,6 +830,8 @@ public final class BossEvent {
         final String name;
         /** Tier label and mob name, used in chat messages. */
         final String shortName;
+        /** Progression power at spawn (0.55..1.0); scales arrow damage. */
+        final double power;
         final ServerBossEvent bar;
         final Map<UUID, Double> damage = new HashMap<>();
         final Map<UUID, String> damageNames = new HashMap<>();
@@ -797,11 +841,12 @@ public final class BossEvent {
         double lastStuckZ;
         int stuckTicks;
 
-        BossInstance(LivingEntity entity, String name, BossTier tier, String shortName) {
+        BossInstance(LivingEntity entity, String name, BossTier tier, String shortName, double power) {
             this.entity = entity;
             this.tier = tier;
             this.name = name;
             this.shortName = shortName;
+            this.power = Math.max(0.05, Math.min(1.0, power));
             this.bar = new ServerBossEvent(Component.literal(name).withStyle(ChatFormatting.RED),
                     tier.barColor(), BossBarOverlay.PROGRESS);
             resetStuckTracking();
