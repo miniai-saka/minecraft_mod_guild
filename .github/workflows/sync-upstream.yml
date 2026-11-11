@@ -1,0 +1,22 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: '23 21 * * *' # 06:23 JST
+  workflow_dispatch:
+
+concurrency:
+  group: sync-upstream-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'miniai-saka/minecraft_mod_guild' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Sync main with the parent repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/$GITHUB_REPOSITORY/merge-upstream" -f branch=main --jq .message
