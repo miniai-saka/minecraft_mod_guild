@@ -96,7 +96,7 @@ public final class ModConfig {
 
     /**
      * Mining-based debt repayment: block id -> coin value credited per block mined.
-     * Applies while a consumer loan or FX/ribo debt remains; the loan is repaid first, then debt.
+     * Applies while a consumer loan or ribo debt remains; the loan is repaid first, then debt.
      */
     public Map<String, Double> loanMiningValues = new LinkedHashMap<>();
 

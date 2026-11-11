@@ -35,7 +35,6 @@ public final class ConfigManager {
     }
 
     public static synchronized void loadAll() {
-        dev.guildquests.fx.FxSettings.load();
         try {
             Files.createDirectories(DIR);
             if (!Files.exists(CONFIG)) writeJson(CONFIG, new ModConfig());

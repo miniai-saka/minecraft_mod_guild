@@ -135,7 +135,7 @@ public final class BankScreenHandler extends GuildMenu {
         // Slot 5 is background only; it supplies the summary line above the row list.
         set(5, GuildItems.header(item(Items.NAME_TAG, "銀行サマリー"),
                 "残高 " + Numbers.gc(balance) + " / 借入 " + Numbers.gc(data.loan)
-                        + " / FX・リボ " + Numbers.gc(data.debt)
+                        + " / リボ " + Numbers.gc(data.debt)
                         + " / 滞納 " + (data.delinquent ? "あり" : "なし")));
 
         // Row 0: held coins / fee / transfer / loan. (Bank balance lives in the header.)

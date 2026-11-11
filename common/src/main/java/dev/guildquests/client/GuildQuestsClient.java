@@ -16,7 +16,6 @@ public final class GuildQuestsClient {
     }
 
     public static void init() {
-        FxClient.init();
         GuildQuestsMod.LOGGER.info("[Client] GuildQuestsClient.init() called");
 
         PlatformClient.registerKeyBinding("key.guildquests.openguild", GLFW.GLFW_KEY_G,

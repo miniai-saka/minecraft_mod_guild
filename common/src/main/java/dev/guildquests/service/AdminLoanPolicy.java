@@ -2,7 +2,7 @@ package dev.guildquests.service;
 
 import dev.guildquests.data.PlayerGuildData;
 
-/** Shared mutations for the command and the chest menu; consumer loans remain separate from ribo/FX debt. */
+/** Shared mutations for the command and the chest menu; consumer loans remain separate from ribo debt. */
 public final class AdminLoanPolicy {
     private AdminLoanPolicy() { }
     public static void add(PlayerGuildData data, long amount, long dueAt) {

@@ -68,9 +68,6 @@ remapJar {
     archiveFileName = "${base.archivesName.get()}_${project.version}.jar"
 }
 
-if (providers.gradleProperty('fxDebug').isPresent()) {
-    apply from: 'fx-debug.gradle'
-}
 if (providers.gradleProperty('guiDebug').isPresent()) {
     apply from: 'gui-debug.gradle'
 }

@@ -527,7 +527,7 @@ public final class GuildService {
     }
 
     /**
-     * Mining-based debt repayment. While the player owes a consumer loan or FX/ribo debt, breaking
+     * Mining-based debt repayment. While the player owes a consumer loan or ribo debt, breaking
      * a block whose id is listed in {@code loanMiningValues} repays the loan first and then the
      * shared debt directly (never the balance). The credit is accumulated in thousandths of a coin
      * so fractional rates stay exact.
@@ -565,7 +565,7 @@ public final class GuildService {
                 data.debt = 0;
                 data.delinquent = data.adminDelinquent;
                 data.nextRiboDueAt = 0;
-                if (debtPaid > 0) message(player, "採掘による返済でFX・リボ債務を完済しました。", ChatFormatting.GREEN);
+                if (debtPaid > 0) message(player, "採掘による返済でリボ債務を完済しました。", ChatFormatting.GREEN);
             }
             if (data.loan <= 0 && data.debt <= 0) data.loanCreditMillis = 0;
         }
@@ -663,7 +663,7 @@ public final class GuildService {
 
     public static void riboLockMessage(ServerPlayer player, PlayerGuildData data) {
         if (data.adminDelinquent) {
-            message(player, "管理者により滞納ロック中です。解除は管理者へ依頼してください。借入 " + Numbers.format(data.loan) + " / FX・リボ債務 " + Numbers.format(data.debt), ChatFormatting.RED);
+            message(player, "管理者により滞納ロック中です。解除は管理者へ依頼してください。借入 " + Numbers.format(data.loan) + " / リボ債務 " + Numbers.format(data.debt), ChatFormatting.RED);
             return;
         }
         message(player, "債務の滞納中です。債務 " + Numbers.format(data.debt)
