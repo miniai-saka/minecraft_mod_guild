@@ -100,13 +100,13 @@ Minecraft 1.20.1 の Fabric 向けに、クエスト、ギルド通貨、銀行�
 生成物:
 
 ```text
-fabric/build/libs/guildquests_fabric-1.20.1_26.17.0.jar
+fabric/build/libs/guildquests_fabric-1.20.1_26.17.1.jar
 ```
 
 ## 導入
 
 1. Fabric で Minecraft 1.20.1 を用意します。
-2. 26.17.0 の JAR を `mods/` へ配置します。Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
+2. 26.17.1 の JAR を `mods/` へ配置します。Fabric API も必要です。ワールドと設定を保存し、古い GuildQuests の JAR は重複させず置き換えます。
 3. 一度起動すると `config/guildquests/` が作成されます。
 4. 設定を変更したら、サーバーを再起動するか `/guildadmin reload` を実行します。
 
