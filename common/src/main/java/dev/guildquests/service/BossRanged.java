@@ -35,7 +35,7 @@ public final class BossRanged {
     }
 
     /** Called once per server tick for every live boss. */
-    public static void tick(LivingEntity entity, BossTier tier) {
+    public static void tick(LivingEntity entity, BossTier tier, double power) {
         if (!(entity instanceof Mob mob) || tier == null || !mob.isAlive()) {
             return;
         }
@@ -67,7 +67,7 @@ public final class BossRanged {
             return;
         }
         state.cooldown = Math.max(10, (int) (40 / Math.max(0.1, tier.attackSpeedMultiplier())));
-        shoot(mob, target, tier.arrowDamage());
+        shoot(mob, target, tier.arrowDamage() * Math.max(0.05, Math.min(1.0, power)));
     }
 
     /** Drops any ranged state for a boss that died or was removed. */

@@ -35,7 +35,19 @@ public final class ModConfig {
     public double bossEventHealth = 300;
 
     /** Spawn weights for [weak, normal, strong, elite]. Zero weights disable that tier. */
-    public int[] bossTierWeights = {20, 35, 28, 12, 5};
+    public int[] bossTierWeights = {30, 40, 22, 8};
+
+    /** Scale the boss tier with the average played days of online players (no early elite). */
+    public boolean bossDifficultyProgression = true;
+
+    /** Average played days needed to unlock [weak, normal, strong, elite]; below the first no boss spawns. */
+    public int[] bossTierUnlockDays = {5, 10, 20, 30};
+
+    /**
+     * Power of a tier on its unlock day, in percent. It rises linearly to 100% when the next
+     * tier unlocks, so the first boss after an unlock is weaker (55 = 55%).
+     */
+    public int bossTierRampStartPercent = 55;
 
     /** Chance that killing the weakest boss revives it as the strongest. */
     public double bossWeakestPromoteChance = 0.01;

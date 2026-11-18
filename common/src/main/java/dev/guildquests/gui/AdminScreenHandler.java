@@ -130,7 +130,7 @@ public final class AdminScreenHandler extends GuildMenu {
         action(10, Items.WRITABLE_BOOK, "設定を再読込", () -> { ConfigManager.loadAll(); notice = "設定を再読込しました。"; }, "reload と同じ操作");
         action(12, Items.WITHER_SKELETON_SKULL, "緊急ボスを出現", () -> {
             boolean ok = BossEvent.spawnNow(owner.getServer());
-            notice = ok ? "緊急ボスを出現させました。" : "出現できませんでした（プレイヤー不在 or 上限）。";
+            notice = ok ? "緊急ボスを出現させました。" : "出現できませんでした（プレイヤー不在・上限・進行度不足）。";
         }, "boss と同じ操作", "確率ロールをスキップ");
         action(49, Items.ARROW, "プレイヤー選択へ戻る", () -> view = "PLAYERS");
     }
